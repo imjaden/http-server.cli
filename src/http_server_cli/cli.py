@@ -14,12 +14,16 @@ from http_server_cli.utils import eprint, ensure_storage
 
 # ── 帮助文本 ──────────────────────────────────────────
 
-_HELP = """http-server-cli v{version} — 本地 HTTP 服务管理器
+_HELP = """http-server-cli v{version} — 忘记端口，只管预览
 
 用法:  hs [command] [args]
 
+快捷方式:
+  hs . [-o] [-d]            等价 hs start .
+  hs                        等价 hs start .（当前目录启动）
+
 命令:
-  start [path] [-o] [-d] [-f]   启动服务（path 默认 .；-o 打开浏览器；-d daemon 后台；-f foreground 前台）
+  start [path] [-o] [-d]   启动服务（path 默认 .；-o 打开浏览器；-d daemon 模式）
   list                列出所有运行中的服务
   status [port|path]  查询单个服务状态
   kill <port|path>    关闭指定服务
@@ -30,18 +34,12 @@ _HELP = """http-server-cli v{version} — 本地 HTTP 服务管理器
   help                显示此帮助
   version             显示版本号
 
-快捷方式:
-  hs . -o             等同于 hs start . -o
-  hs . -f             等同于 hs start . -f（前台运行，Ctrl+C 终止）
-
 示例:
-  hs start . -o         当前目录启动 + 打开浏览器
-  hs start ~/my-site    指定目录启动
-  hs start . -d         后台 daemon 模式启动
-  hs . -f              前台运行服务（Ctrl+C 终止）
-  hs list               查看所有服务
-  hs kill 8081          关闭端口 8081 的服务
-  hs set port 3000      修改默认端口为 3000
+  hs . -o                 当前目录启动 + 打开浏览器
+  hs ~/my-site            指定目录启动
+  hs . -d                 daemon 模式
+  hs kill 8081            关闭端口 8081 的服务
+  hs set port 3000        修改默认端口为 3000
 
 数据目录: ~/.http-server-cli/
 """
