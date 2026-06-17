@@ -27,11 +27,11 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Natural Language :: Chinese (Simplified)",
     "Operating System :: MacOS",
-    "Topic :: Utilities :: HTTP Servers",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
 ]
 
 [project.urls]
-Homepage = "https://www.jaden.tech"
+Homepage = "https://github.com/imjaden/http-server-cli"
 Source = "https://github.com/imjaden/http-server-cli"
 BugTracker = "https://github.com/imjaden/http-server-cli/issues"
 
