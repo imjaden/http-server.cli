@@ -23,21 +23,24 @@ _HELP = """http-server-cli v{version} — 忘记端口，只管预览
   hs                        等价 hs start .（当前目录启动）
 
 命令:
-  start [path] [-o] [-d]   启动服务（path 默认 .；-o 打开浏览器；-d daemon 模式）
-  list                列出所有运行中的服务
-  status [port|path]  查询单个服务状态
-  kill <port|path>    关闭指定服务
-  kill-all            关闭所有服务
-  config              显示当前配置
-  set port <num>      修改默认端口
-  set domain <str>    修改绑定域名
-  help                显示此帮助
-  version             显示版本号
+  start [path] [-o] [-d] [-f]   启动服务（path 默认 .；-o 打开浏览器；-d daemon；-f foreground）
+  list [--json]          列出所有运行中的服务（--json 输出 JSON）
+  status [--json] [port|path]  查询单个服务状态（--json 输出 JSON）
+  kill <port|path>       关闭指定服务
+  kill-all               关闭所有服务
+  config [--json]        显示当前配置（--json 输出 JSON）
+  set port <num>         修改默认端口
+  set domain <str>       修改绑定域名
+  help                   显示此帮助
+  version                显示版本号
 
 示例:
   hs . -o                 当前目录启动 + 打开浏览器
   hs ~/my-site            指定目录启动
   hs . -d                 daemon 模式
+  hs list --json          JSON 格式列出所有服务
+  hs status 8080 --json   JSON 格式查询端口 8080 状态
+  hs config --json        JSON 格式显示配置
   hs kill 8081            关闭端口 8081 的服务
   hs set port 3000        修改默认端口为 3000
 
@@ -102,11 +105,24 @@ def _cmd_start(manager, args):
 
 @_register
 def _cmd_list(manager, args):
-    manager.list()
+    parser = argparse.ArgumentParser(prog='hs list', add_help=False)
+    parser.add_argument('--json', action='store_true')
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
+        return
+    manager.list(json=parsed.json)
 
 @_register
 def _cmd_status(manager, args):
-    manager.status(args[0] if args else None)
+    parser = argparse.ArgumentParser(prog='hs status', add_help=False)
+    parser.add_argument('--json', action='store_true')
+    parser.add_argument('arg', nargs='?', default=None)
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
+        return
+    manager.status(arg=parsed.arg, json=parsed.json)
 
 @_register
 def _cmd_kill(manager, args):
@@ -125,7 +141,13 @@ def _cmd_killall(manager, args):
 
 @_register
 def _cmd_config(manager, args):
-    Config().show()
+    parser = argparse.ArgumentParser(prog='hs config', add_help=False)
+    parser.add_argument('--json', action='store_true')
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
+        return
+    Config().show(json=parsed.json)
 
 @_register
 def _cmd_set(manager, args):

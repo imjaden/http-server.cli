@@ -28,7 +28,7 @@ pip install -i https://test.pypi.org/simple/ http-server-cli
 
 验证：
 ```
-hs version     # → http-server-cli v1.0.2
+hs version     # → http-server-cli v1.0.3
 hs . -o        # 当前目录启动 + 打开浏览器
 ```
 
@@ -43,8 +43,8 @@ hs . -o                     # 自动找空闲端口，打开浏览器
 
 # 2. 看看都起了哪些
 hs list
-# ✅  http://localhost:8080  →  ~/project-alpha
-# ✅  http://localhost:8081 🖥  →  ~/project-beta  (daemon)
+# ✅  http://localhost:8080   →  ~/project-alpha
+# ✅  http://localhost:8081   →  ~/project-beta  (daemon)
 
 # 3. 关掉不需要的
 hs kill 8080                # 按端口
@@ -59,10 +59,13 @@ hs kill-all                 # 一键全关
 | `hs . [-o] [-d] [-f]` | **快捷方式**，等价 `hs start .` |
 | `hs start [path] [-o] [-d] [-f]` | 启动服务（path 默认 `.`；`-o` 打开浏览器；`-d` daemon 模式；`-f` 前台模式） |
 | `hs list` | 列出所有运行中服务 |
+| `hs list --json` | JSON 格式列出所有服务 |
 | `hs status [port\|path]` | 查询单个服务状态 |
+| `hs status --json [port\|path]` | JSON 格式查询服务状态 |
 | `hs kill <port\|path>` | 关闭指定服务 |
 | `hs kill-all` | 关闭所有服务 |
 | `hs config` | 显示配置 |
+| `hs config --json` | JSON 格式显示配置 |
 | `hs set port <num>` | 修改默认端口（默认 8080） |
 | `hs set domain <str>` | 修改绑定域名（默认 localhost） |
 

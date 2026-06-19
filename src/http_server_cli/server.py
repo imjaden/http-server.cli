@@ -146,13 +146,38 @@ class ServerManager:
 
     # ── list ───────────────────────────────────────────
 
-    def list(self) -> None:
+    def list(self, json: bool = False) -> None:
         """列出所有已注册服务及其存活状态"""
         servers = self.registry.active_servers()
 
         if not servers:
-            eprint('没有正在运行的 HTTP 服务', 'ℹ️')
-            eprint('使用 hs start [path] -o 启动一个', '💡')
+            if json:
+                import json as _json
+                print(_json.dumps({'servers': [], 'count': 0}, ensure_ascii=False, indent=2))
+            else:
+                eprint('没有正在运行的 HTTP 服务', 'ℹ️')
+                eprint('使用 hs start [path] -o 启动一个', '💡')
+            return
+
+        if json:
+            import json as _json
+            data = {
+                'count': len(servers),
+                'servers': [
+                    {
+                        'url': f"http://{entry.get('domain', self.config.domain)}:{entry['port']}",
+                        'port': entry['port'],
+                        'path': entry['path'],
+                        'pid': entry.get('pid'),
+                        'domain': entry.get('domain', self.config.domain),
+                        'mode': 'daemon' if entry.get('daemon') else ('foreground' if entry.get('foreground') else 'normal'),
+                        'alive': entry['_alive'],
+                        'started_at': entry.get('started_at'),
+                    }
+                    for entry in servers
+                ]
+            }
+            print(_json.dumps(data, ensure_ascii=False, indent=2))
             return
 
         eprint(f'共 {len(servers)} 个 HTTP 服务:', '📊')
@@ -178,10 +203,10 @@ class ServerManager:
 
     # ── status ─────────────────────────────────────────
 
-    def status(self, arg: Optional[str] = None) -> None:
+    def status(self, arg: Optional[str] = None, json: bool = False) -> None:
         """查询单个服务状态"""
         if not arg:
-            self.list()
+            self.list(json=json)
             return
 
         domain = self.config.domain
@@ -192,17 +217,25 @@ class ServerManager:
             if not entry:
                 from http_server_cli.utils import get_pid_by_lsof
                 pids = get_pid_by_lsof(port)
-                if pids:
-                    eprint(f'端口 {port} 已被占用 (PID: {", ".join(str(p) for p in pids)})，但非本工具管理', '⚠️')
+                if json:
+                    import json as _json
+                    print(_json.dumps({'found': False, 'port': port, 'occupied': bool(pids), 'pids': pids}, ensure_ascii=False, indent=2))
                 else:
-                    eprint(f'端口 {port} 未注册', 'ℹ️')
+                    if pids:
+                        eprint(f'端口 {port} 已被占用 (PID: {", ".join(str(p) for p in pids)})，但非本工具管理', '⚠️')
+                    else:
+                        eprint(f'端口 {port} 未注册', 'ℹ️')
                 return
         else:
             abs_path = resolve_path(arg)
             entry = self.registry.find(path=abs_path)
 
         if not entry:
-            eprint('未找到匹配的服务', 'ℹ️')
+            if json:
+                import json as _json
+                print(_json.dumps({'found': False}, ensure_ascii=False, indent=2))
+            else:
+                eprint('未找到匹配的服务', 'ℹ️')
             return
 
         port = entry['port']
@@ -210,6 +243,23 @@ class ServerManager:
         alive = is_process_alive(pid)
         port_active = is_port_in_use(port)
         ep = entry.get('domain', domain)
+
+        if json:
+            import json as _json
+            data = {
+                'found': True,
+                'url': f"http://{ep}:{port}",
+                'port': port,
+                'path': entry['path'],
+                'pid': pid,
+                'domain': ep,
+                'alive': alive and port_active,
+                'port_active': port_active,
+                'mode': 'daemon' if entry.get('daemon') else ('foreground' if entry.get('foreground') else 'normal'),
+                'started_at': entry.get('started_at'),
+            }
+            print(_json.dumps(data, ensure_ascii=False, indent=2))
+            return
 
         if alive and port_active:
             eprint(f'http://{ep}:{port}  ✅ 运行中', '🔍')

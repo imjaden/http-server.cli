@@ -169,10 +169,11 @@ class TestStatus:
     def test_status_no_arg_calls_list(self, monkeypatch, capsys):
         """无参数时等同于 list"""
         called = []
-        monkeypatch.setattr('http_server_cli.server.ServerManager.list', lambda self: called.append(True))
+        monkeypatch.setattr('http_server_cli.server.ServerManager.list', lambda self, **kw: called.append(kw))
         mgr = ServerManager()
         mgr.status()
         assert len(called) == 1
+        assert 'json' in called[0]
 
     def test_status_by_port(self, monkeypatch, capsys):
         """按端口查询"""

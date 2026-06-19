@@ -62,8 +62,17 @@ class Config:
     def to_dict(self) -> dict:
         return dict(self._data)
 
-    def show(self) -> None:
-        """打印配置"""
+    def show(self, json: bool = False) -> None:
+        """打印配置，或返回 JSON 格式"""
+        if json:
+            import json as _json
+            data = {
+                'port': self.port,
+                'domain': self.domain,
+                'data_dir': CONFIG_PATH,
+            }
+            print(_json.dumps(data, ensure_ascii=False, indent=2))
+            return
         print('📋 http-server-cli 配置')
         print(f'  port:   {self.port}')
         print(f'  domain: {self.domain}')
