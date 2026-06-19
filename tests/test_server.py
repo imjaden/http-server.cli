@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-ServerManager 模块测试 — OpenSpec: lifecycle-01 ~ lifecycle-04, port-01 ~ port-03
+ServerManager 模块测试 — OpenSpec: lifecycle-01 ~ lifecycle-04, port-01 ~ port-03, res-01, res-02, log-01, log-02
 
 大部分测试通过 mock 系统调用（lsof / subprocess / os.kill）来验证业务逻辑。
 
@@ -278,7 +278,7 @@ class TestKill:
         mgr.start(path=temp_project)
         mgr.kill(temp_project)
         captured = capsys.readouterr()
-        assert '服务已关闭' in captured.out
+        assert '已终止进程' in captured.out
 
     def test_kill_unregistered_port(self, capsys):
         mgr = ServerManager()
@@ -315,3 +315,82 @@ class TestKillAll:
         captured = capsys.readouterr()
         assert '已关闭' in captured.out
         assert mgr.registry.count() == 0
+
+
+# ── 进程资源监控 ──────────────────────────────────────
+
+class TestResourceMonitoring:
+    """OpenSpec: res-01, res-02"""
+
+    def test_start_shows_start_time(self, temp_project, capsys):
+        """启动服务时显示启动时间"""
+        mgr = ServerManager()
+        mgr.start(path=temp_project)
+        captured = capsys.readouterr()
+        assert '启动时间' in captured.out
+
+    def test_list_shows_cpu_memory(self, temp_project, capsys):
+        """列出服务时显示 CPU 和内存信息"""
+        mgr = ServerManager()
+        mgr.start(path=temp_project)
+        captured = capsys.readouterr()  # 清掉启动输出
+        mgr.list()
+        captured = capsys.readouterr()
+        assert 'CPU' in captured.out
+        assert '内存' in captured.out
+
+    def test_list_shows_duration(self, temp_project, capsys):
+        """列出服务时显示运行时长"""
+        mgr = ServerManager()
+        mgr.start(path=temp_project)
+        captured = capsys.readouterr()  # 清掉启动输出
+        mgr.list()
+        captured = capsys.readouterr()
+        assert '时长' in captured.out
+
+
+# ── 日志管理 ──────────────────────────────────────────
+
+class TestLogging:
+    """OpenSpec: log-01, log-02"""
+
+    def test_start_creates_log_file(self, temp_project, monkeypatch):
+        """启动服务时创建日志文件"""
+        import http_server_cli.utils as hs_utils
+        # 使用测试的临时日志目录
+        test_log_dir = os.path.join(temp_project, 'logs')
+        monkeypatch.setattr('http_server_cli.server.LOG_DIR', test_log_dir)
+        monkeypatch.setattr('http_server_cli.utils.LOG_DIR', test_log_dir)
+        os.makedirs(test_log_dir, exist_ok=True)
+
+        mgr = ServerManager()
+        mgr.start(path=temp_project)
+
+        # 获取实际使用的端口（可能是 8081）
+        entry = mgr.registry.find(path=os.path.realpath(temp_project))
+        port = entry['port']
+
+        log_path = os.path.join(test_log_dir, f'{port}.log')
+        assert os.path.isfile(log_path)
+
+    def test_kill_deletes_log_file(self, temp_project, monkeypatch):
+        """关闭服务时删除日志文件"""
+        import http_server_cli.utils as hs_utils
+        # 使用测试的临时日志目录
+        test_log_dir = os.path.join(temp_project, 'logs')
+        monkeypatch.setattr('http_server_cli.server.LOG_DIR', test_log_dir)
+        monkeypatch.setattr('http_server_cli.utils.LOG_DIR', test_log_dir)
+        os.makedirs(test_log_dir, exist_ok=True)
+
+        mgr = ServerManager()
+        mgr.start(path=temp_project)
+
+        # 获取实际使用的端口
+        entry = mgr.registry.find(path=os.path.realpath(temp_project))
+        port = entry['port']
+
+        log_path = os.path.join(test_log_dir, f'{port}.log')
+        assert os.path.isfile(log_path)
+
+        mgr.kill(str(port))
+        assert not os.path.isfile(log_path)

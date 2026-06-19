@@ -19,6 +19,7 @@ DATA_DIR = os.path.join(HOME, '.http-server-cli')
 CONFIG_PATH = os.path.join(DATA_DIR, 'config.json')
 REGISTRY_PATH = os.path.join(DATA_DIR, 'registry.json')
 LOG_DIR = os.path.join(DATA_DIR, 'logs')
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 MAX_PORT = 10000
 
 # ── 打印 ────────────────────────────────────────────────
@@ -159,6 +160,42 @@ def is_process_alive(pid):
     except (OSError, ProcessLookupError):
         return False
 
+def get_process_stats(pid) -> dict:
+    """获取进程资源使用情况（CPU、内存）"""
+    if not pid or not is_process_alive(pid):
+        return {'cpu': '-', 'memory': '-', 'memory_percent': '-'}
+    
+    try:
+        result = subprocess.run(
+            ['ps', '-p', str(pid), '-o', 'pcpu,pmem,rss'],
+            capture_output=True, text=True,
+            encoding='utf-8', errors='ignore',
+        )
+        if result.returncode != 0:
+            return {'cpu': '-', 'memory': '-', 'memory_percent': '-'}
+        
+        lines = result.stdout.strip().split('\n')
+        if len(lines) < 2:
+            return {'cpu': '-', 'memory': '-', 'memory_percent': '-'}
+        
+        # 解析输出: CPU%, MEM%, RSS
+        parts = lines[1].strip().split()
+        if len(parts) >= 3:
+            cpu = parts[0]
+            mem_percent = parts[1]
+            rss_kb = int(parts[2])
+            # 转换 RSS 为 MB
+            rss_mb = rss_kb / 1024
+            return {
+                'cpu': f'{cpu}%',
+                'memory': f'{rss_mb:.1f}MB',
+                'memory_percent': f'{mem_percent}%',
+            }
+    except (ValueError, subprocess.SubprocessError):
+        pass
+    
+    return {'cpu': '-', 'memory': '-', 'memory_percent': '-'}
+
 # ── 路径 / 时间 ─────────────────────────────────────────
 
 def resolve_path(path_str: str) -> str:
@@ -168,6 +205,42 @@ def resolve_path(path_str: str) -> str:
 def timestamp() -> str:
     """当前 ISO 时间戳（到秒）"""
     return datetime.now().isoformat(timespec='seconds')
+
+def format_duration(started_at: str) -> str:
+    """计算并格式化运行时长
+    
+    Args:
+        started_at: 启动时间，格式如 "2026-06-20T00:05:37" 或 "2026-06-20 00:05:37"
+    
+    Returns:
+        时长字符串，如 "5 分钟"
+    """
+    if not started_at or started_at == '-':
+        return '-'
+    
+    try:
+        # 尝试解析 ISO 格式或空格分隔格式
+        if 'T' in started_at:
+            start_time = datetime.fromisoformat(started_at)
+        else:
+            start_time = datetime.strptime(started_at, '%Y-%m-%d %H:%M:%S')
+        
+        duration = datetime.now() - start_time
+        total_seconds = int(duration.total_seconds())
+        
+        if total_seconds < 60:
+            return '1分钟'
+        elif total_seconds < 3600:
+            minutes = total_seconds // 60
+            return f'{minutes}分钟'
+        else:
+            hours = total_seconds // 3600
+            minutes = (total_seconds % 3600) // 60
+            if minutes > 0:
+                return f'{hours}小时{minutes}分钟'
+            return f'{hours}小时'
+    except (ValueError, TypeError):
+        return '-'
 
 def which_python():
     """当前 Python 解释器路径"""

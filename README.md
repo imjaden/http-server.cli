@@ -4,6 +4,13 @@
 >
 > 基于 `python3 -m http.server`，零外部依赖。项目目录下 `hs . -o` 一键预览。
 
+- [x] **零外部依赖** — 仅需 macOS（lsof/open）和 Python 3.7+（`pip install http-server-cli`）
+- [x] **端口自动分配+预览** — 默认 8080，冲突时自动递增找空闲端口（`hs . -o`）
+- [x] **智能首页** — 无 index.html 时自动重定向到最近修改的 html 文件
+- [x] **项目追踪** — 持久化记录项目路径↔端口映射（`hs list`）
+- [x] **进程资源监控** — 实时显示 CPU、内存使用和运行时长（`hs list`）
+- [x] **多种启动模式** — daemon 后台运行、foreground 前台运行（`-d` daemon / `-f` foreground）
+
 ## 为什么用 `hs`
 
 同时开发多个前端项目时，总在记 "A 用了几号端口" 和 "8080 被谁占了" 之间切换。
@@ -14,21 +21,27 @@
 
 | 场景 | 以前 | 用 `hs` |
 |:---------|:-----|:--------|
-| 启动预览 | `python3 -m http.server 8080` + 手动开浏览器 | `hs . -o` |
-| 查哪个项目在用 8080 | `lsof -i :8080`，再 `ps` 看路径 | `hs list` |
-| 关掉某个服务 | `lsof` 查 PID → `kill` | `hs kill 8080` |
-| 换个项目 | 先关旧的，再开新的（或冲突） | `hs start ../project-b` |
-| 关掉所有 | 挨个查 PID 逐个 kill | `hs kill-all` |
+| 启动服务 | `python3 -m http.server 8080` + 手动开浏览器 | `hs . -o` 已启动则直接打开浏览器，否则自动找空闲端口|
+| 查看服务 | `lsof -i :8080`，再 `ps` 看路径 | `hs list` |
+| 切换项目 | 先关旧的，再开新的（或冲突） | `hs ../project-b` |
+| 关掉服务 | `lsof` 查 PID → `kill` | `hs kill 8080` |
 
 ## 安装
 
 ```bash
+# 从 TestPyPI 安装（测试版）
 pip install -i https://test.pypi.org/simple/ http-server-cli
+
+# 从官方 PyPI 安装（正式版）
+pip install http-server-cli
+
+# 升级到最新版本
+pip install --upgrade http-server-cli
 ```
 
 验证：
 ```
-hs version     # → http-server-cli v1.0.3
+hs version     # → http-server-cli v1.0.4
 hs . -o        # 当前目录启动 + 打开浏览器
 ```
 

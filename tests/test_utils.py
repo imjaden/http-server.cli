@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Utils 模块测试 — OpenSpec: cfg-01(ensure_storage)
+Utils 模块测试 — OpenSpec: cfg-01(ensure_storage), res-03(format_duration)
 """
 
 import json
@@ -17,6 +17,8 @@ from http_server_cli.utils import (
     resolve_path,
     timestamp,
     ensure_storage,
+    format_duration,
+    get_process_stats,
 )
 import http_server_cli.utils as hs_utils
 
@@ -126,3 +128,49 @@ class TestEnsureStorage:
 
         reg = read_json(_registry_path())
         assert reg == {'servers': []}
+
+
+class TestFormatDuration:
+    """时长格式化 — OpenSpec: res-03"""
+
+    def test_minutes(self):
+        from datetime import datetime, timedelta
+        # 5分钟前的时间戳
+        start_time = datetime.now() - timedelta(minutes=5)
+        started_at = start_time.strftime('%Y-%m-%dT%H:%M:%S')
+        assert format_duration(started_at) == '5分钟'
+
+    def test_hours(self):
+        from datetime import datetime, timedelta
+        # 2小时前的时间戳
+        start_time = datetime.now() - timedelta(hours=2)
+        started_at = start_time.strftime('%Y-%m-%dT%H:%M:%S')
+        assert format_duration(started_at) == '2小时'
+
+    def test_days(self):
+        from datetime import datetime, timedelta
+        # 1天前的时间戳
+        start_time = datetime.now() - timedelta(days=1)
+        started_at = start_time.strftime('%Y-%m-%dT%H:%M:%S')
+        assert format_duration(started_at) == '24小时'
+
+    def test_empty_string(self):
+        assert format_duration('') == '-'
+
+    def test_dash(self):
+        assert format_duration('-') == '-'
+
+
+class TestGetProcessStats:
+    """进程资源监控 — OpenSpec: res-01, res-02"""
+
+    def test_returns_dict(self):
+        info = get_process_stats(os.getpid())
+        assert isinstance(info, dict)
+        assert 'cpu' in info
+        assert 'memory' in info
+
+    def test_invalid_pid_returns_dash(self):
+        info = get_process_stats(999999)
+        assert info['cpu'] == '-'
+        assert info['memory'] == '-'

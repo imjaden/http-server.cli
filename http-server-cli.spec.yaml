@@ -1,7 +1,7 @@
 name: http-server-cli
-version: 1.0.3
-description: 基于 python3 -m http.server 的本地 HTTP 服务管理器。自动分配端口、追踪项目映射、管理服务生命周期。
-date: 2026-06-17
+version: 1.0.4
+description: 基于 python3 -m http.server 的本地 HTTP 服务管理器。自动分配端口、追踪项目映射、管理服务生命周期、智能首页跳转、进程资源监控。
+date: 2026-06-20
 author: IRIS
 
 metadata:
@@ -14,6 +14,9 @@ capabilities:
   - registry
   - configuration
   - cli-interface
+  - smart-homepage
+  - resource-monitoring
+  - logging
 
 specs:
 
@@ -276,7 +279,7 @@ specs:
         scenarios:
           - name: version 命令
             when: 执行 hs version
-            then: 输出 http-server-cli v1.0.3
+            then: 输出 http-server-cli v1.1.0
 
           - name: --version 标志
             when: 执行 hs --version
@@ -292,3 +295,135 @@ specs:
             then:
               - 输出"未知命令"
               - 显示帮助信息
+
+  # ── 智能首页跳转 ───────────────────────────────────
+
+  smart-homepage:
+    purpose: 首页访问时智能跳转到最近修改的 HTML 文件
+    requirements:
+      - id: home-01
+        name: 存在 index.html
+        description: 当目录存在 index.html 时正常返回
+        priority: MUST
+        scenarios:
+          - name: 正常返回
+            given: 目录存在 index.html
+            when: 访问 /
+            then: 正常返回 index.html 内容
+
+      - id: home-02
+        name: 重定向到最近修改
+        description: 无 index.html 时重定向到最近修改的 HTML 文件
+        priority: MUST
+        scenarios:
+          - name: 单个 html 文件
+            given: 目录无 index.html，有 test.html
+            when: 访问 /
+            then:
+              - 返回 302 重定向
+              - Location: /test.html
+
+          - name: 多个 html 文件
+            given: 目录无 index.html，有 a.html、b.html（b.html 最近修改）
+            when: 访问 /
+            then:
+              - 返回 302 重定向
+              - Location: /b.html
+
+          - name: 查询参数处理
+            given: 目录无 index.html，有 test.html
+            when: 访问 /?t=1781889346836
+            then:
+              - 返回 302 重定向
+              - Location: /test.html
+
+      - id: home-03
+        name: 无 HTML 文件
+        description: 无任何 HTML 文件时返回目录列表
+        priority: MUST
+        scenarios:
+          - name: 返回目录列表
+            given: 目录无任何 HTML 文件
+            when: 访问 /
+            then: 返回默认目录列表
+
+  # ── 进程资源监控 ───────────────────────────────────
+
+  resource-monitoring:
+    purpose: 监控服务进程的 CPU、内存使用情况
+    requirements:
+      - id: res-01
+        name: start 显示资源
+        description: 启动服务时显示进程资源信息
+        priority: MUST
+        scenarios:
+          - name: 显示资源信息
+            given: 服务成功启动
+            when: 执行 hs start .
+            then:
+              - 输出包含 CPU 使用率
+              - 输出包含内存使用量
+              - 输出包含启动时间
+
+      - id: res-02
+        name: list 显示资源
+        description: 列出服务时显示每个服务的资源信息
+        priority: MUST
+        scenarios:
+          - name: 显示所有服务资源
+            given: registry 中有 2 个服务
+            when: 执行 hs list
+            then:
+              - 每个服务显示 CPU 使用率
+              - 每个服务显示内存使用量
+              - 每个服务显示运行时长
+
+      - id: res-03
+        name: 时长计算
+        description: 计算服务运行时长并格式化输出
+        priority: MUST
+        scenarios:
+          - name: 分钟级时长
+            given: 服务运行 5 分钟
+            when: 执行 hs list
+            then: 输出"时长: 5 分钟"
+
+          - name: 小时级时长
+            given: 服务运行 2 小时
+            when: 执行 hs list
+            then: 输出"时长: 2 小时"
+
+  # ── 日志管理 ───────────────────────────────────────
+
+  logging:
+    purpose: 服务日志的持久化存储与清理
+    requirements:
+      - id: log-01
+        name: 日志文件创建
+        description: 服务启动时创建日志文件
+        priority: MUST
+        scenarios:
+          - name: 创建日志文件
+            given: 服务在端口 8080 启动
+            when: 检查 ~/.http-server-cli/logs/8080.log
+            then: 文件存在且可读取
+
+      - id: log-02
+        name: 日志文件删除
+        description: 服务关闭时删除日志文件
+        priority: MUST
+        scenarios:
+          - name: 删除日志文件
+            given: 服务在端口 8080 运行
+            when: 执行 hs kill 8080
+            then: ~/.http-server-cli/logs/8080.log 文件被删除
+
+      - id: log-03
+        name: 首页跳转日志
+        description: 首页智能跳转时输出日志
+        priority: SHOULD
+        scenarios:
+          - name: 重定向日志
+            given: 目录无 index.html，有 test.html
+            when: 访问 /
+            then: 日志输出"首页无 index.html，重定向到: test.html"

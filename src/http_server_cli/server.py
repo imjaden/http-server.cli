@@ -21,6 +21,10 @@ from http_server_cli.utils import (
     resolve_path,
     LOG_DIR,
     MAX_PORT,
+    SCRIPT_DIR,
+    get_process_stats,
+    format_duration,
+    timestamp,
 )
 
 from typing import Optional
@@ -61,7 +65,17 @@ class ServerManager:
         if entry:
             port = entry['port']
             if is_process_alive(entry.get('pid')) and is_port_in_use(port):
-                eprint(f'服务已在运行: http://{domain}:{port}  →  {format_path(abs_path)}', 'ℹ️')
+                started_at = entry.get('started_at', '-')
+                duration = format_duration(started_at)
+                stats = get_process_stats(entry.get('pid'))
+                log_path = os.path.join(LOG_DIR, f'{port}.log')
+                
+                print(f'✅  http://{domain}:{port}')
+                print(f'    📁  {format_path(abs_path)}')
+                print(f'    🔧  PID: {entry.get("pid")}  |  启动时间: {started_at}')
+                print(f'    📊  CPU: {stats["cpu"]}  |  内存: {stats["memory"]} ({stats["memory_percent"]}) | 时长: {duration}')
+                print(f'    📋  日志文件: {format_path(log_path)}')
+                
                 if open_browser:
                     webbrowser.open(f'http://{domain}:{port}')
                 return
@@ -70,21 +84,20 @@ class ServerManager:
                 self.registry.remove(path=abs_path)
 
         # ── 查找可用端口 ──
-        if is_port_in_use(default_port):
-            port = find_available_port(default_port + 1)
-            if port is None:
-                eprint(f'端口 {default_port}-{MAX_PORT} 已全部被占用，无法启动', '❌')
-                return
+        port = find_available_port(default_port)
+        if port is None:
+            eprint(f'端口 {default_port}-{MAX_PORT} 已全部被占用，无法启动', '❌')
+            return
+        if port != default_port:
             eprint(f'端口 {default_port} 已被占用，自动分配端口 {port}', '🔀')
-        else:
-            port = default_port
 
         # ── 启动后台进程 ──
         log_path = os.path.join(LOG_DIR, f'{port}.log')
+        runner_path = os.path.join(SCRIPT_DIR, 'runner.py')
         try:
             with open(log_path, 'w') as log_f:
                 proc = subprocess.Popen(
-                    [sys.executable, '-m', 'http.server', str(port), '--bind', domain],
+                    [sys.executable, runner_path, str(port), abs_path, '--bind', domain],
                     cwd=abs_path,
                     stdout=log_f,
                     stderr=subprocess.STDOUT,
@@ -104,17 +117,20 @@ class ServerManager:
             return
 
         # ── 注册 ──
+        started_at = timestamp()
         self.registry.add(
             port=port, path=abs_path, pid=proc.pid,
             domain=domain, daemon=daemon, foreground=foreground,
+            started_at=started_at,
         )
 
-        eprint(f'服务已启动: http://{domain}:{port} (PID: {proc.pid})', '✅')
-        eprint(f'访问路径: {format_path(abs_path)}', '📁')
-        eprint(f'日志文件: {format_path(log_path)}', '📋')
+        print(f'✅  http://{domain}:{port}')
+        print(f'    📁  {format_path(abs_path)}')
+        print(f'    🔧  PID: {proc.pid}  |  启动时间: {started_at}')
+        print(f'    📋  日志文件: {format_path(log_path)}')
 
         if open_browser:
-            time.sleep(0.5)
+            time.sleep(0.5)  # 等待服务完全启动
             webbrowser.open(f'http://{domain}:{port}')
             eprint('浏览器已打开', '🌐')
 
@@ -150,6 +166,12 @@ class ServerManager:
         """列出所有已注册服务及其存活状态"""
         servers = self.registry.active_servers()
 
+        # 按端口排序
+        servers = sorted(servers, key=lambda x: x['port'])
+
+        # 获取当前目录
+        current_dir = os.getcwd()
+
         if not servers:
             if json:
                 import json as _json
@@ -173,6 +195,7 @@ class ServerManager:
                         'mode': 'daemon' if entry.get('daemon') else ('foreground' if entry.get('foreground') else 'normal'),
                         'alive': entry['_alive'],
                         'started_at': entry.get('started_at'),
+                        'current': entry['path'] == current_dir,
                     }
                     for entry in servers
                 ]
@@ -192,13 +215,26 @@ class ServerManager:
             started = entry.get('started_at', '-')
             daemon_mode = entry.get('daemon', False)
             foreground_mode = entry.get('foreground', False)
+            is_current = entry['path'] == current_dir
 
-            status_icon = '✅' if alive else '❌'
-            status_text = '' if alive else ' (已停止)'
-            mode_tag = ' 🖥' if daemon_mode else (' ⌨' if foreground_mode else '')
-            print(f'  {status_icon}  http://{domain}:{port}{status_text}{mode_tag}')
-            print(f'      📁  {path}')
-            print(f'      🔧  PID: {pid}  |  启动时间: {started}')
+            # 当前目录服务使用 📍 标记
+            if is_current:
+                print(f'📍  http://{domain}:{port} （current）')
+            else:
+                status_icon = '✅' if alive else '❌'
+                status_text = '' if alive else ' (已停止)'
+                mode_tag = ' 🖥' if daemon_mode else (' ⌨' if foreground_mode else '')
+                print(f'{status_icon}  http://{domain}:{port}{status_text}{mode_tag}')
+            
+            print(f'    📁  {path}')
+            
+            # 计算时长
+            duration = format_duration(started)
+            
+            # 进程资源使用情况
+            stats = get_process_stats(entry.get('pid'))
+            print(f'    🔧  PID: {pid}  |  启动时间: {started}')
+            print(f'    📊  CPU: {stats["cpu"]}  |  内存: {stats["memory"]} ({stats["memory_percent"]}) | 时长: {duration}')
             print()
 
     # ── status ─────────────────────────────────────────
@@ -300,6 +336,9 @@ class ServerManager:
 
         pid = entry.get('pid')
         path = format_path(entry['path'])
+        started_at = entry.get('started_at', '-')
+        duration = format_duration(started_at)
+        log_path = os.path.join(LOG_DIR, f'{port}.log')
 
         if pid and is_process_alive(pid):
             try:
@@ -311,7 +350,11 @@ class ServerManager:
                 if is_process_alive(pid):
                     eprint(f'进程组 {pgid} 未响应 SIGTERM，发送 SIGKILL', '⚠️')
                     os.killpg(pgid, signal.SIGKILL)
-                eprint(f'已终止进程 PID: {pid}', '🛑')
+                print(f'🛑 已终止进程 PID: {pid}')
+                print(f'🛑 http://{domain}:{port}')
+                print(f'    📁  {path}')
+                print(f'    🔧  启动时间: {started_at}  |  时长: {duration}')
+                print(f'    📋  日志文件: {format_path(log_path)}')
             except ProcessLookupError:
                 pass
             except PermissionError:
@@ -321,7 +364,14 @@ class ServerManager:
             eprint(f'进程 {pid} 已不存在', 'ℹ️')
 
         self.registry.remove(port=port)
-        eprint(f'服务已关闭: http://{domain}:{port}  →  {path}', '✅')
+        
+        # 删除日志文件
+        if os.path.isfile(log_path):
+            try:
+                os.remove(log_path)
+                eprint(f'日志文件已删除: {format_path(log_path)}', '🗑️')
+            except OSError as e:
+                eprint(f'删除日志文件失败: {e}', '⚠️')
 
     # ── kill_all ───────────────────────────────────────
 
