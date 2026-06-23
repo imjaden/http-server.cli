@@ -1,7 +1,7 @@
 name: http-server-cli
-version: 1.0.4
+version: 1.0.5
 description: 基于 python3 -m http.server 的本地 HTTP 服务管理器。自动分配端口、追踪项目映射、管理服务生命周期、智能首页跳转、进程资源监控。
-date: 2026-06-20
+date: 2026-06-23
 author: IRIS
 
 metadata:
