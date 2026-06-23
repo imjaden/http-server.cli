@@ -119,6 +119,7 @@ python3 -m pytest tests/
 | `http-server` (npm) | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | `serve` (npm) | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | `live-server` | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
+| `portless` (npm) | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
 | `kill-port-cli` (npm) | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ |
 | `lsof` / `netstat` | ❌ | ❌ | ❌ | 手动 | 手动 | ❌ |
 | **`http-server-cli`** | **✅** | **✅** | **✅** | **✅** | **✅** | **✅** |

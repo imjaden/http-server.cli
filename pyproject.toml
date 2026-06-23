@@ -5,8 +5,8 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "http-server-cli"
 dynamic = ["version"]
-description = "本地 HTTP 服务管理器 — 基于 python3 -m http.server"
-readme = "README.md"
+description = "Local HTTP Server Manager"
+readme = "README.en.md"
 requires-python = ">=3.7"
 license = "MIT"
 authors = [
@@ -25,7 +25,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Natural Language :: Chinese (Simplified)",
+    "Natural Language :: English",
     "Operating System :: MacOS",
     "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
 ]
