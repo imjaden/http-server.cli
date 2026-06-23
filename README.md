@@ -1,3 +1,7 @@
+<p align="center">
+  <a href="README.md">🇨🇳 中文</a> · <a href="README.en.md">🇬🇧 English</a>
+</p>
+
 # http-server-cli
 
 > 忘记端口，只管预览 — Forget ports. Just preview.
