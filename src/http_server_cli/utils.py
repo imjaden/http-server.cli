@@ -153,6 +153,26 @@ def is_process_alive(pid):
     except (OSError, ProcessLookupError):
         return False
 
+def get_process_info(pid: int) -> Optional[dict]:
+    """获取进程的用户和完整命令行（用于非本工具服务诊断）"""
+    if not pid or not is_process_alive(pid):
+        return None
+    try:
+        result = subprocess.run(
+            ['ps', '-p', str(pid), '-o', 'user=,args='],
+            capture_output=True, text=True, timeout=5,
+            encoding='utf-8', errors='ignore',
+        )
+        if result.returncode == 0:
+            line = result.stdout.strip()
+            if ' ' in line:
+                user, cmd = line.split(' ', 1)
+                return {'user': user.strip(), 'command': cmd.strip()}
+    except (subprocess.TimeoutExpired, subprocess.SubprocessError, ValueError):
+        pass
+    return None
+
+
 def get_process_stats(pid) -> dict:
     """获取进程资源使用情况（CPU、内存）"""
     if not pid or not is_process_alive(pid):

@@ -601,6 +601,9 @@ class TestStatusJson:
         assert result['success'] is True
         assert result['data']['found'] is False
         assert result['data']['occupied'] is True
+        assert result['data']['pids'] == [7777]
+        # 7777 进程不存在，process 字段应为 None（不会被包含）
+        assert 'process' not in result['data']
 
 
 class TestKillJson:

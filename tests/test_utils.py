@@ -12,6 +12,7 @@ import pytest
 
 from http_server_cli.utils import (
     format_path,
+    get_process_info,
     json_output,
     read_json,
     write_json,
@@ -175,6 +176,29 @@ class TestGetProcessStats:
         info = get_process_stats(999999)
         assert info['cpu'] == '-'
         assert info['memory'] == '-'
+
+
+class TestGetProcessInfo:
+    """进程信息查询（用于非本工具服务诊断）"""
+
+    def test_returns_info_for_self(self):
+        """查询当前进程应返回 user 和 command"""
+        info = get_process_info(os.getpid())
+        assert info is not None
+        assert 'user' in info
+        assert 'command' in info
+        # 当前进程的 command 应包含 pytest 或 python
+        assert any(x in info['command'] for x in ('pytest', 'python'))
+
+    def test_returns_none_for_dead_pid(self):
+        """无效 PID 应返回 None"""
+        info = get_process_info(9999999)
+        assert info is None
+
+    def test_returns_none_for_none(self):
+        """None PID 应返回 None"""
+        info = get_process_info(0)
+        assert info is None
 
 
 class TestJsonOutput:

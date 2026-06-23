@@ -18,6 +18,7 @@ from http_server_cli.utils import (
     is_port_in_use,
     find_available_port,
     is_process_alive,
+    get_process_info,
     resolve_path,
     LOG_DIR,
     MAX_PORT,
@@ -315,10 +316,25 @@ class ServerManager:
                 from http_server_cli.utils import get_pid_by_lsof
                 pids = get_pid_by_lsof(port)
                 if json:
-                    json_output(True, 'status', data={'found': False, 'port': port, 'occupied': bool(pids), 'pids': pids})
+                    info = get_process_info(max(pids)) if pids else None
+                    data = {
+                        'found': False, 'port': port,
+                        'occupied': bool(pids), 'pids': pids,
+                    }
+                    if info:
+                        data['process'] = info
+                    json_output(True, 'status', data=data)
                 else:
                     if pids:
-                        eprint(f'端口 {port} 已被占用 (PID: {", ".join(str(p) for p in pids)})，但非本工具管理', '⚠️')
+                        pid = max(pids)
+                        eprint(f'端口 {port} 已被占用 (PID: {pid})，但非本工具管理', '⚠️')
+                        info = get_process_info(pid)
+                        if info:
+                            print()
+                            print(f'👤 USER: {info["user"]}')
+                            print(f'⚙️ CMD: {info["command"]}')
+                            print(f'🛑 kill: kill -KILL {pid}')
+                            print()
                     else:
                         eprint(f'端口 {port} 未注册', 'ℹ️')
                 return
