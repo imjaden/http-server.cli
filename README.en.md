@@ -10,6 +10,8 @@
 - [x] **Project Tracking** — Persistent project path ↔ port mapping (`hs list`)
 - [x] **Process Resource Monitoring** — Real-time CPU, memory usage and runtime (`hs list`)
 - [x] **Multiple Launch Modes** — Daemon background or foreground (`-d` daemon / `-f` foreground)
+- [x] **JSON Output** — All commands support `--json` for API/MCP consumption
+- [x] **Custom Index Page** — Specify default HTML file with `-i`/`--index`
 
 ## Why `hs`
 
@@ -29,10 +31,6 @@ When developing multiple frontend projects, you constantly switch between "Which
 ## Installation
 
 ```bash
-# Install from TestPyPI (testing version)
-pip install -i https://test.pypi.org/simple/ http-server-cli
-
-# Install from official PyPI (stable version)
 pip install http-server-cli
 
 # Upgrade to latest version
@@ -41,7 +39,7 @@ pip install --upgrade http-server-cli
 
 Verify:
 ```
-hs version     # → http-server-cli v1.0.4
+hs version     # → http-server-cli v1.0.5
 hs . -o        # Start in current directory + open browser
 ```
 
@@ -70,7 +68,7 @@ hs kill-all                 # Kill all
 | Command | Description |
 |:-----|:------|
 | `hs . [-o] [-d] [-f]` | **Shortcut**, equivalent to `hs start .` |
-| `hs start [path] [-o] [-d] [-f]` | Start server (path defaults to `.`; `-o` open browser; `-d` daemon mode; `-f` foreground mode) |
+| `hs start [path] [-o] [-d] [-f] [-i <file>]` | Start server (path defaults to `.`; `-o` open browser; `-d` daemon; `-f` foreground; `-i` custom index) |
 | `hs list` | List all running servers |
 | `hs list --json` | JSON format list |
 | `hs status [port\|path]` | Query single server status |
@@ -88,6 +86,7 @@ hs kill-all                 # Kill all
 - **`hs . -d`**: daemon mode, runs in background, check with `hs list`
 - **`hs . -f`**: foreground mode, Ctrl+C to stop
 - **`hs`** without args = `hs start .` (start in current directory)
+- **`hs . -i app.html`**: use `app.html` as the index page
 
 ## Data Directory
 

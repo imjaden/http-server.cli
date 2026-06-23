@@ -10,6 +10,8 @@
 - [x] **项目追踪** — 持久化记录项目路径↔端口映射（`hs list`）
 - [x] **进程资源监控** — 实时显示 CPU、内存使用和运行时长（`hs list`）
 - [x] **多种启动模式** — daemon 后台运行、foreground 前台运行（`-d` daemon / `-f` foreground）
+- [x] **JSON 输出** — 所有命令支持 `--json` 供 API/MCP 消费
+- [x] **自定义首页** — 通过 `-i`/`--index` 指定首页文件
 
 ## 为什么用 `hs`
 
@@ -29,10 +31,6 @@
 ## 安装
 
 ```bash
-# 从 TestPyPI 安装（测试版）
-pip install -i https://test.pypi.org/simple/ http-server-cli
-
-# 从官方 PyPI 安装（正式版）
 pip install http-server-cli
 
 # 升级到最新版本
@@ -41,7 +39,7 @@ pip install --upgrade http-server-cli
 
 验证：
 ```
-hs version     # → http-server-cli v1.0.4
+hs version     # → http-server-cli v1.0.5
 hs . -o        # 当前目录启动 + 打开浏览器
 ```
 
@@ -70,17 +68,13 @@ hs kill-all                 # 一键全关
 | 命令 | 说明 |
 |:-----|:------|
 | `hs . [-o] [-d] [-f]` | **快捷方式**，等价 `hs start .` |
-| `hs start [path] [-o] [-d] [-f]` | 启动服务（path 默认 `.`；`-o` 打开浏览器；`-d` daemon 模式；`-f` 前台模式） |
-| `hs list` | 列出所有运行中服务 |
-| `hs list --json` | JSON 格式列出所有服务 |
-| `hs status [port\|path]` | 查询单个服务状态 |
-| `hs status --json [port\|path]` | JSON 格式查询服务状态 |
-| `hs kill <port\|path>` | 关闭指定服务 |
-| `hs kill-all` | 关闭所有服务 |
-| `hs config` | 显示配置 |
-| `hs config --json` | JSON 格式显示配置 |
-| `hs set port <num>` | 修改默认端口（默认 8080） |
-| `hs set domain <str>` | 修改绑定域名（默认 localhost） |
+| `hs start [path] [-o] [-d] [-f] [-i <file>]` | 启动服务；`-i` 指定首页文件 |
+| `hs list [--json]` | 列出所有运行中服务 |
+| `hs status [--json] [port\|path]` | 查询单个服务状态 |
+| `hs kill <port\|path> [--json]` | 关闭指定服务 |
+| `hs kill-all [--json]` | 关闭所有服务 |
+| `hs config [--json]` | 显示配置 |
+| `hs set port|domain <value> [--json]` | 修改配置 |
 
 ### 小贴士
 
@@ -88,6 +82,7 @@ hs kill-all                 # 一键全关
 - **`hs . -d`**：daemon 模式，后台运行，可用 `hs list` 查看
 - **`hs . -f`**：前台模式，Ctrl+C 终止服务
 - **`hs`** 不带参数 = `hs start .`（当前目录启动）
+- **`hs . -i app.html`**：以 `app.html` 为首页
 
 ## 数据目录
 
