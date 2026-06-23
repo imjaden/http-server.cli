@@ -10,7 +10,7 @@ Handler 模块测试 — OpenSpec: home-01 ~ home-03
 
 import os
 import tempfile
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
@@ -25,10 +25,11 @@ class TestHomepageRedirect:
     def test_find_latest_html_returns_none_when_no_html(self):
         """无 HTML 文件时返回 None"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            handler = SmartHTTPRequestHandler(
-                MagicMock(), MagicMock(), MagicMock(), directory=tmpdir
-            )
-            result = handler._find_latest_html()
+            # 创建 handler 实例，避免调用父类 __init__
+            handler = MagicMock(spec=SmartHTTPRequestHandler)
+            handler.directory = tmpdir
+            # 直接调用实际方法
+            result = SmartHTTPRequestHandler._find_latest_html(handler)
             assert result is None
 
     def test_find_latest_html_returns_single_html(self):
@@ -38,10 +39,9 @@ class TestHomepageRedirect:
             with open(html_file, 'w') as f:
                 f.write('<html><body>Test</body></html>')
 
-            handler = SmartHTTPRequestHandler(
-                MagicMock(), MagicMock(), MagicMock(), directory=tmpdir
-            )
-            result = handler._find_latest_html()
+            handler = MagicMock(spec=SmartHTTPRequestHandler)
+            handler.directory = tmpdir
+            result = SmartHTTPRequestHandler._find_latest_html(handler)
             assert result == 'test.html'
 
     def test_find_latest_html_returns_most_recent(self):
@@ -63,10 +63,9 @@ class TestHomepageRedirect:
             with open(b_html, 'w') as f:
                 f.write('<html>B updated</html>')
 
-            handler = SmartHTTPRequestHandler(
-                MagicMock(), MagicMock(), MagicMock(), directory=tmpdir
-            )
-            result = handler._find_latest_html()
+            handler = MagicMock(spec=SmartHTTPRequestHandler)
+            handler.directory = tmpdir
+            result = SmartHTTPRequestHandler._find_latest_html(handler)
             assert result == 'b.html'
 
     def test_find_latest_html_ignores_index(self):
@@ -81,10 +80,9 @@ class TestHomepageRedirect:
             with open(other_html, 'w') as f:
                 f.write('<html>Other</html>')
 
-            handler = SmartHTTPRequestHandler(
-                MagicMock(), MagicMock(), MagicMock(), directory=tmpdir
-            )
-            result = handler._find_latest_html()
+            handler = MagicMock(spec=SmartHTTPRequestHandler)
+            handler.directory = tmpdir
+            result = SmartHTTPRequestHandler._find_latest_html(handler)
             assert result == 'other.html'
 
 
@@ -112,10 +110,11 @@ class TestLogMessage:
     def test_log_message_format(self, capsys):
         """日志格式应包含时间戳和消息"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            handler = SmartHTTPRequestHandler(
-                MagicMock(), MagicMock(), MagicMock(), directory=tmpdir
-            )
-            handler.log_message('Test message')
+            # 创建 handler 实例，避免调用父类 __init__
+            handler = MagicMock(spec=SmartHTTPRequestHandler)
+            handler.directory = tmpdir
+            # 直接调用实际方法
+            SmartHTTPRequestHandler.log_message(handler, 'Test message')
             captured = capsys.readouterr()
             # 日志应包含时间戳格式 [YYYY-MM-DD HH:MM:SS]
             assert '[' in captured.err
