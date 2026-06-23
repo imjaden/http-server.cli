@@ -39,7 +39,7 @@ pip install --upgrade http-server-cli
 
 验证：
 ```
-hs version     # → http-server-cli v1.0.5
+hs version     # → http-server-cli v1.0.x
 hs . -o        # 当前目录启动 + 打开浏览器
 ```
 

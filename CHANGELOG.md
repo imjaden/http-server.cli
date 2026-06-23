@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.5 (2026-06-23)
+## 1.0.6 (2026-06-23)
 
 ### Added
 - `--json` flag for all commands (start/list/status/kill/kill-all/config/set/version)

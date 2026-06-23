@@ -39,7 +39,7 @@ pip install --upgrade http-server-cli
 
 Verify:
 ```
-hs version     # → http-server-cli v1.0.5
+hs version     # → http-server-cli v1.0.x
 hs . -o        # Start in current directory + open browser
 ```
 
