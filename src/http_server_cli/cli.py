@@ -241,7 +241,7 @@ def main():
     elif cmd not in _COMMANDS:
         # 快捷方式：路径（如 .、~/site）隐式作为 start 的 path 参数
         if cmd.startswith(('.', '/', '~')) or cmd == '..':
-            parsed.args = [cmd] + parsed.args
+            parsed.args = [parsed.command] + parsed.args
             cmd = 'start'
         else:
             eprint(f'未知命令: {cmd}', '❌')

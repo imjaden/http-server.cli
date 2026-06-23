@@ -81,6 +81,82 @@ class TestKillAllAlias:
 
         assert len(called) == 2
 
+class TestPathShortcut:
+    """路径快捷方式（hs /path/to/dir）应保留原始路径"""
+
+    def test_shorthand_path_preserves_hyphens(self, monkeypatch):
+        """hs /path/with-hyphens --json 应保留连字符，不转为下划线"""
+        captured = {}
+        def fake_start(mgr, args):
+            captured['args'] = args
+
+        monkeypatch.setattr('http_server_cli.cli._COMMANDS', {'start': fake_start})
+        monkeypatch.setattr('http_server_cli.cli.ServerManager', lambda: None)
+        monkeypatch.setattr('http_server_cli.cli.ensure_storage', lambda: None)
+
+        import sys
+        old_argv = sys.argv
+        sys.argv = ['hs', '/Users/test/my-project-foo', '--json']
+        try:
+            from http_server_cli.cli import main
+            main()
+        except SystemExit:
+            pass
+        sys.argv = old_argv
+
+        assert 'args' in captured
+        # 路径中的连字符应被保留
+        assert '/Users/test/my-project-foo' in captured['args']
+        assert '--json' in captured['args']
+
+    def test_shorthand_relative_path_with_hyphens(self, monkeypatch):
+        """hs ./my-project --json 相对路径中的连字符应保留"""
+        captured = {}
+        def fake_start(mgr, args):
+            captured['args'] = args
+
+        monkeypatch.setattr('http_server_cli.cli._COMMANDS', {'start': fake_start})
+        monkeypatch.setattr('http_server_cli.cli.ServerManager', lambda: None)
+        monkeypatch.setattr('http_server_cli.cli.ensure_storage', lambda: None)
+
+        import sys
+        old_argv = sys.argv
+        sys.argv = ['hs', './my-project', '--json']
+        try:
+            from http_server_cli.cli import main
+            main()
+        except SystemExit:
+            pass
+        sys.argv = old_argv
+
+        assert 'args' in captured
+        assert './my-project' in captured['args']
+
+    def test_command_name_still_normalized(self, monkeypatch):
+        """hs kill-all 的命令名连字符仍应转下划线"""
+        captured = []
+        def tracker(mgr, args):
+            captured.append(True)
+
+        cmds = dict(_COMMANDS)
+        cmds['kill_all'] = tracker
+        monkeypatch.setattr('http_server_cli.cli._COMMANDS', cmds)
+        monkeypatch.setattr('http_server_cli.cli.ServerManager', lambda: None)
+        monkeypatch.setattr('http_server_cli.cli.ensure_storage', lambda: None)
+
+        import sys
+        old_argv = sys.argv
+        sys.argv = ['hs', 'kill-all']
+        try:
+            from http_server_cli.cli import main
+            main()
+        except SystemExit:
+            pass
+        sys.argv = old_argv
+
+        assert len(captured) == 1
+
+
 class TestUnknownCommand:
     """未知命令应在 main() 中处理。此处验证 _COMMANDS 不包含它。"""
 
