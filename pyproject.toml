@@ -27,6 +27,8 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Natural Language :: English",
     "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
     "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
 ]
 
