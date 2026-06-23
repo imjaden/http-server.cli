@@ -3,7 +3,7 @@
 """
 HTTP 服务启动脚本：使用自定义处理器启动服务。
 
-用法: python3 runner.py <port> <directory> [--bind <domain>]
+用法: python3 runner.py <port> <directory> [--bind <domain>] [--index <file>]
 """
 
 import argparse
@@ -22,10 +22,11 @@ def main():
     parser.add_argument('port', type=int, help='监听端口')
     parser.add_argument('directory', help='服务目录')
     parser.add_argument('--bind', default='localhost', help='绑定域名')
+    parser.add_argument('--index', default='index.html', help='首页文件名（默认 index.html）')
     args = parser.parse_args()
 
     # 创建处理器
-    handler_class = create_handler(args.directory)
+    handler_class = create_handler(args.directory, index_page=args.index)
 
     # 启动服务
     server_address = (args.bind, args.port)

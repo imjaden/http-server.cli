@@ -12,6 +12,7 @@ import pytest
 
 from http_server_cli.utils import (
     format_path,
+    json_output,
     read_json,
     write_json,
     resolve_path,
@@ -174,3 +175,47 @@ class TestGetProcessStats:
         info = get_process_stats(999999)
         assert info['cpu'] == '-'
         assert info['memory'] == '-'
+
+
+class TestJsonOutput:
+    """json_output 统一信封输出"""
+
+    def test_success_with_data(self, capsys):
+        json_output(True, 'test-cmd', data={'key': 'value', 'num': 42})
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['command'] == 'test-cmd'
+        assert result['data'] == {'key': 'value', 'num': 42}
+        assert result['error'] is None
+
+    def test_error_without_data(self, capsys):
+        json_output(False, 'test-cmd', error='something went wrong')
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['success'] is False
+        assert result['command'] == 'test-cmd'
+        assert result['data'] is None
+        assert result['error'] == 'something went wrong'
+
+    def test_success_none_data(self, capsys):
+        json_output(True, 'test-cmd')
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['data'] is None
+        assert result['error'] is None
+
+    def test_output_is_valid_json(self, capsys):
+        json_output(True, 'cmd', data={'nested': {'a': [1, 2]}})
+        captured = capsys.readouterr()
+        # 应能被 json.loads 成功解析
+        result = json.loads(captured.out)
+        assert result['data']['nested']['a'] == [1, 2]
+
+    def test_ensure_ascii_false(self, capsys):
+        """中文内容不应被转义"""
+        json_output(True, 'test', data={'msg': '路径不存在'})
+        captured = capsys.readouterr()
+        assert '\\u' not in captured.out
+        assert '路径不存在' in captured.out

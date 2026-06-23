@@ -9,6 +9,7 @@ is_port_in_use / is_process_alive 等函数。monkeypatch 必须打在 **消费�
 命名空间** 上，不能只打 utils。
 """
 
+import json
 import os
 from unittest.mock import MagicMock, patch
 
@@ -150,6 +151,22 @@ class TestStart:
         # 输出使用 format_path 格式化了（~ 简写），取当前目录名做近似匹配
         cwd_basename = os.path.basename(os.getcwd())
         assert cwd_basename in captured.out
+
+    def test_start_with_custom_index_page(self, temp_project):
+        """--index app.html 应在 registry 中记录"""
+        mgr = ServerManager()
+        mgr.start(path=temp_project, index_page='app.html')
+        entry = mgr.registry.find(path=os.path.realpath(temp_project))
+        assert entry is not None
+        assert entry['index_page'] == 'app.html'
+
+    def test_start_default_index_page(self, temp_project):
+        """未指定 --index 时默认 index.html"""
+        mgr = ServerManager()
+        mgr.start(path=temp_project)
+        entry = mgr.registry.find(path=os.path.realpath(temp_project))
+        assert entry is not None
+        assert entry['index_page'] == 'index.html'
 
 # ── list ────────────────────────────────────────────────
 
@@ -405,3 +422,238 @@ class TestLogging:
 
         mgr.kill(str(port))
         assert not os.path.isfile(log_path)
+
+
+# ═══════════════════════════════════════════════════════════
+# --json 模式测试
+# ═══════════════════════════════════════════════════════════
+
+class TestStartJson:
+    """start --json 输出格式"""
+
+    def test_start_success_json(self, temp_project, capsys):
+        mgr = ServerManager()
+        mgr.start(path=temp_project, json=True)
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['command'] == 'start'
+        assert result['error'] is None
+        d = result['data']
+        assert d['port'] == 8080
+        assert d['path'] == os.path.realpath(temp_project)
+        assert d['already_running'] is False
+        assert d['mode'] == 'normal'
+        assert 'stats' in d
+        assert 'duration' in d
+
+    def test_start_already_running_json(self, temp_project, capsys):
+        mgr = ServerManager()
+        mgr.start(path=temp_project)
+        capsys.readouterr()  # 清掉首次输出
+        # 模拟端口被占 + 进程存活 → 已运行状态
+        import http_server_cli.server as hs_srv
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setattr('http_server_cli.server.is_port_in_use', lambda p: True)
+        monkeypatch.setattr('http_server_cli.registry.is_port_in_use', lambda p: True)
+
+        mgr.start(path=temp_project, json=True)
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['data']['already_running'] is True
+        assert result['data']['index_page'] == 'index.html'
+        monkeypatch.undo()
+
+    def test_start_already_running_json_custom_index(self, temp_project, capsys):
+        """已运行服务 JSON 输出应包含注册的 index_page"""
+        mgr = ServerManager()
+        mgr.start(path=temp_project, index_page='dashboard.html')
+        capsys.readouterr()
+        import http_server_cli.server as hs_srv
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setattr('http_server_cli.server.is_port_in_use', lambda p: True)
+        monkeypatch.setattr('http_server_cli.registry.is_port_in_use', lambda p: True)
+
+        mgr.start(path=temp_project, json=True)
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['data']['already_running'] is True
+        assert result['data']['index_page'] == 'dashboard.html'
+        monkeypatch.undo()
+
+    def test_start_invalid_path_json(self, capsys):
+        mgr = ServerManager()
+        mgr.start(path='/nonexistent/path', json=True)
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['success'] is False
+        assert result['command'] == 'start'
+        assert '路径不存在' in result['error']
+
+    def test_start_no_port_available_json(self, monkeypatch, temp_project, capsys):
+        monkeypatch.setattr('http_server_cli.server.find_available_port', lambda sp: None)
+        mgr = ServerManager()
+        mgr.start(path=temp_project, json=True)
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['success'] is False
+        assert '已全部被占用' in result['error']
+
+    def test_start_json_contains_index_page(self, temp_project, capsys):
+        """start --json 输出应包含 index_page"""
+        mgr = ServerManager()
+        mgr.start(path=temp_project, json=True, index_page='dashboard.html')
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['data']['index_page'] == 'dashboard.html'
+
+    def test_start_json_default_index_page(self, temp_project, capsys):
+        """start --json 默认 index_page 应为 index.html"""
+        mgr = ServerManager()
+        mgr.start(path=temp_project, json=True)
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['data']['index_page'] == 'index.html'
+
+
+class TestListJson:
+    """list --json 输出格式"""
+
+    def test_list_empty_json(self, capsys):
+        mgr = ServerManager()
+        mgr.list(json=True)
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['command'] == 'list'
+        assert result['data'] == {'servers': [], 'count': 0}
+
+    def test_list_with_servers_json(self, monkeypatch, temp_project, capsys):
+        mgr = ServerManager()
+        mgr.start(path=temp_project, index_page='app.html')
+        capsys.readouterr()  # 清掉启动输出
+        # 标记端口被占用 + 进程存活 → alive=True
+        monkeypatch.setattr('http_server_cli.server.is_port_in_use', lambda p: True)
+        monkeypatch.setattr('http_server_cli.registry.is_port_in_use', lambda p: True)
+
+        mgr.list(json=True)
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['data']['count'] == 1
+        server = result['data']['servers'][0]
+        assert server['port'] == 8080
+        assert server['alive'] is True
+        assert server['index_page'] == 'app.html'
+        assert 'url' in server
+        assert 'path' in server
+
+
+class TestStatusJson:
+    """status --json 输出格式"""
+
+    def test_status_found_json(self, monkeypatch, temp_project, capsys):
+        mgr = ServerManager()
+        mgr.start(path=temp_project)
+        capsys.readouterr()
+        monkeypatch.setattr('http_server_cli.server.is_port_in_use', lambda p: True)
+        monkeypatch.setattr('http_server_cli.registry.is_port_in_use', lambda p: True)
+
+        mgr.status(arg='8080', json=True)
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['data']['found'] is True
+        assert result['data']['port'] == 8080
+        assert result['data']['alive'] is True
+        assert result['data']['index_page'] == 'index.html'
+        assert 'stats' in result['data']
+        assert 'duration' in result['data']
+
+    def test_status_json_custom_index_page(self, monkeypatch, temp_project, capsys):
+        """status --json 应显示自定义 index_page"""
+        mgr = ServerManager()
+        mgr.start(path=temp_project, index_page='dashboard.html')
+        capsys.readouterr()
+        monkeypatch.setattr('http_server_cli.server.is_port_in_use', lambda p: True)
+        monkeypatch.setattr('http_server_cli.registry.is_port_in_use', lambda p: True)
+
+        mgr.status(arg='8080', json=True)
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['data']['index_page'] == 'dashboard.html'
+
+    def test_status_not_found_json(self, capsys):
+        mgr = ServerManager()
+        mgr.status(arg='9999', json=True)
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['data']['found'] is False
+
+    def test_status_occupied_by_other_json(self, monkeypatch, capsys):
+        monkeypatch.setattr('http_server_cli.utils.get_pid_by_lsof', lambda p: [7777])
+        mgr = ServerManager()
+        mgr.status(arg='8080', json=True)
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['data']['found'] is False
+        assert result['data']['occupied'] is True
+
+
+class TestKillJson:
+    """kill --json 输出格式"""
+
+    def test_kill_by_port_json(self, temp_project, capsys):
+        mgr = ServerManager()
+        mgr.start(path=temp_project)
+        capsys.readouterr()
+        mgr.kill('8080', json=True)
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['command'] == 'kill'
+        assert result['data']['killed'] is True
+        assert result['data']['port'] == 8080
+
+    def test_kill_unregistered_port_json(self, capsys):
+        mgr = ServerManager()
+        mgr.kill('9999', json=True)
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['success'] is False
+        assert '未注册' in result['error']
+
+    def test_kill_no_arg_json(self, capsys):
+        mgr = ServerManager()
+        mgr.kill('', json=True)
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['success'] is False
+        assert '请指定' in result['error']
+
+
+class TestKillAllJson:
+    """kill-all --json 输出格式"""
+
+    def test_kill_all_empty_json(self, capsys):
+        mgr = ServerManager()
+        mgr.kill_all(json=True)
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['data'] == {'total': 0, 'killed': 0, 'entries': []}
+
+    def test_kill_all_with_servers_json(self, temp_project, capsys):
+        mgr = ServerManager()
+        mgr.start(path=temp_project)
+        capsys.readouterr()
+        mgr.kill_all(json=True)
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['data']['total'] == 1
+        assert result['data']['killed'] == 1
+        assert result['data']['entries'][0]['port'] == 8080

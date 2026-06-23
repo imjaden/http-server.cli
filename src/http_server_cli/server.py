@@ -24,6 +24,7 @@ from http_server_cli.utils import (
     SCRIPT_DIR,
     get_process_stats,
     format_duration,
+    json_output,
     timestamp,
 )
 
@@ -39,7 +40,8 @@ class ServerManager:
     # ── start ──────────────────────────────────────────
 
     def start(self, path: Optional[str] = None, open_browser: bool = False,
-              daemon: bool = False, foreground: bool = False) -> None:
+              daemon: bool = False, foreground: bool = False, json: bool = False,
+              index_page: Optional[str] = None) -> None:
         """
         启动 HTTP 服务。
 
@@ -57,7 +59,10 @@ class ServerManager:
         default_port = self.config.port
 
         if not os.path.isdir(abs_path):
-            eprint(f'路径不存在或不是目录: {format_path(abs_path)}', '❌')
+            if json:
+                json_output(False, 'start', error=f'路径不存在或不是目录: {format_path(abs_path)}')
+            else:
+                eprint(f'路径不存在或不是目录: {format_path(abs_path)}', '❌')
             return
 
         # ── 检查是否已注册且存活 ──
@@ -70,11 +75,27 @@ class ServerManager:
                 stats = get_process_stats(entry.get('pid'))
                 log_path = os.path.join(LOG_DIR, f'{port}.log')
                 
-                print(f'✅  http://{domain}:{port}')
-                print(f'    📁  {format_path(abs_path)}')
-                print(f'    🔧  PID: {entry.get("pid")}  |  启动时间: {started_at}')
-                print(f'    📊  CPU: {stats["cpu"]}  |  内存: {stats["memory"]} ({stats["memory_percent"]}) | 时长: {duration}')
-                print(f'    📋  日志文件: {format_path(log_path)}')
+                if json:
+                    json_output(True, 'start', data={
+                        'url': f'http://{domain}:{port}',
+                        'port': port,
+                        'path': abs_path,
+                        'pid': entry.get('pid'),
+                        'domain': domain,
+                        'mode': 'daemon' if entry.get('daemon') else ('foreground' if entry.get('foreground') else 'normal'),
+                        'started_at': started_at,
+                        'browser_opened': False,
+                        'already_running': True,
+                        'index_page': entry.get('index_page', 'index.html'),
+                        'stats': stats,
+                        'duration': duration,
+                    })
+                else:
+                    print(f'✅  http://{domain}:{port}')
+                    print(f'    📁  {format_path(abs_path)}')
+                    print(f'    🔧  PID: {entry.get("pid")}  |  启动时间: {started_at}')
+                    print(f'    📊  CPU: {stats["cpu"]}  |  内存: {stats["memory"]} ({stats["memory_percent"]}) | 时长: {duration}')
+                    print(f'    📋  日志文件: {format_path(log_path)}')
                 
                 if open_browser:
                     webbrowser.open(f'http://{domain}:{port}')
@@ -86,34 +107,50 @@ class ServerManager:
         # ── 查找可用端口 ──
         port = find_available_port(default_port)
         if port is None:
-            eprint(f'端口 {default_port}-{MAX_PORT} 已全部被占用，无法启动', '❌')
+            if json:
+                json_output(False, 'start', error=f'端口 {default_port}-{MAX_PORT} 已全部被占用，无法启动')
+            else:
+                eprint(f'端口 {default_port}-{MAX_PORT} 已全部被占用，无法启动', '❌')
             return
-        if port != default_port:
+        if not json and port != default_port:
             eprint(f'端口 {default_port} 已被占用，自动分配端口 {port}', '🔀')
 
         # ── 启动后台进程 ──
         log_path = os.path.join(LOG_DIR, f'{port}.log')
         runner_path = os.path.join(SCRIPT_DIR, 'runner.py')
         try:
+            index = index_page or 'index.html'
             with open(log_path, 'w') as log_f:
                 proc = subprocess.Popen(
-                    [sys.executable, runner_path, str(port), abs_path, '--bind', domain],
+                    [sys.executable, runner_path, str(port), abs_path, '--bind', domain, '--index', index],
                     cwd=abs_path,
                     stdout=log_f,
                     stderr=subprocess.STDOUT,
                     preexec_fn=os.setsid if hasattr(os, 'setsid') else None,
                 )
         except PermissionError as e:
-            eprint(f'权限不足，无法写入日志或启动进程: {e}', '❌')
+            if json:
+                json_output(False, 'start', error=f'权限不足，无法写入日志或启动进程: {e}')
+            else:
+                eprint(f'权限不足，无法写入日志或启动进程: {e}', '❌')
             return
         except FileNotFoundError as e:
-            eprint(f'Python 解释器未找到: {e}', '❌')
+            if json:
+                json_output(False, 'start', error=f'Python 解释器未找到: {e}')
+            else:
+                eprint(f'Python 解释器未找到: {e}', '❌')
             return
         except OSError as e:
-            eprint(f'系统错误（端口/资源不可用）: {e}', '❌')
+            if json:
+                json_output(False, 'start', error=f'系统错误（端口/资源不可用）: {e}')
+            else:
+                eprint(f'系统错误（端口/资源不可用）: {e}', '❌')
             return
         except Exception as e:
-            eprint(f'启动失败: {e}', '❌')
+            if json:
+                json_output(False, 'start', error=f'启动失败: {e}')
+            else:
+                eprint(f'启动失败: {e}', '❌')
             return
 
         # ── 注册 ──
@@ -121,18 +158,43 @@ class ServerManager:
         self.registry.add(
             port=port, path=abs_path, pid=proc.pid,
             domain=domain, daemon=daemon, foreground=foreground,
-            started_at=started_at,
+            started_at=started_at, index_page=index,
         )
 
-        print(f'✅  http://{domain}:{port}')
-        print(f'    📁  {format_path(abs_path)}')
-        print(f'    🔧  PID: {proc.pid}  |  启动时间: {started_at}')
-        print(f'    📋  日志文件: {format_path(log_path)}')
+        stats = get_process_stats(proc.pid)
+        duration = format_duration(started_at)
+        log_path_display = format_path(log_path)
+
+        if json:
+            json_output(True, 'start', data={
+                'url': f'http://{domain}:{port}',
+                'port': port,
+                'path': abs_path,
+                'pid': proc.pid,
+                'domain': domain,
+                'mode': 'daemon' if daemon else ('foreground' if foreground else 'normal'),
+                'started_at': started_at,
+                'browser_opened': bool(open_browser),
+                'already_running': False,
+                'index_page': index,
+                'stats': stats,
+                'duration': duration,
+            })
+        else:
+            print(f'✅  http://{domain}:{port}')
+            print(f'    📁  {format_path(abs_path)}')
+            print(f'    🔧  PID: {proc.pid}  |  启动时间: {started_at}')
+            print(f'    📊  CPU: {stats["cpu"]}  |  内存: {stats["memory"]} ({stats["memory_percent"]}) | 时长: {duration}')
+            print(f'    📋  日志文件: {log_path_display}')
 
         if open_browser:
             time.sleep(0.5)  # 等待服务完全启动
             webbrowser.open(f'http://{domain}:{port}')
-            eprint('浏览器已打开', '🌐')
+            if not json:
+                eprint('浏览器已打开', '🌐')
+
+        if json:
+            return  # JSON 模式跳过交互行为
 
         if daemon:
             eprint(f'按 Ctrl+C 停止日志查看，服务仍在后台运行', '🔄')
@@ -174,15 +236,13 @@ class ServerManager:
 
         if not servers:
             if json:
-                import json as _json
-                print(_json.dumps({'servers': [], 'count': 0}, ensure_ascii=False, indent=2))
+                json_output(True, 'list', data={'servers': [], 'count': 0})
             else:
                 eprint('没有正在运行的 HTTP 服务', 'ℹ️')
                 eprint('使用 hs start [path] -o 启动一个', '💡')
             return
 
         if json:
-            import json as _json
             data = {
                 'count': len(servers),
                 'servers': [
@@ -196,11 +256,12 @@ class ServerManager:
                         'alive': entry['_alive'],
                         'started_at': entry.get('started_at'),
                         'current': entry['path'] == current_dir,
+                        'index_page': entry.get('index_page', 'index.html'),
                     }
                     for entry in servers
                 ]
             }
-            print(_json.dumps(data, ensure_ascii=False, indent=2))
+            json_output(True, 'list', data=data)
             return
 
         eprint(f'共 {len(servers)} 个 HTTP 服务:', '📊')
@@ -254,8 +315,7 @@ class ServerManager:
                 from http_server_cli.utils import get_pid_by_lsof
                 pids = get_pid_by_lsof(port)
                 if json:
-                    import json as _json
-                    print(_json.dumps({'found': False, 'port': port, 'occupied': bool(pids), 'pids': pids}, ensure_ascii=False, indent=2))
+                    json_output(True, 'status', data={'found': False, 'port': port, 'occupied': bool(pids), 'pids': pids})
                 else:
                     if pids:
                         eprint(f'端口 {port} 已被占用 (PID: {", ".join(str(p) for p in pids)})，但非本工具管理', '⚠️')
@@ -268,8 +328,7 @@ class ServerManager:
 
         if not entry:
             if json:
-                import json as _json
-                print(_json.dumps({'found': False}, ensure_ascii=False, indent=2))
+                json_output(True, 'status', data={'found': False})
             else:
                 eprint('未找到匹配的服务', 'ℹ️')
             return
@@ -281,7 +340,8 @@ class ServerManager:
         ep = entry.get('domain', domain)
 
         if json:
-            import json as _json
+            duration = format_duration(entry.get('started_at', ''))
+            stats = get_process_stats(pid)
             data = {
                 'found': True,
                 'url': f"http://{ep}:{port}",
@@ -293,8 +353,11 @@ class ServerManager:
                 'port_active': port_active,
                 'mode': 'daemon' if entry.get('daemon') else ('foreground' if entry.get('foreground') else 'normal'),
                 'started_at': entry.get('started_at'),
+                'index_page': entry.get('index_page', 'index.html'),
+                'stats': stats,
+                'duration': duration,
             }
-            print(_json.dumps(data, ensure_ascii=False, indent=2))
+            json_output(True, 'status', data=data)
             return
 
         if alive and port_active:
@@ -312,10 +375,13 @@ class ServerManager:
 
     # ── kill ───────────────────────────────────────────
 
-    def kill(self, arg: str) -> None:
+    def kill(self, arg: str, json: bool = False) -> None:
         """关闭指定服务（按端口或路径）"""
         if not arg:
-            eprint('请指定端口或路径: kill <port|path>', '⚠️')
+            if json:
+                json_output(False, 'kill', error='请指定端口或路径: kill <port|path>')
+            else:
+                eprint('请指定端口或路径: kill <port|path>', '⚠️')
             return
 
         domain = self.config.domain
@@ -324,13 +390,19 @@ class ServerManager:
             port = int(arg)
             entry = self.registry.find(port=port)
             if not entry:
-                eprint(f'端口 {port} 未注册', 'ℹ️')
+                if json:
+                    json_output(False, 'kill', error=f'端口 {port} 未注册')
+                else:
+                    eprint(f'端口 {port} 未注册', 'ℹ️')
                 return
         else:
             abs_path = resolve_path(arg)
             entry = self.registry.find(path=abs_path)
             if not entry:
-                eprint(f'路径 {arg} 未注册', 'ℹ️')
+                if json:
+                    json_output(False, 'kill', error=f'路径 {arg} 未注册')
+                else:
+                    eprint(f'路径 {arg} 未注册', 'ℹ️')
                 return
             port = entry['port']
 
@@ -339,6 +411,7 @@ class ServerManager:
         started_at = entry.get('started_at', '-')
         duration = format_duration(started_at)
         log_path = os.path.join(LOG_DIR, f'{port}.log')
+        killed = False
 
         if pid and is_process_alive(pid):
             try:
@@ -348,38 +421,63 @@ class ServerManager:
                 os.killpg(pgid, signal.SIGTERM)
                 time.sleep(0.5)
                 if is_process_alive(pid):
-                    eprint(f'进程组 {pgid} 未响应 SIGTERM，发送 SIGKILL', '⚠️')
+                    if not json:
+                        eprint(f'进程组 {pgid} 未响应 SIGTERM，发送 SIGKILL', '⚠️')
                     os.killpg(pgid, signal.SIGKILL)
-                print(f'🛑 已终止进程 PID: {pid}')
-                print(f'🛑 http://{domain}:{port}')
-                print(f'    📁  {path}')
-                print(f'    🔧  启动时间: {started_at}  |  时长: {duration}')
-                print(f'    📋  日志文件: {format_path(log_path)}')
+                killed = True
+                if json:
+                    pass  # will output below
+                else:
+                    print(f'🛑 已终止进程 PID: {pid}')
+                    print(f'🛑 http://{domain}:{port}')
+                    print(f'    📁  {path}')
+                    print(f'    🔧  启动时间: {started_at}  |  时长: {duration}')
+                    print(f'    📋  日志文件: {format_path(log_path)}')
             except ProcessLookupError:
                 pass
             except PermissionError:
-                eprint(f'无权限终止进程组 PID: {pid}，请手动执行 kill {pid}', '⚠️')
+                if json:
+                    json_output(False, 'kill', error=f'无权限终止进程组 PID: {pid}，请手动执行 kill {pid}')
+                else:
+                    eprint(f'无权限终止进程组 PID: {pid}，请手动执行 kill {pid}', '⚠️')
                 return
         else:
-            eprint(f'进程 {pid} 已不存在', 'ℹ️')
+            if not json:
+                eprint(f'进程 {pid} 已不存在', 'ℹ️')
 
         self.registry.remove(port=port)
         
         # 删除日志文件
+        log_removed = False
         if os.path.isfile(log_path):
             try:
                 os.remove(log_path)
-                eprint(f'日志文件已删除: {format_path(log_path)}', '🗑️')
+                log_removed = True
+                if not json:
+                    eprint(f'日志文件已删除: {format_path(log_path)}', '🗑️')
             except OSError as e:
-                eprint(f'删除日志文件失败: {e}', '⚠️')
+                if not json:
+                    eprint(f'删除日志文件失败: {e}', '⚠️')
+
+        if json:
+            json_output(True, 'kill', data={
+                'port': port,
+                'path': entry['path'],
+                'pid': pid,
+                'killed': killed,
+                'log_removed': log_removed,
+            })
 
     # ── kill_all ───────────────────────────────────────
 
-    def kill_all(self) -> None:
+    def kill_all(self, json: bool = False) -> None:
         """关闭所有已注册服务"""
         servers = self.registry.all()
         if not servers:
-            eprint('没有正在运行的服务', 'ℹ️')
+            if json:
+                json_output(True, 'kill-all', data={'total': 0, 'killed': 0, 'entries': []})
+            else:
+                eprint('没有正在运行的服务', 'ℹ️')
             return
 
         count = 0
@@ -398,4 +496,14 @@ class ServerManager:
                     pass
             self.registry.remove(port=port)
 
-        eprint(f'已关闭 {count} 个服务', '✅')
+        if json:
+            json_output(True, 'kill-all', data={
+                'total': len(servers),
+                'killed': count,
+                'entries': [
+                    {'port': s['port'], 'path': s['path']}
+                    for s in servers
+                ],
+            })
+        else:
+            eprint(f'已关闭 {count} 个服务', '✅')

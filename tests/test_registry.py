@@ -104,6 +104,29 @@ class TestRegistryCornerCases:
             data = json.load(f)
         assert data == {'servers': []}
 
+class TestIndexPage:
+    """index_page 字段存储"""
+
+    def test_add_stores_default_index_page(self, fresh_registry):
+        """未指定 index_page 时默认存 index.html"""
+        fresh_registry.add(port=8080, path='/tmp/foo', pid=12345)
+        entry = fresh_registry.find(port=8080)
+        assert entry.get('index_page') == 'index.html'
+
+    def test_add_stores_custom_index_page(self, fresh_registry):
+        """指定 index_page 应被正确存储"""
+        fresh_registry.add(port=8080, path='/tmp/foo', pid=12345, index_page='app.html')
+        entry = fresh_registry.find(port=8080)
+        assert entry.get('index_page') == 'app.html'
+
+    def test_index_page_persists_to_disk(self, fresh_registry):
+        """index_page 应持久化到磁盘 JSON"""
+        fresh_registry.add(port=8080, path='/tmp/foo', pid=12345, index_page='dashboard.html')
+        with open(_registry_path(), 'r') as f:
+            on_disk = json.load(f)
+        assert on_disk['servers'][0]['index_page'] == 'dashboard.html'
+
+
 class TestActiveServers:
     """reg-02/03: 存活检测 + 残留清理"""
 

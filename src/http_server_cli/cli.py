@@ -19,30 +19,32 @@ _HELP = """http-server-cli v{version} — 忘记端口，只管预览
 用法:  hs [command] [args]
 
 快捷方式:
-  hs . [-o] [-d]            等价 hs start .
-  hs                        等价 hs start .（当前目录启动）
+  hs . [-o] [-d] [-i <file>]  等价 hs start .
+  hs                          等价 hs start .（当前目录启动）
 
 命令:
-  start [path] [-o] [-d] [-f]   启动服务（path 默认 .；-o 打开浏览器；-d daemon；-f foreground）
-  list [--json]          列出所有运行中的服务（--json 输出 JSON）
-  status [--json] [port|path]  查询单个服务状态（--json 输出 JSON）
-  kill <port|path>       关闭指定服务
-  kill-all               关闭所有服务
-  config [--json]        显示当前配置（--json 输出 JSON）
-  set port <num>         修改默认端口
-  set domain <str>       修改绑定域名
-  help                   显示此帮助
-  version                显示版本号
+  start [path] [-o] [-d] [-f] [-i <file>] [--json]  启动服务（path 默认 .）
+  list [--json]                   列出所有运行中的服务
+  status [--json] [port|path]     查询单个服务状态
+  kill <port|path> [--json]       关闭指定服务
+  kill-all [--json]               关闭所有服务
+  config [--json]                 显示当前配置
+  set port|domain <value> [--json]  修改配置
+  help                            显示此帮助
+  version [--json]                显示版本号
 
 示例:
   hs . -o                 当前目录启动 + 打开浏览器
+  hs . -i app.html        以 app.html 为首页
   hs ~/my-site            指定目录启动
-  hs . -d                 daemon 模式
+  hs . --json             JSON 格式获取启动结果
   hs list --json          JSON 格式列出所有服务
   hs status 8080 --json   JSON 格式查询端口 8080 状态
+  hs kill 8080 --json     JSON 格式获取关闭结果
+  hs kill-all --json      JSON 格式获取关闭结果
   hs config --json        JSON 格式显示配置
-  hs kill 8081            关闭端口 8081 的服务
-  hs set port 3000        修改默认端口为 3000
+  hs set port 3000 --json JSON 格式获取配置修改结果
+  hs version --json       JSON 格式显示版本
 
 数据目录: ~/.http-server-cli/
 """
@@ -51,30 +53,59 @@ _HELP = """http-server-cli v{version} — 忘记端口，只管预览
 
 def _handle_set(args):
     """set port|domain <value>"""
-    if len(args) < 2:
-        eprint('用法: set <port|domain> <值>', '⚠️')
-        eprint('  set port 8080      设置默认端口', '💡')
-        eprint('  set domain 0.0.0.0 设置绑定域名', '💡')
+    json_mode = '--json' in args
+    clean_args = [a for a in args if a != '--json']
+
+    if len(clean_args) < 2:
+        if json_mode:
+            from http_server_cli.utils import json_output
+            json_output(False, 'set', error='用法: set <port|domain> <值>')
+        else:
+            eprint('用法: set <port|domain> <值>', '⚠️')
+            eprint('  set port 8080      设置默认端口', '💡')
+            eprint('  set domain 0.0.0.0 设置绑定域名', '💡')
         return
 
-    key, value = args[0], args[1]
+    key, value = clean_args[0], clean_args[1]
     config = Config()
 
     if key == 'port':
         try:
             port = int(value)
             if port < 1024 or port > 65535:
-                eprint('端口号应在 1024-65535 之间', '⚠️')
+                if json_mode:
+                    from http_server_cli.utils import json_output
+                    json_output(False, 'set', error='端口号应在 1024-65535 之间')
+                else:
+                    eprint('端口号应在 1024-65535 之间', '⚠️')
                 return
+            old_value = config.port
             config.set_port(port)
-            eprint(f'默认端口已设置为 {port}', '✅')
+            if json_mode:
+                from http_server_cli.utils import json_output
+                json_output(True, 'set', data={'key': 'port', 'old_value': old_value, 'new_value': port})
+            else:
+                eprint(f'默认端口已设置为 {port}', '✅')
         except ValueError:
-            eprint(f'无效端口号: {value}', '❌')
+            if json_mode:
+                from http_server_cli.utils import json_output
+                json_output(False, 'set', error=f'无效端口号: {value}')
+            else:
+                eprint(f'无效端口号: {value}', '❌')
     elif key == 'domain':
+        old_value = config.domain
         config.set_domain(value)
-        eprint(f'默认域名已设置为 {value}', '✅')
+        if json_mode:
+            from http_server_cli.utils import json_output
+            json_output(True, 'set', data={'key': 'domain', 'old_value': old_value, 'new_value': value})
+        else:
+            eprint(f'默认域名已设置为 {value}', '✅')
     else:
-        eprint(f'未知配置项: {key}（支持: port, domain）', '⚠️')
+        if json_mode:
+            from http_server_cli.utils import json_output
+            json_output(False, 'set', error=f'未知配置项: {key}（支持: port, domain）')
+        else:
+            eprint(f'未知配置项: {key}（支持: port, domain）', '⚠️')
 
 # ── 命令分派 ──────────────────────────────────────────
 
@@ -92,6 +123,8 @@ def _cmd_start(manager, args):
     parser.add_argument('-o', '--open', action='store_true')
     parser.add_argument('-d', '--daemon', action='store_true')
     parser.add_argument('-f', '--foreground', action='store_true')
+    parser.add_argument('-i', '--index', default=None, help='首页文件名（默认 index.html）')
+    parser.add_argument('--json', action='store_true')
     try:
         parsed, _ = parser.parse_known_args(args)
     except SystemExit:
@@ -101,6 +134,8 @@ def _cmd_start(manager, args):
         open_browser=parsed.open,
         daemon=parsed.daemon,
         foreground=parsed.foreground,
+        json=parsed.json,
+        index_page=parsed.index,
     )
 
 @_register
@@ -126,18 +161,31 @@ def _cmd_status(manager, args):
 
 @_register
 def _cmd_kill(manager, args):
-    if not args:
-        eprint('用法: kill <port|path>', '⚠️')
+    parser = argparse.ArgumentParser(prog='hs kill', add_help=False)
+    parser.add_argument('arg', nargs='?', default=None)
+    parser.add_argument('--json', action='store_true')
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
         return
-    manager.kill(args[0])
+    if parsed.arg is None:
+        manager.kill('', json=parsed.json)
+    else:
+        manager.kill(parsed.arg, json=parsed.json)
 
 @_register
 def _cmd_kill_all(manager, args):
-    manager.kill_all()
+    parser = argparse.ArgumentParser(prog='hs kill-all', add_help=False)
+    parser.add_argument('--json', action='store_true')
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
+        return
+    manager.kill_all(json=parsed.json)
 
 @_register
 def _cmd_killall(manager, args):
-    manager.kill_all()
+    manager.kill_all(json='--json' in args)
 
 @_register
 def _cmd_config(manager, args):
@@ -159,7 +207,18 @@ def _cmd_help(manager, args):
 
 @_register
 def _cmd_version(manager, args):
-    print(f'http-server-cli v{__version__}')
+    if '--json' in args or (args and args[0] == '--json'):
+        from http_server_cli.utils import json_output
+        import sys
+        data = {
+            'version': __version__,
+            'name': 'http-server-cli',
+            'python': sys.version.split()[0],
+            'platform': sys.platform,
+        }
+        json_output(True, 'version', data=data)
+    else:
+        print(f'http-server-cli v{__version__}')
 
 # ── main ───────────────────────────────────────────────
 

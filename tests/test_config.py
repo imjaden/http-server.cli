@@ -70,6 +70,17 @@ class TestConfigPersistence:
         captured = capsys.readouterr()
         assert 'port' in captured.out
 
+    def test_config_show_json_output(self, fresh_config, capsys):
+        fresh_config.show(json=True)
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['command'] == 'config'
+        assert result['data']['port'] == 8080
+        assert result['data']['domain'] == 'localhost'
+        assert 'data_dir' in result['data']
+        assert result['error'] is None
+
 class TestConfigCornerCases:
     """cfg-04: 损坏/丢失保护"""
 

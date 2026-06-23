@@ -7,6 +7,7 @@ CLI 入口测试 — OpenSpec: cli-01 ~ cli-03
 和 _COMMANDS 注册表。
 """
 
+import json
 import sys
 from unittest.mock import MagicMock
 
@@ -41,6 +42,16 @@ class TestVersionCommand:
         captured = capsys.readouterr()
         assert f'http-server-cli v{__version__}' in captured.out
 
+    def test_version_json_output(self, capsys):
+        _COMMANDS['version'](None, ['--json'])
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['command'] == 'version'
+        assert result['data']['version'] == __version__
+        assert result['data']['name'] == 'http-server-cli'
+        assert result['error'] is None
+
 class TestHelpCommand:
     """help 命令输出"""
 
@@ -63,7 +74,7 @@ class TestKillAllAlias:
     def test_killall_dispatches_to_kill_all(self, monkeypatch):
         called = []
         mock_mgr = MagicMock()
-        monkeypatch.setattr(mock_mgr, 'kill_all', lambda: called.append(True))
+        monkeypatch.setattr(mock_mgr, 'kill_all', lambda **kw: called.append(True))
 
         _COMMANDS['killall'](mock_mgr, [])
         _COMMANDS['kill_all'](mock_mgr, [])

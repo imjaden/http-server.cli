@@ -53,7 +53,7 @@ class Registry:
 
     def add(self, port: int, path: str, pid: int, domain: Optional[str] = None,
             started_at: Optional[str] = None, daemon: bool = False,
-            foreground: bool = False) -> None:
+            foreground: bool = False, index_page: Optional[str] = None) -> None:
         """添加新条目"""
         from http_server_cli.utils import timestamp as _ts
         self._data['servers'].append({
@@ -64,6 +64,7 @@ class Registry:
             'daemon': daemon,
             'foreground': foreground,
             'started_at': started_at or _ts(),
+            'index_page': index_page or 'index.html',
         })
         self.save()
 

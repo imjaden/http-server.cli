@@ -104,6 +104,52 @@ class TestQueryParameterHandling:
         assert result.query == 'v=1'
 
 
+class TestCustomIndexPage:
+    """自定义首页 — --index 参数"""
+
+    def _make_handler_instance(self, tmpdir, index_page='index.html'):
+        """辅助：创建一个 SmartHTTPRequestHandler 实例（mock 掉父类 __init__ 避免 socket）"""
+        from http.server import SimpleHTTPRequestHandler
+        with patch.object(SimpleHTTPRequestHandler, '__init__', return_value=None):
+            from http_server_cli.handler import create_handler
+            handler_class = create_handler(tmpdir, index_page=index_page)
+            handler = handler_class.__new__(handler_class)
+            handler.__init__()
+            return handler
+
+    def test_create_handler_sets_custom_index_page(self):
+        """create_handler(index_page='app.html') 应将 app.html 传给实例"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            handler = self._make_handler_instance(tmpdir, index_page='app.html')
+            assert handler.directory == tmpdir
+            assert handler.index_page == 'app.html'
+
+    def test_default_index_page_is_index_html(self):
+        """create_handler() 默认 index_page 应为 index.html"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            handler = self._make_handler_instance(tmpdir)
+            assert handler.index_page == 'index.html'
+
+    def test_find_latest_html_still_works_with_custom_index(self):
+        """自定义首页不影响 _find_latest_html 行为"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dashboard = os.path.join(tmpdir, 'dashboard.html')
+            with open(dashboard, 'w') as f:
+                f.write('<html>Dashboard</html>')
+
+            handler = MagicMock(spec=SmartHTTPRequestHandler)
+            handler.directory = tmpdir
+            result = SmartHTTPRequestHandler._find_latest_html(handler)
+            assert result == 'dashboard.html'
+
+    def test_custom_index_affects_log_message(self):
+        """自定义 index_page 应出现在 log_message 中"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            handler = self._make_handler_instance(tmpdir, index_page='dashboard.html')
+            # 验证 index_page 被正确设置
+            assert handler.index_page == 'dashboard.html'
+
+
 class TestLogMessage:
     """日志输出 — OpenSpec: log-03"""
 

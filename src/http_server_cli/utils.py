@@ -12,7 +12,7 @@ import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 HOME = os.path.expanduser('~')
 DATA_DIR = os.path.join(HOME, '.http-server-cli')
@@ -72,64 +72,57 @@ def write_json(filepath: str, data: dict) -> None:
 
 # ── 端口检测 ────────────────────────────────────────────
 
-def _check_macos() -> bool:
-    """非 macOS 平台给出 pending 提示"""
-    if sys.platform != 'darwin':
-        print('⚠️ http-server-cli 当前仅支持 macOS（依赖 lsof 命令）')
-        print('   Linux/Windows 支持开发中，欢迎贡献 PR')
-        print('   https://github.com/imjaden/http-server-cli')
-        return False
-    return True
-
 def is_port_in_use(port: int) -> bool:
-    """用 lsof 检测端口是否被占用（仅 macOS）"""
-    if not _check_macos():
-        return False
-    result = subprocess.run(
-        ['lsof', '-i', f':{port}', '-P', '-n', '-F', 'p'],
-        capture_output=True, text=True,
-        encoding='utf-8', errors='ignore',
-    )
-    return result.returncode == 0
+    """检测端口是否被占用（跨平台，socket 直连检测）"""
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        try:
+            return s.connect_ex(('127.0.0.1', port)) == 0
+        except (socket.gaierror, OSError):
+            return False
 
 def get_all_occupied_ports() -> set:
-    """一次性获取所有 LISTEN 状态的端口号，减少 lsof 调用次数"""
-    if not _check_macos():
-        return set()
-    try:
-        result = subprocess.run(
-            ['lsof', '-iTCP', '-sTCP:LISTEN', '-P', '-n'],
-            capture_output=True, text=True, timeout=5,
-            encoding='utf-8', errors='ignore',
-        )
-    except subprocess.TimeoutExpired:
-        return set()
-    if result.returncode != 0:
-        return set()
-    ports: set = set()
-    for line in result.stdout.strip().split('\n')[1:]:  # skip header
-        parts = line.split()
-        if len(parts) >= 9:
-            name = parts[8]  # "127.0.0.1:8080" or "*:8080" or "[::1]:8080"
-            if ':' in name:
-                port_str = name.rsplit(':', 1)[-1].rstrip(')')
-                if port_str.isdigit():
-                    ports.add(int(port_str))
-    return ports
+    """一次性获取所有 LISTEN 状态的端口号
+
+    macOS:  调用 lsof 快速批量获取（100ms 级）
+    其他平台: 回退到空集（find_available_port 会逐个检测）
+    """
+    if sys.platform == 'darwin':
+        try:
+            result = subprocess.run(
+                ['lsof', '-iTCP', '-sTCP:LISTEN', '-P', '-n'],
+                capture_output=True, text=True, timeout=5,
+                encoding='utf-8', errors='ignore',
+            )
+        except subprocess.TimeoutExpired:
+            return set()
+        if result.returncode != 0:
+            return set()
+        ports: set = set()
+        for line in result.stdout.strip().split('\n')[1:]:
+            parts = line.split()
+            if len(parts) >= 9:
+                name = parts[8]
+                if ':' in name:
+                    port_str = name.rsplit(':', 1)[-1].rstrip(')')
+                    if port_str.isdigit():
+                        ports.add(int(port_str))
+        return ports
+    return set()
 
 def find_available_port(start_port: int) -> Optional[int]:
-    """从 start_port 递增查找空闲端口，MAX_PORT 封顶（批量 lsof 检测）"""
-    occupied = get_all_occupied_ports()
+    """从 start_port 递增查找空闲端口，MAX_PORT 封顶"""
     port = start_port
     while port <= MAX_PORT:
-        if port not in occupied:
+        if not is_port_in_use(port):
             return port
         port += 1
     return None
 
 def get_pid_by_lsof(port: int) -> list:
     """通过 lsof 获取占用端口的 PID 列表（仅 macOS）"""
-    if not _check_macos():
+    if sys.platform != 'darwin':
         return []
     result = subprocess.run(
         ['lsof', '-i', f':{port}', '-P', '-n', '-F', 'p'],
@@ -241,6 +234,27 @@ def format_duration(started_at: str) -> str:
             return f'{hours}小时'
     except (ValueError, TypeError):
         return '-'
+
+# ── JSON 输出 ────────────────────────────────────────────
+
+def json_output(success: bool, command: str, data: Any = None, error: Optional[str] = None) -> None:
+    """统一 JSON 信封输出，供 API / MCP 消费者解析。
+
+    Args:
+        success: 操作是否成功
+        command: 命令名（start/list/status/kill/kill-all/config/set/version）
+        data: 业务数据 payload
+        error: 失败时的错误描述，成功时为 None
+    """
+    import json
+    payload = {
+        'success': success,
+        'command': command,
+        'data': data,
+        'error': error,
+    }
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+
 
 def which_python():
     """当前 Python 解释器路径"""

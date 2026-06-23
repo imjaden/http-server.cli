@@ -11,7 +11,7 @@ http-server-cli — 本地 HTTP 服务管理器
 =====================================
 基于 python3 -m http.server，自动检测可用端口、记录项目映射、管理服务生命周期。
 
-Version: 1.1(2026-06-20)
+Version: 1.0.5(2026-06-23)
 Description
 - 本地 HTTP 服务管理器，零外部依赖
 - 自动检测可用端口，记录项目映射
@@ -20,16 +20,15 @@ Description
 【指令清单】
 | 指令 | 功能说明 |
 |------|---------|
-| start [path] [-o] [-d] [-f] | 启动服务（path 默认 .；-o 打开浏览器；-d daemon；-f foreground） |
+| start [path] [-o] [-d] [-f] [-i] [--json] | 启动服务；-i 指定首页文件（--json 输出 JSON） |
 | list [--json] | 列出所有运行中的服务（--json 输出 JSON） |
 | status [--json] [port|path] | 查询单个服务状态（--json 输出 JSON） |
-| kill <port|path> | 关闭指定服务 |
-| kill-all | 关闭所有服务 |
+| kill <port|path> [--json] | 关闭指定服务（--json 输出 JSON） |
+| kill-all [--json] | 关闭所有服务（--json 输出 JSON） |
 | config [--json] | 显示当前配置（--json 输出 JSON） |
-| set port <num> | 修改默认端口 |
-| set domain <str> | 修改绑定域名 |
+| set port|domain <value> [--json] | 修改配置（--json 输出 JSON） |
 | help | 显示帮助信息 |
-| version | 显示版本号 |
+| version [--json] | 显示版本号（--json 输出 JSON） |
 
 【辅助工具】
 | 工具方法 | 功能说明 |
@@ -63,4 +62,4 @@ Dependency
 - 重大架构变更时主版本号 +1，修订号归零
 """
 
-__version__ = '1.0.4'
+__version__ = '1.0.5'

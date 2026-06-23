@@ -65,13 +65,13 @@ class Config:
     def show(self, json: bool = False) -> None:
         """打印配置，或返回 JSON 格式"""
         if json:
-            import json as _json
+            from http_server_cli.utils import json_output
             data = {
                 'port': self.port,
                 'domain': self.domain,
                 'data_dir': CONFIG_PATH,
             }
-            print(_json.dumps(data, ensure_ascii=False, indent=2))
+            json_output(success=True, command='config', data=data)
             return
         print('📋 http-server-cli 配置')
         print(f'  port:   {self.port}')
