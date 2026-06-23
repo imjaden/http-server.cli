@@ -160,16 +160,16 @@ if [ "$UPLOAD_OK" = true ]; then
 
     if [ "$TARGET" = "testpypi" ]; then
         echo "  验证安装:"
-        echo "    pip install --index-url https://test.pypi.org/simple/ http-server-cli"
+        echo "    pip install http-server-cli --index-url https://test.pypi.org/simple/"
         echo ""
         echo "  或升级:"
-        echo "    pip install --upgrade --index-url https://test.pypi.org/simple/ http-server-cli"
+        echo "    pip install --upgrade http-server-cli --index-url https://test.pypi.org/simple/"
     else
         echo "  验证安装:"
-        echo "    pip install http-server-cli"
+        echo "    pip install http-server-cli --index-url https://pypi.org/simple/"
         echo ""
         echo "  或升级:"
-        echo "    pip install --upgrade http-server-cli"
+        echo "    pip install --upgrade http-server-cli --index-url https://pypi.org/simple/"
     fi
 
     echo "  验证版本:"
