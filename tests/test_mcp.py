@@ -175,8 +175,9 @@ class TestMCPServerInitialization:
         assert result['protocolVersion'] == MCP_PROTOCOL_VERSION
 
     def test_dispatch_list_tools(self):
-        """dispatch 正确路由 tools/list"""
+        """dispatch 正确路由 tools/list（需先 init）"""
         server = MCPServer()
+        server._dispatch('initialize', {'protocolVersion': '2025-03-26', 'clientInfo': {}})
         result = server._dispatch('tools/list', {})
         assert 'tools' in result
 

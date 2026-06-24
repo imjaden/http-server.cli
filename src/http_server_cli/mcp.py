@@ -268,6 +268,8 @@ class MCPServer:
         """分发 JSON-RPC 方法"""
         if method == 'initialize':
             return self._handle_initialize(params)
+        elif method in ('tools/list', 'tools/call') and not self._initialized:
+            raise ValueError(f'Must call initialize first before {method}')
         elif method == 'tools/list':
             return self._handle_list_tools()
         elif method == 'tools/call':
@@ -289,9 +291,9 @@ class MCPServer:
     def _handle_initialize(self, params: dict) -> dict:
         """MCP 初始化握手"""
         version = params.get('protocolVersion', '')
-        # 记录客户端信息
         client_info = params.get('clientInfo', {})
         self._session_id = f'{client_info.get("name", "unknown")}-{id(self)}'
+        self._initialized = True
         return {
             'protocolVersion': MCP_PROTOCOL_VERSION,
             'serverInfo': {
