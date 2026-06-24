@@ -8,7 +8,7 @@
 >
 > Based on `python3 -m http.server`, zero external dependencies. Just `hs . -o` to preview your project.
 
-- [x] **Zero External Dependencies** — Only requires macOS (lsof/open) and Python 3.7+ (`pip install http-server-cli`)
+- [x] **Zero External Dependencies** — Requires Python 3.7+ only, cross-platform (macOS/Linux/Windows) (`pip install http-server-cli`)
 - [x] **Auto Port Allocation + Preview** — Default 8080, auto-increment on conflict (`hs . -o`)
 - [x] **Smart Homepage** — Auto-redirect to most recently modified HTML file when no index.html
 - [x] **Custom Index Page** — Specify default HTML file with `-i`/`--index`
@@ -111,7 +111,7 @@ hs kill-all                 # Kill all
 
 ## Platform Requirements
 
-Currently only supports **macOS** (requires `lsof` command). Linux/Windows support in development.
+Supports **macOS**, **Linux**, and **Windows** (macOS uses `lsof` for accelerated port detection; other platforms fall back to direct socket checking).
 
 ## Local Development
 

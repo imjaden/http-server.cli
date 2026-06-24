@@ -8,7 +8,7 @@
 >
 > 基于 `python3 -m http.server`，零外部依赖。项目目录下 `hs . -o` 一键预览。
 
-- [x] **零外部依赖** — 仅需 macOS（lsof/open）和 Python 3.7+（`pip install http-server-cli`）
+- [x] **零外部依赖** — 仅需 Python 3.7+，macOS/Linux/Windows 全平台支持（`pip install http-server-cli`）
 - [x] **端口自动分配+预览** — 默认 8080，冲突时自动递增找空闲端口（`hs . -o`）
 - [x] **智能首页** — 无 index.html 时自动重定向到最近修改的 html 文件
 - [x] **自定义首页** — 通过 `-i`/`--index` 指定首页文件
@@ -107,7 +107,7 @@ hs kill-all                 # 一键全关
 
 ## 平台要求
 
-当前仅支持 **macOS**（依赖 `lsof` 命令）。Linux/Windows 支持开发中。
+支持 **macOS**、**Linux**、**Windows**（macOS 使用 `lsof` 加速端口检测，其他平台自动降级为 socket 直连）。
 
 ## 本地开发
 
