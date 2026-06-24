@@ -43,7 +43,7 @@ Icon
 .coverage*
 htmlcov/
 loop.md
-agent-todo.mp
+agent-todo.md
 
 # Runtime
 *.log

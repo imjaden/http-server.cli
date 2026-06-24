@@ -11,11 +11,11 @@
 - [x] **零外部依赖** — 仅需 macOS（lsof/open）和 Python 3.7+（`pip install http-server-cli`）
 - [x] **端口自动分配+预览** — 默认 8080，冲突时自动递增找空闲端口（`hs . -o`）
 - [x] **智能首页** — 无 index.html 时自动重定向到最近修改的 html 文件
+- [x] **自定义首页** — 通过 `-i`/`--index` 指定首页文件
 - [x] **项目追踪** — 持久化记录项目路径↔端口映射（`hs list`）
 - [x] **进程资源监控** — 实时显示 CPU、内存使用和运行时长（`hs list`）
 - [x] **多种启动模式** — daemon 后台运行、foreground 前台运行（`-d` daemon / `-f` foreground）
 - [x] **JSON 输出** — 所有命令支持 `--json` 供 API/MCP 消费
-- [x] **自定义首页** — 通过 `-i`/`--index` 指定首页文件
 
 ## 为什么用 `hs`
 
