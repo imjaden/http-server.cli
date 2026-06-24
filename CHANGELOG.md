@@ -5,30 +5,52 @@
 ### Added
 - `hs dashboard` — Web dashboard for GUI management of HTTP services
   - REST API: list, status, kill, kill-all, restart
-  - Dark-themed inline HTML/CSS/JS, 5s auto-refresh
-  - `--json` one-shot query mode, `-d` daemon mode
-  - Duplicate run detection: shows status if already running
-  - Dashboard API now includes managed infrastructure services (MCP SSE)
+  - Dark-themed inline HTML/CSS/JS, 5s auto-refresh, favicon 📊
+  - `--json` one-shot query mode, `-o` auto-daemon + open browser
+  - Duplicate run detection: shows status or opens browser if already running
+  - Dashboard API includes managed infrastructure services (MCP SSE)
   - Managed registry integration (registry-managed.json)
+- `hs dashboard` subcommands:
+  - `hs dashboard stop` — stop running dashboard via managed registry
+  - `hs dashboard status` — query dashboard status (port/PID/duration/CPU/memory)
+  - `hs dashboard restart` — stop + restart
+  - `hs dashboard help` — dashboard-specific usage
 - `hs mcp` — MCP Server for AI Agent integration
-  - JSON-RPC 2.0 over SSE (default) or stdio transport
-  - Default mode: SSE + daemon (background)
+  - JSON-RPC 2.0 over SSE (default, auto-daemon) or stdio transport
   - 6 tools: hs_list, hs_status, hs_start, hs_kill, hs_kill_all, hs_config
-  - SSE mode registers to managed registry, stdio mode does not
+  - SSE mode registers to managed registry; stdio mode does not
   - Duplicate run detection for SSE mode
+  - Init sequence validation (rejects tools before initialize)
   - Package CLI via subprocess (方案A), zero external dependencies
+- `hs mcp` subcommands:
+  - `hs mcp stop` — stop MCP SSE service via managed registry
+  - `hs mcp status` — query MCP status (port/PID/duration)
+  - `hs mcp restart` — stop + restart
+  - `hs mcp help` — mcp-specific usage
+- `hs list` now merges both registries, managed services marked with 🔧
 - `registry-managed.json` — separate registry for infrastructure services
   - Dashboard and MCP SSE services tracked here
-  - `hs list` merges both registries, managed services marked with 🔧
   - `hs kill-all` does NOT affect managed services
-- Web dashboard fix: frontend JS now correctly reads `data.data.servers` (bug fix for empty table)
-- Test suite for registry_managed, updated dashboard/mcp tests (48 new tests)
+- `scripts/hs-mcp-demo.py` — reusable MCP integration verification script
+  - Subcommand mode: help/status/init/tools/hs_list/hs_config/all
+  - Zero third-party deps, no auto-start (shows manual commands)
+  - Includes AI Agent config examples (Claude Desktop, Cursor, VS Code)
+- Test suite: 182 tests (registry_managed, dashboard, MCP, CLI, server)
 
 ### Changed
-- `hs mcp` default transport changed from stdio to SSE
-- `hs mcp` now supports `-d`/`--daemon` flag
-- `hs list` now shows managed infrastructure services with 🔧 marker
+- `hs mcp` default transport changed from stdio to SSE (auto-daemon)
+- `hs dashboard -o` now auto-daemons (no need for `-d`)
+- Dashboard web layout: h1 + stats + toolbar on same line (compact flexbox)
+- `_execute_hs()`: parses full JSON output first, handles multi-line `indent=2` output
 - `__version__` bumped to 1.0.7
+
+### Fixed
+- Dashboard API returning empty user services (Registry cached at server start;
+  now creates fresh ServerManager per API request)
+- MCP `_execute_hs()` failing on multi-line JSON output from `json_output()`
+- Dashboard frontend JS reading `data.servers` instead of `data.data.servers`
+- `hs dashboard -o` not opening browser in daemon mode (parent now opens browser)
+- `hs mcp` daemon infinite subprocess chain (HS_MCP_WORKER env var)
 
 ## 1.0.6 (2026-06-23)
 

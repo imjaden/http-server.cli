@@ -16,6 +16,9 @@
 - [x] **Process Resource Monitoring** — Real-time CPU, memory usage and runtime (`hs list`)
 - [x] **Multiple Launch Modes** — Daemon background or foreground (`-d` daemon / `-f` foreground)
 - [x] **JSON Output** — All commands support `--json` for API/MCP consumption
+- [x] **Web Dashboard** — `hs dashboard -o` GUI management for HTTP services
+- [x] **MCP Server** — `hs mcp` AI Agent integration (SSE/stdio, 6 tools)
+- [x] **Managed Registry** — Infrastructure services isolated from user services
 
 ## Why `hs`
 
@@ -78,9 +81,11 @@ hs kill-all                 # Kill all
 || `hs status [port\|path]` | Query single server status |
 || `hs status --json [port\|path]` | JSON format status |
 || `hs kill <port\|path>` | Kill specified server |
-|| `hs kill-all` | Kill all servers |
 || `hs dashboard [-p PORT] [-o] [--json]` | Web dashboard (default port 8180) |
+|| `hs dashboard stop\|status\|restart\|help` | Dashboard management subcommands |
 || `hs mcp [--transport stdio\|sse] [--port PORT]` | MCP Server for AI Agent integration |
+|| `hs mcp stop\|status\|restart\|help` | MCP management subcommands |
+|| `hs kill-all` | Kill all servers |
 || `hs config` | Show configuration |
 || `hs config --json` | JSON format configuration |
 || `hs set port <num>` | Set default port (default 8080) |
@@ -98,9 +103,10 @@ hs kill-all                 # Kill all
 
 ```
 ~/.http-server-cli/
-├── config.json       # Default port/domain configuration
-├── registry.json     # port → {path, pid, domain, daemon, foreground, started_at}
-└── logs/{port}.log   # http.server logs
+├── config.json            # Default port/domain configuration
+├── registry.json          # port → {path, pid, domain, daemon, foreground, started_at}
+├── registry-managed.json  # Infrastructure services (dashboard, MCP SSE)
+└── logs/{port}.log        # http.server logs
 ```
 
 ## Platform Requirements

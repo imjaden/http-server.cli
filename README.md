@@ -16,6 +16,9 @@
 - [x] **进程资源监控** — 实时显示 CPU、内存使用和运行时长（`hs list`）
 - [x] **多种启动模式** — daemon 后台运行、foreground 前台运行（`-d` daemon / `-f` foreground）
 - [x] **JSON 输出** — 所有命令支持 `--json` 供 API/MCP 消费
+- [x] **Web 仪表盘** — `hs dashboard -o` 图形化管理 HTTP 服务
+- [x] **MCP Server** — `hs mcp` AI Agent 集成（SSE/stdio，6 个工具）
+- [x] **Managed Registry** — 基础设施服务与用户服务隔离管理
 
 ## 为什么用 `hs`
 
@@ -73,11 +76,13 @@ hs kill-all                 # 一键全关
 |:-----|:------|
 | `hs . [-o] [-d] [-f]` | **快捷方式**，等价 `hs start .` |
 | `hs start [path] [-o] [-d] [-f] [-i <file>]` | 启动服务；`-i` 指定首页文件 |
-| `hs list [--json]` | 列出所有运行中服务 |
-| `hs status [--json] [port\|path]` | 查询单个服务状态 |
+|| `hs list [--json]` | 列出所有运行中服务 |
+|| `hs status [--json] [port\|path]` | 查询单个服务状态 |
 || `hs kill <port\|path> [--json]` | 关闭指定服务 |
 || `hs dashboard [-p PORT] [-o] [-d] [--json]` | Web 仪表盘（默认端口 8180） |
+|| `hs dashboard stop\|status\|restart\|help` | dashboard 管理子命令 |
 || `hs mcp [--transport stdio\|sse] [--port PORT]` | MCP Server（供 AI Agent 集成） |
+|| `hs mcp stop\|status\|restart\|help` | MCP 管理子命令 |
 || `hs kill-all [--json]` | 关闭所有服务 |
 | `hs config [--json]` | 显示配置 |
 | `hs set port|domain <value> [--json]` | 修改配置 |
@@ -94,9 +99,10 @@ hs kill-all                 # 一键全关
 
 ```
 ~/.http-server-cli/
-├── config.json       # 默认端口/域名配置
-├── registry.json     # port → {path, pid, domain, daemon, foreground, started_at}
-└── logs/{port}.log   # http.server 日志
+├── config.json            # 默认端口/域名配置
+├── registry.json          # port → {path, pid, domain, daemon, foreground, started_at}
+├── registry-managed.json  # 基础设施服务（dashboard、MCP SSE）
+└── logs/{port}.log        # http.server 日志
 ```
 
 ## 平台要求
