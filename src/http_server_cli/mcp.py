@@ -485,12 +485,20 @@ def serve_sse(port: int = 8181, daemon: bool = False) -> None:
         port: 监听端口
         daemon: 后台守护模式
     """
+    # 避免无限子进程链：被 daemon 拉起的子进程直接运行
+    if os.environ.get('HS_MCP_WORKER') == '1':
+        _serve_sse(port=port)
+        return
+
     if daemon:
         import subprocess as _sp
         hs_entry = os.path.join(os.path.dirname(__file__), '__main__.py')
         cmd = [sys.executable, hs_entry, 'mcp', '--transport', 'sse', '-p', str(port)]
+        env = os.environ.copy()
+        env['HS_MCP_WORKER'] = '1'
         proc = _sp.Popen(
             cmd,
+            env=env,
             stdout=_sp.DEVNULL,
             stderr=_sp.DEVNULL,
             preexec_fn=os.setsid if hasattr(os, 'setsid') else None,

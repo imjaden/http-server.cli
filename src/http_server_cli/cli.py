@@ -43,7 +43,7 @@ _HELP = """http-server-cli v{version} — 忘记端口，只管预览
 
   hs dashboard -o          打开 Web 管理面板（默认端口 8180）
   hs dashboard --json      一次性查询服务列表
-  hs mcp                   启动 MCP Server（默认 SSE + daemon，AI Agent 集成）
+  hs mcp                   启动 MCP Server（后台运行 SSE，AI Agent 集成）
 
 ━━━ 配置 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -344,11 +344,10 @@ def _cmd_dashboard(manager, args):
 
 @_register
 def _cmd_mcp(manager, args):
-    """hs mcp — MCP Server（默认 SSE + daemon）"""
+    """hs mcp — MCP Server（自动后台运行 SSE）"""
     parser = argparse.ArgumentParser(prog='hs mcp', add_help=False)
     parser.add_argument('--transport', choices=['stdio', 'sse'], default='sse')
     parser.add_argument('--port', type=int, default=8181)
-    parser.add_argument('-d', '--daemon', action='store_true')
     try:
         parsed, _ = parser.parse_known_args(args)
     except SystemExit:
@@ -357,9 +356,9 @@ def _cmd_mcp(manager, args):
         from http_server_cli.mcp import serve_stdio
         serve_stdio()
     else:
-        # SSE 模式 — 默认 daemon
+        # SSE 模式 — 自动后台运行（常驻服务，不占用终端）
         from http_server_cli.mcp import serve_sse
-        serve_sse(port=parsed.port, daemon=parsed.daemon)
+        serve_sse(port=parsed.port, daemon=True)
 
 # ── main ───────────────────────────────────────────────
 

@@ -613,17 +613,19 @@ def serve(port: int = 8180, open_browser: bool = False,
         import subprocess as _sp
         hs_entry = os.path.join(os.path.dirname(__file__), '__main__.py')
         cmd = [sys.executable, hs_entry, 'dashboard', '-p', str(port)]
-        if open_browser:
-            cmd.append('-o')
         proc = _sp.Popen(
             cmd,
             stdout=_sp.DEVNULL,
             stderr=_sp.DEVNULL,
             preexec_fn=os.setsid if hasattr(os, 'setsid') else None,
         )
-        # 注册 managed 条目（父进程 PID）
+        # 注册 managed 条目
         mreg.add(name='dashboard', type_='http', port=port, pid=proc.pid)
         print(f'📊  hs dashboard (daemon) →  http://127.0.0.1:{port}  (PID: {proc.pid})')
+        if open_browser:
+            time.sleep(0.5)
+            webbrowser.open(f'http://127.0.0.1:{port}')
+            print('🌐  浏览器已打开')
         print(f'⏹  使用 hs kill {port} 或 kill {proc.pid} 停止')
         return
 

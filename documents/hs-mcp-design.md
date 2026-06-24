@@ -16,7 +16,7 @@ MCP (Model Context Protocol) 是 Anthropic 提出的开放协议，定义了 AI 
 
 1. **零外部依赖** — MCP 协议基于 JSON-RPC 2.0，直接用 stdio 通信，无需 SDK
 2. **薄封装层** — MCP Server 不实现任何业务逻辑，仅将 `hs --json` 命令包装为 MCP Tool
-3. **优先 stdio 模式** — AI Agent 原生支持，无需启动独立 HTTP 服务
+3. **SSE 模式为默认** — 自动后台常驻，适合持续集成的 AI Agent 场景
 4. **复用 --json 输出** — CLI 的 `--json` 输出格式就是 MCP Tool 的响应格式
 
 ---
@@ -24,9 +24,9 @@ MCP (Model Context Protocol) 是 Anthropic 提出的开放协议，定义了 AI 
 ## 二、用法
 
 ```bash
-hs mcp                     # 启动 MCP Server（stdio 模式）
-hs mcp --transport sse     # SSE 模式（HTTP 服务）
-hs mcp --port 8181         # SSE 模式指定端口
+hs mcp                              # 默认 SSE 模式，自动后台运行（常驻服务）
+hs mcp --port 8181                  # SSE 模式指定端口
+hs mcp --transport stdio            # stdio 模式（一次性，AI Agent 原生支持）
 ```
 
 ### AI Agent 配置示例
@@ -47,7 +47,7 @@ hs mcp --port 8181         # SSE 模式指定端口
 **Cursor**:
 
 ```
-Command: hs mcp
+Command: hs mcp --transport stdio
 ```
 
 ---
@@ -81,7 +81,7 @@ MCP 基于 JSON-RPC 2.0，通过 stdio 的 stdin/stdout 通信。
 |--------|------|------|
 | `hs_list` | 列出所有运行中的服务 | `{}` |
 | `hs_status` | 查询单个服务状态 | `{ port: number }` |
-| `hs_start` | 启动 HTTP 服务 | `{ path: string, open?: bool, daemon?: bool, foreground?: bool, index?: string }` |
+| `hs_start` | 启动 HTTP 服务 | `{ path: string, open?: bool, index?: string }` |
 | `hs_kill` | 关闭指定服务 | `{ port?: number, path?: string }` |
 | `hs_kill_all` | 关闭所有服务 | `{}` |
 | `hs_config` | 显示当前配置 | `{}` |
@@ -120,7 +120,7 @@ MCP 基于 JSON-RPC 2.0，通过 stdio 的 stdin/stdout 通信。
 
 ---
 
-## 四、实现方案 A：直接包装 CLI（推荐）
+## 四、实现方案：直接包装 CLI
 
 ### 架构
 
@@ -128,6 +128,7 @@ MCP 基于 JSON-RPC 2.0，通过 stdio 的 stdin/stdout 通信。
 AI Agent                    MCP Server (hs mcp)
    │                              │
    │  JSON-RPC 2.0 over stdio     │
+   │  or SSE / HTTP               │
    ├─────────────────────────────▶│
    │  tools/call hs_kill          │
    │                              ├─▶ subprocess hs kill 8080 --json
@@ -151,7 +152,7 @@ def _execute_hs(args: list) -> dict:
 
 ### 文件结构
 
-**新增 `src/http_server_cli/mcp.py`** (~150 行)：
+**`src/http_server_cli/mcp.py`** (~500 行)：
 
 ```
 mcp.py
@@ -162,7 +163,9 @@ mcp.py
   │   ├── _handle_initialize() # 协议握手
   │   ├── _handle_list_tools() # 返回工具列表
   │   └── _handle_call_tool()  # 执行 hs 命令
-  └── serve_stdio()   # 入口函数
+  ├── serve_stdio()   # stdio 入口函数
+  ├── serve_sse()     # SSE 入口函数（含 daemon 逻辑）
+  └── _serve_sse()    # SSE 内部函数（HTTP 服务主循环）
 ```
 
 ### 工具到命令的映射
@@ -171,8 +174,7 @@ mcp.py
 _TOOL_MAP = {
     'hs_list':    (['list'], {}),
     'hs_status':  (['status', '{port}'], {'port': 'port'}),
-    'hs_start':   (['start', '{path}'], {'path': 'path', 'open': 'open_browser',
-                   'daemon': 'daemon', 'foreground': 'foreground',
+    'hs_start':   (['start', '{path}'], {'path': 'path', 'open': 'open',
                    'index': 'index_page'}),
     'hs_kill':    (['kill', '{port}'], {'port': 'port', 'path': 'path'}),
     'hs_kill_all': (['kill-all'], {}),
@@ -180,77 +182,136 @@ _TOOL_MAP = {
 }
 ```
 
----
+### 隔离性说明
 
-## 五、实现方案 B：共享库调用（备选）
-
-### 架构
-
-```
-MCP Server
-   │
-   ├─▶ from http_server_cli.server import ServerManager
-   │
-   ├─▶ mgr = ServerManager()
-   ├─▶ mgr.list(json=True)     # 直接调用
-   ├─▶ mgr.kill('8080', json=True)
-   └─▶ ...
-```
-
-### 优缺点对比
-
-| 维度 | 方案 A：包装 CLI | 方案 B：共享库 |
-|------|:---:|:---:|
-| 实现复杂度 | ★☆☆ | ★★☆ |
-| 隔离性（MCP 层不影响业务状态） | ✅ 强 | ⚠️ 共享进程状态 |
-| 跨版本兼容 | ✅ CLI 接口稳定 | ⚠️ 内部 API 可能变 |
-| 调试难度 | ★☆☆ 独立进程 | ★★☆ 同进程竞态 |
-| 响应速度 | 毫秒级（子进程启动时间） | 微秒级（直接调用） |
-
-**推荐方案 A**：隔离性好，与 CLI 行为一致，调试简单。
+采用子进程包装而非共享库调用，原因：
+- **隔离性强** — MCP 层不影响业务进程状态
+- **一致性** — 与用户手动执行 `hs ...` 行为完全一致
+- **调试简单** — 独立进程，竞态风险低
+- **响应速度** — 毫秒级子进程启动时间，可接受
 
 ---
 
-## 六、SSE 模式（可选）
+## 五、传输模式对比
 
-SSE 模式通过 HTTP 提供 MCP 服务，适合远程访问。
-
-```
-hs mcp --transport sse --port 8181
-```
-
-相比 stdio 模式新增：
+### SSE 模式（默认）
 
 | 路由 | 功能 |
 |------|------|
-| `GET /sse` | SSE 事件流，服务端→客户端消息 |
+| `GET /sse` | SSE 事件流，服务端→客户端推送 |
 | `POST /messages` | 客户端→服务端消息 |
 
-实现上，SSE 模式复用 `MCPServer` 的消息分发逻辑，仅传输层不同。
+SSE 模式复用 `MCPServer._dispatch()` 的消息分发逻辑，仅传输层不同。
+
+### stdio 模式（显式指定）
+
+```
+hs mcp --transport stdio
+```
+
+直接在 stdin/stdout 上运行 JSON-RPC 2.0，适合 Claude Desktop 等原生支持 stdio 的客户端，无需 HTTP 端口。
+
+### 对比表
+
+| 维度 | SSE（默认） | stdio |
+|------|:-----------:|:-----:|
+| 默认值 | ✅ 是 | — |
+| 后台常驻 | ✅ 自动 daemon | ❌ 占用终端 |
+| 断线重连 | ✅ 可重连 | ❌ 进程结束即终止 |
+| 端口占用 | 8181（可配） | 无 |
+| 注册到管理表 | ✅ registry-managed.json | ❌ 无状态 |
+| 重复运行检测 | ✅ 自动检测 + 提示 | ❌ 不适用 |
+| AI Agent 适配 | 需 HTTP 地址 | 原生支持 |
+| VS Code / Cursor | ℹ️ 需 HTTP 代理 | ✅ 直接配置 |
+| 远程访问 | ✅ 可代理转发 | ❌ 本地进程 |
+| 生命周期 | 独立进程，hs kill 可停 | 随父进程退出 |
+
+### 何时使用哪种模式
+
+**选 SSE（默认）：**
+- 需要永久常驻的 MCP 服务
+- 多人共享或远程开发环境
+- 使用 VS Code 或 Cursor 等通过 HTTP 连接的 IDE
+- 需要重复运行检测防止端口冲突
+
+**选 stdio（`--transport stdio`）：**
+- Claude Desktop 等原生支持 stdio 的客户端
+- 临时使用，用完即止的场景
+- 不希望占用端口的环境
+- CI/CD pipeline 中的一次性工具调用
 
 ---
 
-## 七、工作量估算
+## 六、关键实现细节
 
-### 方案 A（推荐）
+### 1. SSE 自动 daemon 与 HS_MCP_WORKER 防循环
 
-| 模块 | 文件 | 代码量 | 时间 |
-|------|------|--------|------|
-| MCP 协议处理 | `mcp.py` | ~120 行 | 2h |
-| CLI 入口 | `cli.py` | +5 行 | 0.5h |
-| 测试 | `tests/test_mcp.py` | ~80 行 | 1.5h |
-| **合计** | | **~205 行** | **~0.5 天** |
+SSE 模式默认自动 daemon（后台运行），通过 `HS_MCP_WORKER` 环境变量防止无限子进程链：
 
-### 方案 B（备选）
+```
+用户执行 hs mcp（默认 SSE）
+  │
+  ├─ 检查 HS_MCP_WORKER=1？
+  │   └─ 否 → 进入 daemon 分支
+  │       ├─ 设置 HS_MCP_WORKER=1 环境变量
+  │       ├─ 通过 subprocess.Popen 启动子进程（后台）
+  │       │   └─ 子进程：HS_MCP_WORKER=1 → 直接进入 _serve_sse()
+  │       ├─ 注册到 ManagedRegistry（PID 为子进程 PID）
+  │       ├─ 输出提示信息到终端
+  │       └─ 父进程退出（终端归还原用户）
+  │
+  └─ 是 → 直接执行 _serve_sse() 进入 HTTP 主循环
+```
 
-| 模块 | 代码量 | 时间 |
-|------|--------|------|
-| MCP 协议 + 业务逻辑 | ~180 行 | 3h |
-| **合计** | | **~0.5 天** |
+**为什么需要 HS_MCP_WORKER：**
+- `hs mcp` 本身就是一个 `hs` 命令的子进程（通过子进程调用）
+- 如果 daemon 分支再次调用 `hs mcp`，会形成无限循环
+- `HS_MCP_WORKER=1` 标记子进程已脱离 daemon 流程，直接启动服务
+
+### 2. 重复运行检测
+
+SSE 模式在 `_serve_sse()` 启动前检查 `registry-managed.json`：
+
+```python
+mreg = ManagedRegistry()
+existing = mreg.find(name='mcp')
+if existing:
+    # 验证 PID 存活 + 端口可用
+    if is_process_alive(epid) and is_port_in_use(eport):
+        # 输出已有服务信息并返回，不启动新进程
+        return
+    else:
+        # 进程已死，清理旧记录后继续启动
+        mreg.remove(name='mcp')
+```
+
+### 3. Managed Registry 注册
+
+SSE 模式在 HTTP 服务器启动后立即注册到 `registry-managed.json`：
+
+```python
+mreg.add(name='mcp', type_='sse', port=port, pid=os.getpid(), transport='sse')
+```
+
+- daemon 模式：父进程注册，PID 指向子进程
+- 前台模式（HS_MCP_WORKER=1）：当前进程注册
+
+注销发生在 `KeyboardInterrupt` 时自动清理，或通过 `hs list` 查看状态。
+
+### 4. hs start 强制 daemon 模式
+
+MCP 场景下 `hs_start` 工具的 `foreground` 参数被忽略，始终以 daemon 方式启动：
+
+```python
+if name == 'hs_start' and 'foreground' not in hs_args:
+    hs_args.insert(1, '--daemon')
+```
+
+确保 AI Agent 发起的服务启动不会阻塞 MCP 连接。
 
 ---
 
-## 八、MCP 与 Dashboard 的关系
+## 七、MCP 与 Dashboard 的关系
 
 ```
 hs CLI (--json)
@@ -265,5 +326,29 @@ hs CLI (--json)
 两者独立：
 - **Dashboard** 提供可视化页面给人看，需要 HTML/CSS/JS
 - **MCP Server** 提供结构化接口给 AI 用，纯 JSON，不需要 UI
-- **数据源相同**：都通过 `ServerManager`（方案 B）或子进程调用（方案 A）操作
+- **数据源相同**：都通过子进程调用 `hs --json`
 - **可独立部署**：dashboard 不依赖 MCP，MCP 不依赖 dashboard
+- **共享注册表**：两者都注册到 `registry-managed.json`，`hs list` 合并展示
+
+---
+
+## 八、代码路径
+
+| 文件 | 职责 | 代码量 |
+|------|------|--------|
+| `src/http_server_cli/mcp.py` | MCP 协议层 + SSE HTTP 服务 | ~510 行 |
+| `src/http_server_cli/cli.py` | CLI 入口 `_cmd_mcp` | ~15 行 |
+| `src/http_server_cli/registry_managed.py` | ManagedRegistry 持久化注册 | ~100 行 |
+
+`_cmd_mcp` 在 `cli.py`：
+
+```python
+@_register
+def _cmd_mcp(manager, args):
+    parser.add_argument('--transport', choices=['stdio', 'sse'], default='sse')
+    parser.add_argument('--port', type=int, default=8181)
+    if parsed.transport == 'stdio':
+        serve_stdio()
+    else:
+        serve_sse(port=parsed.port, daemon=True)
+```
