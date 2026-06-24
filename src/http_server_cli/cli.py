@@ -41,7 +41,7 @@ _HELP = """http-server-cli v{version} — 忘记端口，只管预览
 
 ━━━ 图形与集成 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  hs dashboard -o          打开 Web 管理面板（默认端口 8180）
+  hs dashboard -o          打开 Web 管理面板（自动后台运行，默认端口 8180）
   hs dashboard --json      一次性查询服务列表
   hs mcp                   启动 MCP Server（后台运行 SSE，AI Agent 集成）
 
@@ -327,7 +327,7 @@ def _cmd_version(manager, args):
 
 @_register
 def _cmd_dashboard(manager, args):
-    """hs dashboard — Web 仪表盘"""
+    """hs dashboard — Web 仪表盘（自动后台运行）"""
     parser = argparse.ArgumentParser(prog='hs dashboard', add_help=False)
     parser.add_argument('-p', '--port', type=int, default=8180)
     parser.add_argument('-o', '--open', action='store_true')
@@ -338,8 +338,10 @@ def _cmd_dashboard(manager, args):
     except SystemExit:
         return
     from http_server_cli.dashboard import serve
+    # 指定 -o 时自动后台运行（dashboard 是常驻服务）
+    auto_daemon = parsed.daemon or parsed.open
     serve(port=parsed.port, open_browser=parsed.open,
-          json_output_mode=parsed.json, daemon=parsed.daemon)
+          json_output_mode=parsed.json, daemon=auto_daemon)
 
 
 @_register

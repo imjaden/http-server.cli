@@ -591,7 +591,11 @@ def serve(port: int = 8180, open_browser: bool = False,
             cpu_s = stats.get('cpu', '-')
             mem_s = stats.get('memory', '-')
             print(f'    📊  时长: {duration}  |  CPU: {cpu_s}  |  内存: {mem_s}')
-            print(f'    💡  打开浏览器: hs dashboard -o')
+            if open_browser:
+                webbrowser.open(f'http://127.0.0.1:{eport}')
+                print('🌐  浏览器已打开')
+            else:
+                print(f'    💡  打开浏览器: hs dashboard -o')
             return
         else:
             # 残留记录，清理
