@@ -42,6 +42,8 @@ Icon
 .pytest_cache/
 .coverage*
 htmlcov/
+loop.md
+agent-todo.mp
 
 # Runtime
 *.log
