@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.0.7 (2026-06-24)
+
+### Added
+- `hs dashboard` — Web dashboard for GUI management of HTTP services
+  - REST API: list, status, kill, kill-all, restart
+  - Dark-themed inline HTML/CSS/JS, 5s auto-refresh
+  - `--json` one-shot query mode, `-d` daemon mode
+- `hs mcp` — MCP Server for AI Agent integration
+  - JSON-RPC 2.0 over stdio/SSE transport
+  - 6 tools: hs_list, hs_status, hs_start, hs_kill, hs_kill_all, hs_config
+  - Package CLI via subprocess (方案A), zero external dependencies
+- Test suite for dashboard and MCP modules (37+ new tests)
+
+### Changed
+- `__version__` bumped to 1.0.7
+- CLI help text updated with dashboard/mcp commands
+
 ## 1.0.6 (2026-06-23)
 
 ### Added

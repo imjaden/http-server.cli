@@ -27,6 +27,8 @@ _HELP = """http-server-cli v{version} — 忘记端口，只管预览
   list [--json]                   列出所有运行中的服务
   status [--json] [port|path]     查询单个服务状态
   kill <port|path> [--json]       关闭指定服务
+  dashboard [-p PORT] [-o] [-d] [--json]  Web 仪表盘（默认端口 8180）
+  mcp [--transport stdio|sse] [--port PORT]  MCP Server（供 AI Agent 集成）
   kill-all [--json]               关闭所有服务
   config [--json]                 显示当前配置
   set port|domain <value> [--json]  修改配置
@@ -219,6 +221,41 @@ def _cmd_version(manager, args):
         json_output(True, 'version', data=data)
     else:
         print(f'http-server-cli v{__version__}')
+
+
+@_register
+def _cmd_dashboard(manager, args):
+    """hs dashboard — Web 仪表盘"""
+    parser = argparse.ArgumentParser(prog='hs dashboard', add_help=False)
+    parser.add_argument('-p', '--port', type=int, default=8180)
+    parser.add_argument('-o', '--open', action='store_true')
+    parser.add_argument('-d', '--daemon', action='store_true')
+    parser.add_argument('--json', action='store_true')
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
+        return
+    from http_server_cli.dashboard import serve
+    serve(port=parsed.port, open_browser=parsed.open,
+          json_output_mode=parsed.json, daemon=parsed.daemon)
+
+
+@_register
+def _cmd_mcp(manager, args):
+    """hs mcp — MCP Server"""
+    parser = argparse.ArgumentParser(prog='hs mcp', add_help=False)
+    parser.add_argument('--transport', choices=['stdio', 'sse'], default='stdio')
+    parser.add_argument('--port', type=int, default=8181)
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
+        return
+    if parsed.transport == 'sse':
+        from http_server_cli.mcp import serve_sse
+        serve_sse(port=parsed.port)
+    else:
+        from http_server_cli.mcp import serve_stdio
+        serve_stdio()
 
 # ── main ───────────────────────────────────────────────
 
