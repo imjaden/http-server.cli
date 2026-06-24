@@ -76,14 +76,14 @@ hs kill-all                 # 一键全关
 |:-----|:------|
 | `hs . [-o] [-d] [-f]` | **快捷方式**，等价 `hs start .` |
 | `hs start [path] [-o] [-d] [-f] [-i <file>]` | 启动服务；`-i` 指定首页文件 |
-|| `hs list [--json]` | 列出所有运行中服务 |
-|| `hs status [--json] [port\|path]` | 查询单个服务状态 |
-|| `hs kill <port\|path> [--json]` | 关闭指定服务 |
-|| `hs dashboard [-p PORT] [-o] [-d] [--json]` | Web 仪表盘（默认端口 8180） |
-|| `hs dashboard stop\|status\|restart\|help` | dashboard 管理子命令 |
-|| `hs mcp [--transport stdio\|sse] [--port PORT]` | MCP Server（供 AI Agent 集成） |
-|| `hs mcp stop\|status\|restart\|help` | MCP 管理子命令 |
-|| `hs kill-all [--json]` | 关闭所有服务 |
+| `hs list [--json]` | 列出所有运行中服务 |
+| `hs status [--json] [port\|path]` | 查询单个服务状态 |
+| `hs kill <port\|path> [--json]` | 关闭指定服务 |
+| `hs dashboard [-p PORT] [-o] [-d] [--json]` | Web 仪表盘（默认端口 8180） |
+| `hs dashboard stop\|status\|restart\|help` | dashboard 管理子命令 |
+| `hs mcp [--transport stdio\|sse] [--port PORT]` | MCP Server（供 AI Agent 集成） |
+| `hs mcp stop\|status\|restart\|help` | MCP 管理子命令 |
+| `hs kill-all [--json]` | 关闭所有服务 |
 | `hs config [--json]` | 显示配置 |
 | `hs set port|domain <value> [--json]` | 修改配置 |
 

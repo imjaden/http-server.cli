@@ -76,20 +76,20 @@ hs kill-all                 # Kill all
 |:-----|:------|
 | `hs . [-o] [-d] [-f]` | **Shortcut**, equivalent to `hs start .` |
 | `hs start [path] [-o] [-d] [-f] [-i <file>]` | Start server (path defaults to `.`; `-o` open browser; `-d` daemon; `-f` foreground; `-i` custom index) |
-|| `hs list` | List all running servers |
-|| `hs list --json` | JSON format list |
-|| `hs status [port\|path]` | Query single server status |
-|| `hs status --json [port\|path]` | JSON format status |
-|| `hs kill <port\|path>` | Kill specified server |
-|| `hs dashboard [-p PORT] [-o] [--json]` | Web dashboard (default port 8180) |
-|| `hs dashboard stop\|status\|restart\|help` | Dashboard management subcommands |
-|| `hs mcp [--transport stdio\|sse] [--port PORT]` | MCP Server for AI Agent integration |
-|| `hs mcp stop\|status\|restart\|help` | MCP management subcommands |
-|| `hs kill-all` | Kill all servers |
-|| `hs config` | Show configuration |
-|| `hs config --json` | JSON format configuration |
-|| `hs set port <num>` | Set default port (default 8080) |
-|| `hs set domain <str>` | Set bind domain (default localhost) |
+| `hs list` | List all running servers |
+| `hs list --json` | JSON format list |
+| `hs status [port\|path]` | Query single server status |
+| `hs status --json [port\|path]` | JSON format status |
+| `hs kill <port\|path>` | Kill specified server |
+| `hs dashboard [-p PORT] [-o] [--json]` | Web dashboard (default port 8180) |
+| `hs dashboard stop\|status\|restart\|help` | Dashboard management subcommands |
+| `hs mcp [--transport stdio\|sse] [--port PORT]` | MCP Server for AI Agent integration |
+| `hs mcp stop\|status\|restart\|help` | MCP management subcommands |
+| `hs kill-all` | Kill all servers |
+| `hs config` | Show configuration |
+| `hs config --json` | JSON format configuration |
+| `hs set port <num>` | Set default port (default 8080) |
+| `hs set domain <str>` | Set bind domain (default localhost) |
 
 ### Tips
 
