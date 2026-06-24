@@ -18,6 +18,8 @@ import threading
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from http_server_cli.utils import is_port_in_use, is_process_alive
+
 # ── MCP 协议常量 ───────────────────────────────────────
 
 MCP_PROTOCOL_VERSION = '2025-03-26'
@@ -353,8 +355,26 @@ class MCPServer:
 # ── SSE 传输模式 ───────────────────────────────────────
 
 def _serve_sse(port: int = 8181) -> None:
-    """SSE 模式 MCP Server（HTTP 传输）"""
+    """SSE 模式 MCP Server（HTTP 传输），注册到 managed registry"""
     from http.server import HTTPServer, BaseHTTPRequestHandler
+    from http_server_cli.registry_managed import ManagedRegistry
+
+    # ── 重复执行检测 ──
+    mreg = ManagedRegistry()
+    existing = mreg.find(name='mcp')
+    if existing:
+        epid = existing.get('pid')
+        eport = existing.get('port')
+        if epid and is_process_alive(epid) and is_port_in_use(eport):
+            from http_server_cli.utils import format_duration as _fd
+            duration = _fd(existing.get('started_at', ''))
+            print(f'📡  hs mcp 已在运行')
+            print(f'    🔧  http://127.0.0.1:{eport}/sse  (PID: {epid})')
+            print(f'    📊  时长: {duration}')
+            print(f'    💡  SSE endpoint: http://127.0.0.1:{eport}/sse')
+            return
+        else:
+            mreg.remove(name='mcp')
 
     _sse_clients: list[threading.Event] = []
     _sse_lock = threading.Lock()
@@ -388,12 +408,11 @@ def _serve_sse(port: int = 8181) -> None:
             self.wfile.write(f'event: start\ndata: {json.dumps({"sessionId": session_id})}\n\n'.encode())
             self.wfile.flush()
 
-            # 保持连接
             event = threading.Event()
             with _sse_lock:
                 _sse_clients.append(event)
             try:
-                event.wait()  # 阻塞直到连接关闭
+                event.wait()
             except KeyboardInterrupt:
                 pass
             finally:
@@ -428,12 +447,10 @@ def _serve_sse(port: int = 8181) -> None:
             self.end_headers()
             self.wfile.write(json.dumps(response, ensure_ascii=False).encode())
 
-            # 广播到 SSE 客户端
             msg = json.dumps(response, ensure_ascii=False)
             with _sse_lock:
                 for client in _sse_clients[:]:
                     try:
-                        # 这里简化处理，实际需要更复杂的 SSE 推送
                         pass
                     except Exception:
                         _sse_clients.remove(client)
@@ -442,12 +459,15 @@ def _serve_sse(port: int = 8181) -> None:
             pass
 
     server = HTTPServer(('127.0.0.1', port), SSEHandler)
+    # 注册 managed
+    mreg.add(name='mcp', type_='sse', port=port, pid=os.getpid(), transport='sse')
     print(f'📡  hs mcp (SSE)  →  http://127.0.0.1:{port}/sse')
     print('⏹  按 Ctrl+C 停止\n')
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         print()
+        mreg.remove(name='mcp')
         print('📡  MCP SSE 服务已停止')
         server.server_close()
 
@@ -458,6 +478,28 @@ def serve_stdio() -> None:
     server = MCPServer()
     server.run()
 
-def serve_sse(port: int = 8181) -> None:
-    """启动 MCP Server（SSE 模式）"""
+def serve_sse(port: int = 8181, daemon: bool = False) -> None:
+    """启动 MCP Server（SSE 模式）
+
+    Args:
+        port: 监听端口
+        daemon: 后台守护模式
+    """
+    if daemon:
+        import subprocess as _sp
+        hs_entry = os.path.join(os.path.dirname(__file__), '__main__.py')
+        cmd = [sys.executable, hs_entry, 'mcp', '--transport', 'sse', '-p', str(port)]
+        proc = _sp.Popen(
+            cmd,
+            stdout=_sp.DEVNULL,
+            stderr=_sp.DEVNULL,
+            preexec_fn=os.setsid if hasattr(os, 'setsid') else None,
+        )
+        # 父进程注册 managed
+        from http_server_cli.registry_managed import ManagedRegistry
+        mreg = ManagedRegistry()
+        mreg.add(name='mcp', type_='sse', port=port, pid=proc.pid, transport='sse')
+        print(f'📡  hs mcp (SSE daemon) →  http://127.0.0.1:{port}/sse  (PID: {proc.pid})')
+        print(f'⏹  使用 hs kill {port} 或 kill {proc.pid} 停止')
+        return
     _serve_sse(port=port)

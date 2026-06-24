@@ -15,8 +15,9 @@ import sys
 import time
 import webbrowser
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from typing import Optional
+from typing import Any, Optional
 
+from http_server_cli.registry_managed import ManagedRegistry
 from http_server_cli.server import ServerManager
 from http_server_cli.utils import (
     LOG_DIR,
@@ -184,23 +185,44 @@ _HTML_PAGE = """<!DOCTYPE html>
         .catch(function(e){ cb(e, null); });
     }
 
-    function render(servers) {
+    function render(servers, managed) {
       var tbody = document.getElementById('servers-tbody');
       var alive = 0, dead = 0;
       servers.forEach(function(s){ if (s.alive) alive++; else dead++; });
 
       document.getElementById('count-alive').textContent = alive;
       document.getElementById('count-dead').textContent = dead;
-      document.getElementById('count-total').textContent = servers.length;
+      document.getElementById('count-total').textContent = servers.length + managed.length;
 
-      if (servers.length === 0) {
+      var html = '';
+
+      // Managed services section
+      if (managed.length > 0) {
+        html += '<tr class="managed-header"><td colspan="7">🔧 基础设施服务</td></tr>';
+        managed.forEach(function(s) {
+          var isAlive = s._alive;
+          var stats = s.stats || {};
+          var cpu = '—';
+          var mem = '—';
+          html += '<tr>' +
+            '<td class="url-cell"> http://localhost:' + s.port + '</td>' +
+            '<td class="path-cell">' + esc(s.name) + (s.transport ? ' (' + s.transport + ')' : '') + '</td>' +
+            '<td class="pid-cell">' + (s.pid || '-') + '</td>' +
+            '<td><span class="status-badge ' + (isAlive ? 'alive' : 'dead') + '">' + (isAlive ? '🟢' : '🔴') + ' ' + (isAlive ? '运行中' : '已停止') + '</span></td>' +
+            '<td class="stats-cell">' + cpu + '</td>' +
+            '<td class="stats-cell">' + mem + '</td>' +
+            '<td>—</td></tr>';
+        });
+      }
+
+      if (servers.length === 0 && managed.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="empty-state">' +
           '<p>没有正在运行的 HTTP 服务</p>' +
           '<p class="hint">使用 <code>hs . -o</code> 启动一个服务</p></td></tr>';
         return;
       }
 
-      var html = '';
+      // User services
       servers.forEach(function(s) {
         var isAlive = s.alive;
         var statusClass = isAlive ? 'alive' : 'dead';
@@ -238,7 +260,9 @@ _HTML_PAGE = """<!DOCTYPE html>
     function loadServers() {
       fetchAPI('/api/servers', 'GET', function(err, data) {
         if (err) { showToast('获取服务列表失败', 'error'); return; }
-        render(data.servers || []);
+        var servers = (data.data && data.data.servers) || [];
+        var managed = (data.data && data.data.managed) || [];
+        render(servers, managed);
       });
     }
 
@@ -317,16 +341,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
         else:
             self._error('not found')
 
-    def _get_server_list(self) -> list:
-        """获取服务列表，附带存活状态和资源统计"""
+    def _get_server_list(self) -> dict:
+        """获取服务列表，附带存活状态和资源统计。返回 dict 含 servers + managed"""
         entries = self.manager.registry.active_servers()
-        now = time.time()
         servers = []
         for entry in entries:
             pid = entry.get('pid')
             stats = get_process_stats(pid)
             started = entry.get('started_at', '')
-            duration = self._format_duration(started)
             servers.append({
                 'port': entry['port'],
                 'path': entry['path'],
@@ -337,11 +359,27 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 'mode': 'daemon' if entry.get('daemon') else
                         ('foreground' if entry.get('foreground') else 'normal'),
                 'started_at': started,
-                'duration': duration,
+                'duration': self._format_duration(started),
                 'index_page': entry.get('index_page', 'index.html'),
                 'stats': stats,
             })
-        return servers
+
+        # Managed services
+        mreg = ManagedRegistry()
+        managed = []
+        for entry in mreg.active_servers():
+            managed.append({
+                'name': entry.get('name', ''),
+                'port': entry['port'],
+                'pid': entry.get('pid'),
+                '_alive': entry['_alive'],
+                'type': entry.get('type', ''),
+                'transport': entry.get('transport', ''),
+                'started_at': entry.get('started_at', ''),
+                'stats': get_process_stats(entry.get('pid')),
+            })
+
+        return {'servers': servers, 'managed': managed}
 
     def _format_duration(self, started_at: str) -> str:
         """简易时长格式化"""
@@ -349,10 +387,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
         return format_duration(started_at)
 
     def _handle_get_servers(self) -> None:
-        servers = self._get_server_list()
+        result = self._get_server_list()
         self._json({'success': True, 'command': 'list', 'data': {
-            'count': len(servers),
-            'servers': servers,
+            'count': len(result['servers']),
+            'servers': result['servers'],
+            'managed': result['managed'],
         }})
 
     def _handle_get_status(self, port: int) -> None:
@@ -506,25 +545,57 @@ def serve(port: int = 8180, open_browser: bool = False,
         daemon: 后台守护模式
     """
     manager = ServerManager()
+    mreg = ManagedRegistry()
 
     if json_output_mode:
-        # 一次性查询模式
+        # 一次性查询模式 — 包含 managed 服务
         servers = []
         for entry in manager.registry.active_servers():
-            stats = get_process_stats(entry.get('pid'))
             servers.append({
                 'port': entry['port'],
                 'path': entry['path'],
                 'pid': entry.get('pid'),
                 'alive': entry['_alive'],
-                'stats': stats,
+                'stats': get_process_stats(entry.get('pid')),
+            })
+        managed = []
+        for entry in mreg.active_servers():
+            managed.append({
+                'name': entry.get('name', ''),
+                'port': entry['port'],
+                'pid': entry.get('pid'),
+                'alive': entry['_alive'],
+                'type': entry.get('type', ''),
+                'transport': entry.get('transport', ''),
+                'stats': get_process_stats(entry.get('pid')),
             })
         from http_server_cli.utils import json_output as _jout
         _jout(True, 'dashboard', data={
             'count': len(servers),
             'servers': servers,
+            'managed': managed,
         })
         return
+
+    # ── 重复执行检测 ──
+    existing = mreg.find(name='dashboard')
+    if existing:
+        epid = existing.get('pid')
+        eport = existing.get('port')
+        if epid and is_process_alive(epid) and is_port_in_use(eport):
+            from http_server_cli.utils import format_duration as _fd
+            duration = _fd(existing.get('started_at', ''))
+            stats = get_process_stats(epid)
+            print(f'📊  hs dashboard 已在运行')
+            print(f'    🔧  http://127.0.0.1:{eport}  (PID: {epid})')
+            cpu_s = stats.get('cpu', '-')
+            mem_s = stats.get('memory', '-')
+            print(f'    📊  时长: {duration}  |  CPU: {cpu_s}  |  内存: {mem_s}')
+            print(f'    💡  打开浏览器: hs dashboard -o')
+            return
+        else:
+            # 残留记录，清理
+            mreg.remove(name='dashboard')
 
     # 端口可用性检测
     from http_server_cli.utils import is_port_in_use as _port_check
@@ -550,14 +621,19 @@ def serve(port: int = 8180, open_browser: bool = False,
             stderr=_sp.DEVNULL,
             preexec_fn=os.setsid if hasattr(os, 'setsid') else None,
         )
+        # 注册 managed 条目（父进程 PID）
+        mreg.add(name='dashboard', type_='http', port=port, pid=proc.pid)
         print(f'📊  hs dashboard (daemon) →  http://127.0.0.1:{port}  (PID: {proc.pid})')
         print(f'⏹  使用 hs kill {port} 或 kill {proc.pid} 停止')
         return
 
-    # 前台模式
+    # ── 前台模式 ──
     DashboardHandler.manager = manager
     server = HTTPServer(('127.0.0.1', port), DashboardHandler)
     url = f'http://127.0.0.1:{port}'
+
+    # 注册 managed
+    mreg.add(name='dashboard', type_='http', port=port, pid=os.getpid())
     print(f'📊  hs dashboard  →  {url}')
 
     if open_browser:
@@ -569,5 +645,6 @@ def serve(port: int = 8180, open_browser: bool = False,
         server.serve_forever()
     except KeyboardInterrupt:
         print()
+        mreg.remove(name='dashboard')
         print('📊  仪表盘已停止')
         server.server_close()

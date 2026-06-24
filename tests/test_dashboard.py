@@ -51,26 +51,31 @@ class TestServe:
         from http_server_cli.dashboard import serve
         mgr = ServerManager()
         mgr.registry.add(
-            port=9991, path='/tmp/test', pid=99999,
+            port=29991, path='/tmp/test', pid=99999,
             started_at=timestamp(),
         )
         captured = __import__('io').StringIO()
         old = sys.stdout
         sys.stdout = captured
         try:
-            serve(port=9990, json_output_mode=True)
+            serve(port=29990, json_output_mode=True)
         finally:
             sys.stdout = old
         data = json.loads(captured.getvalue())
         assert data['command'] == 'dashboard'
         assert data['success'] is True
+        assert 'managed' in data['data']
 
     def test_foreground_starts_server(self):
         """前台模式启动 HTTPServer"""
         from http_server_cli.dashboard import serve
+        import socket
         import threading
         import time
-        port = 9995
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(('127.0.0.1', 0))
+        port = s.getsockname()[1]
+        s.close()
         t = threading.Thread(target=serve, args=(port,), daemon=True)
         t.start()
         time.sleep(0.5)
@@ -105,6 +110,7 @@ class TestJsonMode:
         data = json.loads(captured.getvalue())
         assert data['success'] is True
         assert data['data']['count'] == 2
+        assert 'managed' in data['data']
         ports = {s['port'] for s in data['data']['servers']}
         assert ports == {8881, 8882}
 
@@ -154,11 +160,16 @@ class TestDaemonMode:
     def test_daemon_mode_subprocess(self):
         """daemon 模式通过子进程启动（不 hang）"""
         from http_server_cli.dashboard import serve
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind(('127.0.0.1', 0))
+        port = s.getsockname()[1]
+        s.close()
         captured = __import__('io').StringIO()
         old = sys.stdout
         sys.stdout = captured
         try:
-            serve(port=9996, daemon=True)
+            serve(port=port, daemon=True)
         finally:
             sys.stdout = old
         output = captured.getvalue()

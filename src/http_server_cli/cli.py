@@ -5,6 +5,7 @@ CLI 入口：argparse 解析 + 命令分派。
 """
 
 import argparse
+import os
 import sys
 
 from http_server_cli import __version__
@@ -42,7 +43,7 @@ _HELP = """http-server-cli v{version} — 忘记端口，只管预览
 
   hs dashboard -o          打开 Web 管理面板（默认端口 8180）
   hs dashboard --json      一次性查询服务列表
-  hs mcp                   启动 MCP Server，供 AI Agent（Claude/Cursor）集成调用
+  hs mcp                   启动 MCP Server（默认 SSE + daemon，AI Agent 集成）
 
 ━━━ 配置 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -155,7 +156,101 @@ def _cmd_list(manager, args):
         parsed, _ = parser.parse_known_args(args)
     except SystemExit:
         return
-    manager.list(json=parsed.json)
+    _list_servers(manager, json=parsed.json)
+
+
+def _list_servers(manager, json: bool = False) -> None:
+    """列出所有服务（用户服务 + managed 基础设施服务）"""
+    from http_server_cli.registry_managed import ManagedRegistry
+    from http_server_cli.utils import (
+        eprint, format_path, format_duration, get_process_stats, json_output,
+    )
+    config = manager.config
+
+    user_servers = manager.registry.active_servers()
+    user_servers = sorted(user_servers, key=lambda x: x['port'])
+
+    mreg = ManagedRegistry()
+    managed_servers = mreg.active_servers()
+
+    if json:
+        user_data = []
+        for entry in user_servers:
+            stats = get_process_stats(entry.get('pid'))
+            user_data.append({
+                'url': f"http://{entry.get('domain', config.domain)}:{entry['port']}",
+                'port': entry['port'], 'path': entry['path'],
+                'pid': entry.get('pid'),
+                'alive': entry['_alive'],
+                'mode': 'daemon' if entry.get('daemon') else ('foreground' if entry.get('foreground') else 'normal'),
+                'started_at': entry.get('started_at'),
+                'stats': stats,
+                'duration': format_duration(entry.get('started_at', '')),
+            })
+        managed_data = []
+        for entry in managed_servers:
+            managed_data.append({
+                'name': entry.get('name'),
+                'port': entry['port'], 'pid': entry.get('pid'),
+                'alive': entry['_alive'],
+                'type': entry.get('type'),
+                'transport': entry.get('transport', ''),
+                'started_at': entry.get('started_at'),
+            })
+        json_output(True, 'list', data={
+            'count': len(user_servers),
+            'servers': user_data,
+            'managed': managed_data,
+        })
+        return
+
+    total = len(user_servers) + len(managed_servers)
+    if total == 0:
+        eprint('没有正在运行的 HTTP 服务', 'ℹ️')
+        eprint('使用 hs start [path] -o 启动一个', '💡')
+        return
+
+    # 用户服务
+    eprint(f'共 {len(user_servers)} 个 HTTP 服务:', '📊')
+    print()
+    for entry in user_servers:
+        alive = entry['_alive']
+        port = entry['port']
+        domain = entry.get('domain', config.domain)
+        path = format_path(entry['path'])
+        pid = entry.get('pid', '-')
+        started = entry.get('started_at', '-')
+        is_current = entry['path'] == os.getcwd()
+        if is_current:
+            print(f'📍  http://{domain}:{port} （current）')
+        else:
+            status_icon = '✅' if alive else '❌'
+            status_text = '' if alive else ' (已停止)'
+            mode_tag = ' 🖥' if entry.get('daemon') else (' ⌨' if entry.get('foreground') else '')
+            print(f'{status_icon}  http://{domain}:{port}{status_text}{mode_tag}')
+        print(f'    📁  {path}')
+        stats = get_process_stats(entry.get('pid'))
+        duration = format_duration(started)
+        print(f'    🔧  PID: {pid}  |  启动时间: {started}')
+        print(f'    📊  CPU: {stats["cpu"]}  |  内存: {stats["memory"]} ({stats["memory_percent"]}) | 时长: {duration}')
+        print()
+
+    # Managed 基础设施服务
+    if managed_servers:
+        eprint(f'共 {len(managed_servers)} 个基础设施服务:', '🔧')
+        print()
+        for entry in managed_servers:
+            port = entry['port']
+            alive = entry['_alive']
+            name = entry.get('name', '')
+            transport = entry.get('transport', '')
+            pid = entry.get('pid', '-')
+            started = entry.get('started_at', '-')
+            tag = f' ({transport})' if transport else ''
+            icon = '🟢' if alive else '🔴'
+            print(f'{icon}  {name}{tag}  →  http://127.0.0.1:{port}')
+            print(f'    🔧  PID: {pid}  |  启动时间: {started}')
+            print()
 
 @_register
 def _cmd_status(manager, args):
@@ -249,20 +344,22 @@ def _cmd_dashboard(manager, args):
 
 @_register
 def _cmd_mcp(manager, args):
-    """hs mcp — MCP Server"""
+    """hs mcp — MCP Server（默认 SSE + daemon）"""
     parser = argparse.ArgumentParser(prog='hs mcp', add_help=False)
-    parser.add_argument('--transport', choices=['stdio', 'sse'], default='stdio')
+    parser.add_argument('--transport', choices=['stdio', 'sse'], default='sse')
     parser.add_argument('--port', type=int, default=8181)
+    parser.add_argument('-d', '--daemon', action='store_true')
     try:
         parsed, _ = parser.parse_known_args(args)
     except SystemExit:
         return
-    if parsed.transport == 'sse':
-        from http_server_cli.mcp import serve_sse
-        serve_sse(port=parsed.port)
-    else:
+    if parsed.transport == 'stdio':
         from http_server_cli.mcp import serve_stdio
         serve_stdio()
+    else:
+        # SSE 模式 — 默认 daemon
+        from http_server_cli.mcp import serve_sse
+        serve_sse(port=parsed.port, daemon=parsed.daemon)
 
 # ── main ───────────────────────────────────────────────
 
