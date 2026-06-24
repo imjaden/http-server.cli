@@ -79,6 +79,8 @@ MCP 基于 JSON-RPC 2.0，通过 stdio 的 stdin/stdout 通信。
 }}
 ```
 
+**初始化检查：** `_dispatch()` 在收到 `initialize` 请求时调用 `_handle_initialize()`，该方法会将 `self._initialized` 立即置为 `True` 并返回握手结果。对于 `tools/list` 和 `tools/call` 两个方法，如果 `self._initialized` 为 `False`（说明客户端尚未调用 initialize），服务器会返回 `ValueError` 拒绝请求，强制遵循 MCP 协议规范的握手顺序。此外，`notifications/initialized` 通知也会将 `self._initialized` 置为 `True`，确保双路径（请求/通知）都能正确标识已初始化状态。
+
 ### 工具列表
 
 | 工具名 | 描述 | 参数 |
@@ -146,13 +148,33 @@ AI Agent                    MCP Server (hs mcp)
 MCP Server 对每个 `tools/call` 请求，构造对应的 `hs <command> --json` 命令并执行：
 
 ```python
-def _execute_hs(args: list) -> dict:
+def _execute_hs(args: list[str], timeout: int = 30) -> dict:
     """执行 hs 命令并返回 JSON 结果"""
-    import subprocess, json
-    cmd = [sys.executable, '-m', 'http_server_cli'] + args + ['--json']
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-    return json.loads(result.stdout)
+    cmd = [sys.executable, '__main__.py'] + args + ['--json']
+    result = subprocess.run(
+        cmd, capture_output=True, text=True, timeout=timeout,
+        encoding='utf-8', errors='replace',
+    )
+    # 先尝试整段解析（兼容 json_output 的 indent=2 多行输出）
+    text = result.stdout.strip()
+    if text:
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
+        # 回退：逐行解析（兼容单行 JSON 输出）
+        for line in text.split('\\n'):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                return json.loads(line)
+            except json.JSONDecodeError:
+                continue
+    raise RuntimeError(f'无法解析命令输出: {result.stdout[:500]}')
 ```
+
+**多行 JSON 兼容：** `hs CLI` 的 `json_output()` 使用了 `indent=2` 格式化（如 `hs list` 的详细 JSON 表格），输出可能是跨多行的格式化 JSON。`_execute_hs()` 先尝试用 `json.loads()` 解析整段 stdout；如果失败（理论上不应出现，但作为防御性处理），再回退到逐行解析模式——逐行跳过空行，遇到首行有效 JSON 即返回。
 
 ### 文件结构
 
