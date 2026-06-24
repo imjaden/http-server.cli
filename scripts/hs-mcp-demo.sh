@@ -9,7 +9,7 @@
 #   4. 调用 hs_kill_all (tools/call)
 #
 # 用法:
-#   ./script/hs-mcp-demo.sh
+#   ./scripts/hs-mcp-demo.sh
 #
 # 依赖: bash 4+, curl, python3 (with http_server_cli installed)
 # =============================================================================
