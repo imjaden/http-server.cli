@@ -339,7 +339,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def _get_server_list(self) -> dict:
         """获取服务列表，附带存活状态和资源统计。返回 dict 含 servers + managed"""
-        entries = self.manager.registry.active_servers()
+        # 每次创建新的 ServerManager 以读取最新 registry.json
+        from http_server_cli.server import ServerManager
+        sm = ServerManager()
+        entries = sm.registry.active_servers()
         servers = []
         for entry in entries:
             pid = entry.get('pid')
