@@ -27,6 +27,10 @@ MCP (Model Context Protocol) 是 Anthropic 提出的开放协议，定义了 AI 
 hs mcp                              # 默认 SSE 模式，自动后台运行（常驻服务）
 hs mcp --port 8181                  # SSE 模式指定端口
 hs mcp --transport stdio            # stdio 模式（一次性，AI Agent 原生支持）
+hs mcp help                         # 显示 mcp 专属帮助
+hs mcp status                       # 查询 MCP 服务运行状态（端口/PID/时长）
+hs mcp stop                         # 停止 MCP 服务（查注册表 → 杀进程 → 清理记录）
+hs mcp restart                      # 停止后重新启动 MCP 服务（端口 8181）
 ```
 
 ### AI Agent 配置示例
@@ -337,18 +341,86 @@ hs CLI (--json)
 | 文件 | 职责 | 代码量 |
 |------|------|--------|
 | `src/http_server_cli/mcp.py` | MCP 协议层 + SSE HTTP 服务 | ~510 行 |
-| `src/http_server_cli/cli.py` | CLI 入口 `_cmd_mcp` | ~15 行 |
+| `src/http_server_cli/cli.py` | CLI 入口 `_cmd_mcp` + `_manage_mcp` | ~50 行 |
 | `src/http_server_cli/registry_managed.py` | ManagedRegistry 持久化注册 | ~100 行 |
 
-`_cmd_mcp` 在 `cli.py`：
+`_cmd_mcp` 与 `_manage_mcp` 在 `cli.py`：
 
 ```python
 @_register
 def _cmd_mcp(manager, args):
+    """hs mcp — MCP Server（自动后台运行 SSE）"""
+    sub = args[0] if args else None
+    if sub in ('help', 'stop', 'status', 'restart'):
+        _manage_mcp(sub)
+        return
+
+    parser = argparse.ArgumentParser(prog='hs mcp', add_help=False)
     parser.add_argument('--transport', choices=['stdio', 'sse'], default='sse')
     parser.add_argument('--port', type=int, default=8181)
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
+        return
     if parsed.transport == 'stdio':
+        from http_server_cli.mcp import serve_stdio
         serve_stdio()
     else:
+        from http_server_cli.mcp import serve_sse
         serve_sse(port=parsed.port, daemon=True)
+
+
+def _manage_mcp(subcmd: str) -> None:
+    """管理 MCP 服务：stop / status / restart / help"""
+    from http_server_cli.registry_managed import ManagedRegistry
+    from http_server_cli.utils import (eprint, format_duration,
+                                        is_process_alive, is_port_in_use)
+    import os, signal, time
+
+    mreg = ManagedRegistry()
+    entry = mreg.find(name='mcp')
+
+    if subcmd == 'help':
+        print('━━━ hs mcp ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+        print('  hs mcp                    后台运行 SSE（默认）')
+        print('  hs mcp --transport stdio  前台运行 stdio 模式')
+        print('  hs mcp --port PORT        指定端口')
+        print('  hs mcp stop               停止 MCP 服务')
+        print('  hs mcp status             查看运行状态')
+        print('  hs mcp restart            重启 MCP 服务')
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+        return
+
+    if subcmd in ('stop', 'status', 'restart') and not entry:
+        eprint('MCP 未在运行', 'ℹ️')
+        return
+
+    port = entry.get('port', '?')
+    pid = entry.get('pid')
+
+    if subcmd == 'status':
+        alive = (pid and is_process_alive(pid)
+                 and is_port_in_use(port))
+        duration = format_duration(entry.get('started_at', ''))
+        icon = '🟢' if alive else '🔴'
+        print(f'{icon}  hs mcp (SSE)  →  http://127.0.0.1:{port}/sse')
+        print(f'    🔧  PID: {pid}  |  时长: {duration}')
+        return
+
+    if subcmd in ('stop', 'restart'):
+        if pid and is_process_alive(pid):
+            try:
+                pgid = os.getpgid(pid)
+                os.killpg(pgid, signal.SIGTERM)
+                time.sleep(0.3)
+                if is_process_alive(pid):
+                    os.killpg(pgid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError, OSError):
+                pass
+        mreg.remove(name='mcp')
+        eprint(f'MCP (端口 {port}) 已停止', '🛑')
+
+    if subcmd == 'restart':
+        from http_server_cli.mcp import serve_sse
+        serve_sse(port=8181, daemon=True)
 ```
