@@ -36,6 +36,7 @@ _HTML_PAGE = """<!DOCTYPE html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>hs dashboard</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -43,30 +44,36 @@ _HTML_PAGE = """<!DOCTYPE html>
       background: #0d1117; color: #c9d1d9; min-height: 100vh; padding: 24px;
     }
     .container { max-width: 1200px; margin: 0 auto; }
-    h1 {
-      font-size: 24px; font-weight: 600; margin-bottom: 24px;
-      display: flex; align-items: center; gap: 10px;
-    }
-    h1 small { font-size: 14px; font-weight: 400; color: #8b949e; }
 
-    .stats {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;
+    /* 头部行：标题 + 统计 + 工具栏 同一行 */
+    .header-row {
+      display: flex; align-items: center; gap: 16px; margin-bottom: 24px;
     }
-    .stat-card {
-      background: #161b22; border: 1px solid #30363d; border-radius: 8px;
-      padding: 20px; text-align: center;
+    .header-row h1 {
+      font-size: 20px; font-weight: 600; white-space: nowrap;
+      display: flex; align-items: center; gap: 8px;
     }
-    .stat-card .label { font-size: 13px; color: #8b949e; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .stat-card .value { font-size: 36px; font-weight: 700; }
-    .stat-card .value.green { color: #3fb950; }
-    .stat-card .value.red { color: #f85149; }
-    .stat-card .value.blue { color: #58a6ff; }
+    .header-row h1 small { font-size: 13px; font-weight: 400; color: #8b949e; }
 
-    .toolbar { margin-bottom: 16px; display: flex; justify-content: flex-end; }
+    .header-stats {
+      display: flex; gap: 10px; flex: 1; justify-content: center;
+    }
+    .stat-pill {
+      background: #161b22; border: 1px solid #30363d; border-radius: 20px;
+      padding: 6px 16px; display: flex; align-items: center; gap: 6px;
+      font-size: 13px;
+    }
+    .stat-pill .num { font-weight: 700; font-size: 16px; }
+    .stat-pill .num.green { color: #3fb950; }
+    .stat-pill .num.red { color: #f85149; }
+    .stat-pill .num.blue { color: #58a6ff; }
+    .stat-pill .label { color: #8b949e; }
+
+    .header-toolbar { margin-left: auto; }
     .btn-danger {
       background: #21262d; color: #f85149; border: 1px solid #f85149; border-radius: 8px;
-      padding: 8px 20px; cursor: pointer; font-size: 14px; transition: all 0.15s;
-      display: flex; align-items: center; gap: 6px;
+      padding: 7px 16px; cursor: pointer; font-size: 13px; transition: all 0.15s;
+      display: flex; align-items: center; gap: 5px; white-space: nowrap;
     }
     .btn-danger:hover { background: #f85149; color: #fff; }
     .btn-danger:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -125,27 +132,16 @@ _HTML_PAGE = """<!DOCTYPE html>
 </head>
 <body>
   <div class="container">
-    <h1>hs dashboard <small>HTTP 服务管理面板</small></h1>
-
-    <div class="stats" id="stats">
-      <div class="stat-card">
-        <div class="label">运行中</div>
-        <div class="value green" id="count-alive">—</div>
+    <div class="header-row">
+      <h1>📊 hs dashboard <small>HTTP 服务管理面板</small></h1>
+      <div class="header-stats" id="stats">
+        <span class="stat-pill"><span class="num green" id="count-alive">—</span> <span class="label">运行中</span></span>
+        <span class="stat-pill"><span class="num red" id="count-dead">—</span> <span class="label">已停止</span></span>
+        <span class="stat-pill"><span class="num blue" id="count-total">—</span> <span class="label">总端口</span></span>
       </div>
-      <div class="stat-card">
-        <div class="label">已停止</div>
-        <div class="value red" id="count-dead">—</div>
+      <div class="header-toolbar">
+        <button class="btn-danger" id="btn-kill-all" onclick="killAll()">🛑 关闭全部</button>
       </div>
-      <div class="stat-card">
-        <div class="label">总端口</div>
-        <div class="value blue" id="count-total">—</div>
-      </div>
-    </div>
-
-    <div class="toolbar">
-      <button class="btn-danger" id="btn-kill-all" onclick="killAll()">
-        🛑 一键关闭全部
-      </button>
     </div>
 
     <table>

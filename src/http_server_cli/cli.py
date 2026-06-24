@@ -43,7 +43,11 @@ _HELP = """http-server-cli v{version} — 忘记端口，只管预览
 
   hs dashboard -o          打开 Web 管理面板（自动后台运行，默认端口 8180）
   hs dashboard --json      一次性查询服务列表
+  hs dashboard stop        停止仪表盘
+  hs dashboard status      查看仪表盘状态
   hs mcp                   启动 MCP Server（后台运行 SSE，AI Agent 集成）
+  hs mcp stop              停止 MCP 服务
+  hs mcp status            查看 MCP 状态
 
 ━━━ 配置 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -328,6 +332,12 @@ def _cmd_version(manager, args):
 @_register
 def _cmd_dashboard(manager, args):
     """hs dashboard — Web 仪表盘（自动后台运行）"""
+    # 子命令优先
+    sub = args[0] if args else None
+    if sub in ('help', 'stop', 'status', 'restart'):
+        _manage_dashboard(sub)
+        return
+
     parser = argparse.ArgumentParser(prog='hs dashboard', add_help=False)
     parser.add_argument('-p', '--port', type=int, default=8180)
     parser.add_argument('-o', '--open', action='store_true')
@@ -338,15 +348,90 @@ def _cmd_dashboard(manager, args):
     except SystemExit:
         return
     from http_server_cli.dashboard import serve
-    # 指定 -o 时自动后台运行（dashboard 是常驻服务）
     auto_daemon = parsed.daemon or parsed.open
     serve(port=parsed.port, open_browser=parsed.open,
           json_output_mode=parsed.json, daemon=auto_daemon)
 
 
+def _manage_dashboard(subcmd: str) -> None:
+    """管理 dashboard 服务：stop / status / restart / help"""
+    from http_server_cli.registry_managed import ManagedRegistry
+    from http_server_cli.utils import eprint, format_duration, get_process_stats, is_process_alive, is_port_in_use
+    import os, signal, time
+
+    mreg = ManagedRegistry()
+    entry = mreg.find(name='dashboard')
+
+    if subcmd == 'help':
+        print('━━━ hs dashboard ━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+        print('  hs dashboard              前台启动（调试模式）')
+        print('  hs dashboard -o           后台运行 + 打开浏览器')
+        print('  hs dashboard -d           后台运行')
+        print('  hs dashboard -p PORT      指定端口')
+        print('  hs dashboard --json       一次性查询服务列表')
+        print('  hs dashboard stop         停止仪表盘')
+        print('  hs dashboard status       查看运行状态')
+        print('  hs dashboard restart      重启仪表盘')
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+        return
+
+    if subcmd in ('stop', 'status', 'restart') and not entry:
+        eprint('dashboard 未在运行', 'ℹ️')
+        return
+
+    port = entry.get('port', '?')
+    pid = entry.get('pid')
+
+    if subcmd == 'status':
+        alive = pid and is_process_alive(pid) and is_port_in_use(port)
+        duration = format_duration(entry.get('started_at', ''))
+        stats = get_process_stats(pid)
+        icon = '🟢' if alive else '🔴'
+        print(f'{icon}  hs dashboard  →  http://127.0.0.1:{port}')
+        print(f'    🔧  PID: {pid}  |  时长: {duration}')
+        print(f'    📊  CPU: {stats["cpu"]}  |  内存: {stats["memory"]} ({stats["memory_percent"]})')
+        return
+
+    if subcmd in ('stop', 'restart'):
+        if pid and is_process_alive(pid):
+            try:
+                pgid = os.getpgid(pid)
+                os.killpg(pgid, signal.SIGTERM)
+                time.sleep(0.3)
+                if is_process_alive(pid):
+                    os.killpg(pgid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError, OSError):
+                pass
+        mreg.remove(name='dashboard')
+        # 清理日志
+        log_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),  # src/http_server_cli
+            '..', 'logs', f'{port}.log'
+        )
+        from http_server_cli.utils import LOG_DIR
+        dlog = os.path.join(LOG_DIR, f'{port}.log')
+        for lp in (log_path, dlog):
+            if os.path.isfile(lp):
+                try:
+                    os.remove(lp)
+                except OSError:
+                    pass
+        eprint(f'dashboard (端口 {port}) 已停止', '🛑')
+
+    if subcmd == 'restart':
+        from http_server_cli.dashboard import serve
+        serve(port=8180, open_browser=False, daemon=True)
+
+
 @_register
 def _cmd_mcp(manager, args):
     """hs mcp — MCP Server（自动后台运行 SSE）"""
+    # 子命令优先
+    sub = args[0] if args else None
+    if sub in ('help', 'stop', 'status', 'restart'):
+        _manage_mcp(sub)
+        return
+
     parser = argparse.ArgumentParser(prog='hs mcp', add_help=False)
     parser.add_argument('--transport', choices=['stdio', 'sse'], default='sse')
     parser.add_argument('--port', type=int, default=8181)
@@ -358,9 +443,61 @@ def _cmd_mcp(manager, args):
         from http_server_cli.mcp import serve_stdio
         serve_stdio()
     else:
-        # SSE 模式 — 自动后台运行（常驻服务，不占用终端）
         from http_server_cli.mcp import serve_sse
         serve_sse(port=parsed.port, daemon=True)
+
+
+def _manage_mcp(subcmd: str) -> None:
+    """管理 MCP 服务：stop / status / restart / help"""
+    from http_server_cli.registry_managed import ManagedRegistry
+    from http_server_cli.utils import eprint, format_duration, get_process_stats, is_process_alive, is_port_in_use
+    import os, signal, time
+
+    mreg = ManagedRegistry()
+    entry = mreg.find(name='mcp')
+
+    if subcmd == 'help':
+        print('━━━ hs mcp ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+        print('  hs mcp                    后台运行 SSE（默认）')
+        print('  hs mcp --transport stdio  前台运行 stdio 模式')
+        print('  hs mcp --port PORT        指定端口')
+        print('  hs mcp stop               停止 MCP 服务')
+        print('  hs mcp status             查看运行状态')
+        print('  hs mcp restart            重启 MCP 服务')
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+        return
+
+    if subcmd in ('stop', 'status', 'restart') and not entry:
+        eprint('MCP 未在运行', 'ℹ️')
+        return
+
+    port = entry.get('port', '?')
+    pid = entry.get('pid')
+
+    if subcmd == 'status':
+        alive = pid and is_process_alive(pid) and is_port_in_use(port)
+        duration = format_duration(entry.get('started_at', ''))
+        icon = '🟢' if alive else '🔴'
+        print(f'{icon}  hs mcp (SSE)  →  http://127.0.0.1:{port}/sse')
+        print(f'    🔧  PID: {pid}  |  时长: {duration}')
+        return
+
+    if subcmd in ('stop', 'restart'):
+        if pid and is_process_alive(pid):
+            try:
+                pgid = os.getpgid(pid)
+                os.killpg(pgid, signal.SIGTERM)
+                time.sleep(0.3)
+                if is_process_alive(pid):
+                    os.killpg(pgid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError, OSError):
+                pass
+        mreg.remove(name='mcp')
+        eprint(f'MCP (端口 {port}) 已停止', '🛑')
+
+    if subcmd == 'restart':
+        from http_server_cli.mcp import serve_sse
+        serve_sse(port=8181, daemon=True)
 
 # ── main ───────────────────────────────────────────────
 

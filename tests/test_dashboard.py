@@ -136,7 +136,7 @@ class TestHTMLPage:
         from http_server_cli.dashboard import _HTML_PAGE
         assert 'hs dashboard' in _HTML_PAGE
         assert '运行中' in _HTML_PAGE
-        assert '一键关闭全部' in _HTML_PAGE
+        assert '关闭全部' in _HTML_PAGE
         assert 'URL' in _HTML_PAGE
         assert 'fetch' in _HTML_PAGE or '/api/servers' in _HTML_PAGE
 
