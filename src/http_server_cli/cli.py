@@ -18,37 +18,44 @@ _HELP = """http-server-cli v{version} — 忘记端口，只管预览
 
 用法:  hs [command] [args]
 
-快捷方式:
-  hs . [-o] [-d] [-i <file>]  等价 hs start .
-  hs                          等价 hs start .（当前目录启动）
+━━━ 日常预览 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-命令:
-  start [path] [-o] [-d] [-f] [-i <file>] [--json]  启动服务（path 默认 .）
-  list [--json]                   列出所有运行中的服务
-  status [--json] [port|path]     查询单个服务状态
-  kill <port|path> [--json]       关闭指定服务
-  dashboard [-p PORT] [-o] [-d] [--json]  Web 仪表盘（默认端口 8180）
-  mcp [--transport stdio|sse] [--port PORT]  MCP Server（供 AI Agent 集成）
-  kill-all [--json]               关闭所有服务
-  config [--json]                 显示当前配置
-  set port|domain <value> [--json]  修改配置
-  help                            显示此帮助
-  version [--json]                显示版本号
+  hs . -o                  当前目录启动 + 打开浏览器
+  hs ~/my-site -o          指定目录启动 + 打开浏览器
+  hs . -i app.html         指定首页文件
+  hs . -d                  后台运行（不占用终端）
+  hs                       默认等于 hs .（当前目录启动）
 
-示例:
-  hs . -o                 当前目录启动 + 打开浏览器
-  hs . -i app.html        以 app.html 为首页
-  hs ~/my-site            指定目录启动
-  hs . --json             JSON 格式获取启动结果
-  hs list --json          JSON 格式列出所有服务
-  hs status 8080 --json   JSON 格式查询端口 8080 状态
-  hs kill 8080 --json     JSON 格式获取关闭结果
-  hs kill-all --json      JSON 格式获取关闭结果
-  hs config --json        JSON 格式显示配置
-  hs set port 3000 --json JSON 格式获取配置修改结果
-  hs version --json       JSON 格式显示版本
+  快捷方式: hs start [path]  启动服务;  -o 打开浏览器  -d 后台  -i <file> 首页
 
-数据目录: ~/.http-server-cli/
+━━━ 服务管理 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  hs list                  列出所有运行中的服务（端口/路径/PID/CPU/内存）
+  hs status 8080           查询端口 8080 状态
+  hs kill 8080             关闭端口 8080 的服务
+  hs kill ~/my-site        关闭指定路径的服务
+  hs kill-all              一键关闭所有服务
+
+  --json                   所有命令后追加此参数可获取结构化 JSON 输出
+
+━━━ 图形与集成 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  hs dashboard -o          打开 Web 管理面板（默认端口 8180）
+  hs dashboard --json      一次性查询服务列表
+  hs mcp                   启动 MCP Server，供 AI Agent（Claude/Cursor）集成调用
+
+━━━ 配置 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  hs config                查看当前配置（默认端口/域名）
+  hs set port 3000         修改默认端口
+  hs set domain 0.0.0.0    修改绑定域名
+
+━━━ 其他 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  hs version               显示版本号
+  hs help                  显示此帮助
+
+数据目录: ~/.http-server-cli/（config.json / registry.json / logs/）
 """
 
 # ── Set 子命令 ─────────────────────────────────────────
