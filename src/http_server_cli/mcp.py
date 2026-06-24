@@ -164,15 +164,22 @@ def _execute_hs(args: list[str], timeout: int = 30) -> dict:
         raise RuntimeError(f'命令失败 (exit={result.returncode}): {stderr or result.stdout[:500]}')
 
     # 解析 stdout 中的 JSON 输出
-    # hs CLI 的 json_output() 输出到 stdout，可能有尾随换行/其他输出
-    for line in result.stdout.strip().split('\n'):
-        line = line.strip()
-        if not line:
-            continue
+    # hs CLI 的 json_output() 使用 indent=2 输出多行 JSON，先尝试整段解析
+    text = result.stdout.strip()
+    if text:
         try:
-            return json.loads(line)
+            return json.loads(text)
         except json.JSONDecodeError:
-            continue
+            pass
+        # 回退：逐行解析（兼容单行 JSON 输出）
+        for line in text.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                return json.loads(line)
+            except json.JSONDecodeError:
+                continue
 
     raise RuntimeError(f'无法解析命令输出: {result.stdout[:500]}')
 
