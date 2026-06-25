@@ -32,10 +32,16 @@ _HELP = """http-server-cli v{version} — 忘记端口，只管预览
 ━━━ 服务管理 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   hs list                  列出所有运行中的服务（端口/路径/PID/CPU/内存）
+  hs list --port           仅打印端口号清单
+  hs list --path           仅打印路径清单
+  hs list --short          打印"端口:路径"清单
   hs status 8080           查询端口 8080 状态
   hs kill 8080             关闭端口 8080 的服务
   hs kill ~/my-site        关闭指定路径的服务
   hs kill-all              一键关闭所有服务
+  hs history               显示所有历史启动记录
+  hs history --json        JSON 格式输出历史记录
+  hs search <keyword>      搜索实例（按端口或路径模糊匹配，忽略大小写）
 
   --json                   所有命令后追加此参数可获取结构化 JSON 输出
 
@@ -156,14 +162,19 @@ def _cmd_start(manager, args):
 def _cmd_list(manager, args):
     parser = argparse.ArgumentParser(prog='hs list', add_help=False)
     parser.add_argument('--json', action='store_true')
+    parser.add_argument('--port', action='store_true')
+    parser.add_argument('--path', action='store_true')
+    parser.add_argument('--short', action='store_true')
     try:
         parsed, _ = parser.parse_known_args(args)
     except SystemExit:
         return
-    _list_servers(manager, json=parsed.json)
+    _list_servers(manager, json=parsed.json, port_only=parsed.port,
+                  path_only=parsed.path, short=parsed.short)
 
 
-def _list_servers(manager, json: bool = False) -> None:
+def _list_servers(manager, json: bool = False, port_only: bool = False,
+                  path_only: bool = False, short: bool = False) -> None:
     """列出所有服务（用户服务 + managed 基础设施服务）"""
     from http_server_cli.registry_managed import ManagedRegistry
     from http_server_cli.utils import (
@@ -212,6 +223,20 @@ def _list_servers(manager, json: bool = False) -> None:
     if total == 0:
         eprint('没有正在运行的 HTTP 服务', 'ℹ️')
         eprint('使用 hs start [path] -o 启动一个', '💡')
+        return
+
+    # 过滤输出模式（优先级: --port > --path > --short）
+    if port_only:
+        for entry in user_servers:
+            print(entry['port'])
+        return
+    if path_only:
+        for entry in user_servers:
+            print(format_path(entry['path']))
+        return
+    if short:
+        for entry in user_servers:
+            print(f"{entry['port']}:{format_path(entry['path'])}")
         return
 
     # 用户服务
@@ -306,8 +331,89 @@ def _cmd_config(manager, args):
     Config().show(json=parsed.json)
 
 @_register
+def _cmd_history(manager, args):
+    """显示所有历史记录"""
+    parser = argparse.ArgumentParser(prog='hs history', add_help=False)
+    parser.add_argument('--json', action='store_true')
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
+        return
+    from http_server_cli.history import HistoryStore
+    from http_server_cli.utils import json_output, eprint
+    history = HistoryStore()
+    records = history.records()
+    if parsed.json:
+        json_output(True, 'history', data={'count': len(records), 'records': records})
+        return
+    if not records:
+        eprint('暂无历史记录', 'ℹ️')
+        return
+    eprint(f'共 {len(records)} 条历史记录:', '📊')
+    print()
+    for r in records:
+        port = r.get('port', '-')
+        path = r.get('path', '-')
+        started = r.get('started_at', '-')[:19]
+        ended = r.get('ended_at', '-')[:19] if r.get('ended_at') else '运行中'
+        mem = r.get('memory_mb', 0)
+        print(f'  {port}:{path}')
+        print(f'    开始: {started}  结束: {ended}  内存: {mem} MB')
+        print()
+
+@_register
 def _cmd_set(manager, args):
     _handle_set(args)
+
+@_register
+def _cmd_search(manager, args):
+    """搜索实例（按端口或路径模糊匹配）"""
+    parser = argparse.ArgumentParser(prog='hs search', add_help=False)
+    parser.add_argument('keyword', nargs='?', default=None)
+    parser.add_argument('--json', action='store_true')
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
+        return
+    if not parsed.keyword:
+        from http_server_cli.utils import eprint
+        eprint('用法: hs search <keyword>', '⚠️')
+        return
+
+    # 从 registry 中搜索匹配项
+    servers = manager.registry.active_servers()
+    keyword = parsed.keyword.lower()
+    matches = [s for s in servers
+               if keyword in str(s.get('port', ''))
+               or keyword in s.get('path', '').lower()]
+
+    from http_server_cli.utils import format_path, json_output, eprint
+    from http_server_cli.config import Config
+    config = Config()
+
+    if parsed.json:
+        json_output(True, 'search', data={
+            'keyword': parsed.keyword,
+            'count': len(matches),
+            'servers': matches,
+        })
+        return
+
+    if not matches:
+        eprint(f'未找到匹配 "{parsed.keyword}" 的服务', 'ℹ️')
+        return
+
+    eprint(f'找到 {len(matches)} 个匹配 "{parsed.keyword}" 的服务:', '📊')
+    print()
+    for entry in matches:
+        port = entry['port']
+        path = format_path(entry['path'])
+        domain = entry.get('domain', config.domain)
+        alive = entry['_alive']
+        icon = '✅' if alive else '❌'
+        print(f'  {icon}  http://{domain}:{port}')
+        print(f'      📁  {path}')
+        print()
 
 @_register
 def _cmd_help(manager, args):

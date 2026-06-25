@@ -11,6 +11,7 @@ import time
 import webbrowser
 
 from http_server_cli.config import Config
+from http_server_cli.history import HistoryStore
 from http_server_cli.registry import Registry
 from http_server_cli.utils import (
     eprint,
@@ -161,6 +162,11 @@ class ServerManager:
             domain=domain, daemon=daemon, foreground=foreground,
             started_at=started_at, index_page=index,
         )
+
+        # ── 写入历史记录 ──
+        history = HistoryStore()
+        history.add(port=port, path=abs_path, started_at=started_at,
+                    domain=domain, daemon=daemon, foreground=foreground)
 
         stats = get_process_stats(proc.pid)
         duration = format_duration(started_at)
@@ -462,6 +468,11 @@ class ServerManager:
                 eprint(f'进程 {pid} 已不存在', 'ℹ️')
 
         self.registry.remove(port=port)
+        
+        # ── 关闭历史记录 ──
+        from http_server_cli.history import HistoryStore
+        history = HistoryStore()
+        history.close(port=port, path=entry['path'])
         
         # 删除日志文件
         log_removed = False
