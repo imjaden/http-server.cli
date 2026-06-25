@@ -28,7 +28,15 @@ class SmartHTTPRequestHandler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=directory, **kwargs)
 
     def do_GET(self):
-        """处理 GET 请求，首页智能跳转"""
+        """处理 GET 请求，首页智能跳转，记录访问时间"""
+        
+        # 记录最新访问时间
+        try:
+            from http_server_cli.registry import Registry
+            reg = Registry()
+            reg.touch(self.server.server_port)
+        except Exception:
+            pass
         
         # 解析 URL，获取纯路径（忽略查询参数）
         parsed_path = urlparse(self.path).path

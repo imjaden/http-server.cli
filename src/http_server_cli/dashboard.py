@@ -392,6 +392,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 'mode': 'daemon' if entry.get('daemon') else
                         ('foreground' if entry.get('foreground') else 'normal'),
                 'started_at': started,
+                'last_access_at': entry.get('last_access_at', ''),
                 'duration': self._format_duration(started),
                 'index_page': entry.get('index_page', 'index.html'),
                 'stats': stats,

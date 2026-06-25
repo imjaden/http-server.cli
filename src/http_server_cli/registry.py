@@ -64,6 +64,7 @@ class Registry:
             'daemon': daemon,
             'foreground': foreground,
             'started_at': started_at or _ts(),
+            'last_access_at': started_at or _ts(),
             'index_page': index_page or 'index.html',
         })
         self.save()
@@ -81,6 +82,15 @@ class Registry:
         """清空所有条目"""
         self._data['servers'] = []
         self.save()
+
+    def touch(self, port: int) -> None:
+        """更新指定端口的 last_access_at（请求访问时调用）"""
+        for entry in self._data['servers']:
+            if entry.get('port') == port:
+                from http_server_cli.utils import timestamp as _ts
+                entry['last_access_at'] = _ts()
+                self.save()
+                return
 
     def save(self) -> None:
         write_json(REGISTRY_PATH, self._data)
