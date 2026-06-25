@@ -246,7 +246,7 @@ _HTML_PAGE = """<!DOCTYPE html>
         var btnAction = isAlive ? "confirmClose(" + s.port + ")" : '';
 
         html += '<tr>' +
-          '<td class="url-cell"><a href="http://localhost:' + s.port + '" target="_blank" title="在新标签页中打开">http://localhost:' + s.port + ' <span class="external-link-icon">↗</span></a></td>' +
+          '<td class="url-cell"><a href="http://localhost:' + s.port + '" target="_blank" title="Open in new tab">http://localhost:' + s.port + ' <span class="external-link-icon">&#8599;</span></a></td>' +
           '<td class="path-cell">' + esc(s.path_display || s.path) + '</td>' +
           '<td class="pid-cell">' + (s.pid || '-') + '</td>' +
           '<td><span class="status-badge ' + statusClass + '">' + statusIcon + ' ' + statusText + '</span></td>' +
