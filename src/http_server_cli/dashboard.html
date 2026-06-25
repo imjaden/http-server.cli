@@ -163,10 +163,6 @@
       var alive = 0, dead = 0;
       servers.forEach(function(s){ if (s.alive) alive++; else dead++; });
 
-      document.getElementById('count-alive').textContent = alive;
-      document.getElementById('count-dead').textContent = dead;
-      document.getElementById('count-total').textContent = servers.length + managed.length;
-
       var html = '';
 
       // Managed services section
