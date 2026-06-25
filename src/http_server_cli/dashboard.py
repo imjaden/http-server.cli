@@ -26,310 +26,26 @@ from http_server_cli.utils import (
     is_port_in_use,
     is_process_alive,
     json_output,
+    SCRIPT_DIR,
 )
 
-# ── HTML 页面（内联）─────────────────────────────────────
+# ── HTML 页面（从独立文件加载）─────────────────────────────
 
-_HTML_PAGE = """<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>hs dashboard</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0d1117; color: #c9d1d9; min-height: 100vh; padding: 24px;
-    }
-    .container { max-width: 1200px; margin: 0 auto; }
+_DASHBOARD_HTML = None
 
-    /* 头部行：标题 + 统计 + 工具栏 同一行 */
-    .header-row {
-      display: flex; align-items: center; gap: 16px; margin-bottom: 24px;
-    }
-    .header-row h1 {
-      font-size: 20px; font-weight: 600; white-space: nowrap;
-      display: flex; align-items: center; gap: 8px;
-    }
-    .header-row h1 small { font-size: 13px; font-weight: 400; color: #8b949e; }
+def _get_html() -> str:
+    global _DASHBOARD_HTML
+    if _DASHBOARD_HTML is None:
+        html_path = os.path.join(SCRIPT_DIR, 'dashboard.html')
+        try:
+            with open(html_path, 'r', encoding='utf-8') as f:
+                _DASHBOARD_HTML = f.read()
+        except FileNotFoundError:
+            _DASHBOARD_HTML = '<html><body><h1>Dashboard HTML not found</h1></body></html>'
+    return _DASHBOARD_HTML
 
-    .header-stats {
-      display: flex; gap: 10px; flex: 1; justify-content: center;
-    }
-    .stat-pill {
-      background: #161b22; border: 1px solid #30363d; border-radius: 20px;
-      padding: 6px 16px; display: flex; align-items: center; gap: 6px;
-      font-size: 13px;
-    }
-    .stat-pill .num { font-weight: 700; font-size: 16px; }
-    .stat-pill .num.green { color: #3fb950; }
-    .stat-pill .num.red { color: #f85149; }
-    .stat-pill .num.blue { color: #58a6ff; }
-    .stat-pill .label { color: #8b949e; }
 
-    .header-toolbar { margin-left: auto; }
-    .btn-danger {
-      background: #21262d; color: #f85149; border: 1px solid #f85149; border-radius: 8px;
-      padding: 7px 16px; cursor: pointer; font-size: 13px; transition: all 0.15s;
-      display: flex; align-items: center; gap: 5px; white-space: nowrap;
-    }
-    .btn-danger:hover { background: #f85149; color: #fff; }
-    .btn-danger:disabled { opacity: 0.4; cursor: not-allowed; }
-
-    table {
-      width: 100%; border-collapse: collapse; background: #161b22;
-      border: 1px solid #30363d; border-radius: 8px; overflow: hidden;
-    }
-    thead { background: #21262d; }
-    th {
-      padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600;
-      color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px;
-      border-bottom: 1px solid #30363d;
-    }
-    td {
-      padding: 12px 16px; font-size: 14px; border-bottom: 1px solid #21262d;
-      vertical-align: middle;
-    }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: #1c2128; }
-    .url-cell { font-family: 'SF Mono', Monaco, monospace; color: #58a6ff; font-size: 13px; }
-    .url-cell a { color: #58a6ff; text-decoration: none; }
-    .url-cell a:hover { text-decoration: underline; }
-    .external-link-icon { font-size: 12px; opacity: 0.6; margin-left: 2px; }
-    .url-cell a:hover .external-link-icon { opacity: 1; }
-    .path-cell { font-family: 'SF Mono', Monaco, monospace; font-size: 13px; color: #c9d1d9; }
-    .pid-cell { font-family: 'SF Mono', Monaco, monospace; font-size: 13px; color: #8b949e; }
-    .status-badge {
-      display: inline-flex; align-items: center; gap: 4px;
-      padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 500;
-    }
-    .status-badge.alive { background: rgba(63, 185, 80, 0.15); color: #3fb950; }
-    .status-badge.dead { background: rgba(248, 81, 73, 0.15); color: #f85149; }
-    .stats-cell { font-family: 'SF Mono', Monaco, monospace; font-size: 12px; color: #8b949e; }
-    .action-btn {
-      border: none; cursor: pointer; padding: 4px 12px; border-radius: 6px;
-      font-size: 13px; transition: all 0.15s;
-    }
-    .action-btn.stop { background: rgba(248, 81, 73, 0.15); color: #f85149; }
-    .action-btn.stop:hover { background: #f85149; color: #fff; }
-    .action-btn.start { background: rgba(63, 185, 80, 0.15); color: #3fb950; }
-    .action-btn.start:hover { background: #3fb950; color: #fff; }
-    .action-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-    .empty-state {
-      text-align: center; padding: 60px 20px; color: #8b949e;
-    }
-    .empty-state p { margin-bottom: 8px; }
-    .empty-state .hint { font-size: 13px; color: #484f58; }
-
-    #toast {
-      position: fixed; top: 20px; right: 20px;
-      padding: 12px 20px; border-radius: 8px; font-size: 14px;
-      transition: opacity 0.3s; opacity: 0; pointer-events: none;
-      z-index: 999;
-    }
-    #toast.success { background: rgba(63, 185, 80, 0.2); border: 1px solid #3fb950; color: #3fb950; opacity: 1; }
-    #toast.error { background: rgba(248, 81, 73, 0.2); border: 1px solid #f85149; color: #f85149; opacity: 1; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header-row">
-      <h1>📊 hs dashboard <small>HTTP 服务管理面板</small></h1>
-      <div class="header-stats" id="stats">
-        <span class="stat-pill"><span class="num green" id="count-instances">—</span> <span class="label">Total Instances</span></span>
-        <span class="stat-pill"><span class="num blue" id="count-ports">—</span> <span class="label">Total Ports</span></span>
-        <span class="stat-pill"><span class="num orange" id="count-paths">—</span> <span class="label">Total Paths</span></span>
-        <span class="stat-pill"><span class="num purple" id="count-memory">—</span> <span class="label">Total Memory</span></span>
-      </div>
-      <div class="header-toolbar">
-        <button class="btn-danger" id="btn-kill-all" onclick="killAll()">🛑 关闭全部</button>
-      </div>
-    </div>
-
-    <table>
-      <thead>
-        <tr>
-          <th>URL (Port)</th>
-          <th>路径</th>
-          <th>PID</th>
-          <th>状态</th>
-          <th>CPU</th>
-          <th>内存</th>
-          <th>启动时间</th>
-          <th>最新访问</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody id="servers-tbody">
-        <tr><td colspan="7" class="empty-state">
-          <p>加载中...</p>
-          <p class="hint">正在获取服务列表</p>
-        </td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div id="toast"></div>
-
-  <script>
-    function showToast(msg, type) {
-      var t = document.getElementById('toast');
-      t.textContent = msg; t.className = type;
-      setTimeout(function(){ t.className = ''; }, 3000);
-    }
-
-    function fetchAPI(url, method, cb) {
-      fetch(url, { method: method || 'GET' })
-        .then(function(r){ return r.json(); })
-        .then(function(d){ cb(null, d); })
-        .catch(function(e){ cb(e, null); });
-    }
-
-    function render(servers, managed) {
-      var tbody = document.getElementById('servers-tbody');
-      var alive = 0, dead = 0;
-      servers.forEach(function(s){ if (s.alive) alive++; else dead++; });
-
-      document.getElementById('count-alive').textContent = alive;
-      document.getElementById('count-dead').textContent = dead;
-      document.getElementById('count-total').textContent = servers.length + managed.length;
-
-      var html = '';
-
-      // Managed services section
-      if (managed.length > 0) {
-        html += '<tr class="managed-header"><td colspan="7">🔧 基础设施服务</td></tr>';
-        managed.forEach(function(s) {
-          var isAlive = s._alive;
-          var stats = s.stats || {};
-          var cpu = '—';
-          var mem = '—';
-          html += '<tr>' +
-            '<td class="url-cell"> http://localhost:' + s.port + '</td>' +
-            '<td class="path-cell">' + esc(s.name) + (s.transport ? ' (' + s.transport + ')' : '') + '</td>' +
-            '<td class="pid-cell">' + (s.pid || '-') + '</td>' +
-            '<td><span class="status-badge ' + (isAlive ? 'alive' : 'dead') + '">' + (isAlive ? '🟢' : '🔴') + ' ' + (isAlive ? '运行中' : '已停止') + '</span></td>' +
-            '<td class="stats-cell">' + cpu + '</td>' +
-            '<td class="stats-cell">' + mem + '</td>' +
-            '<td>—</td></tr>';
-        });
-      }
-
-      if (servers.length === 0 && managed.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">' +
-          '<p>没有正在运行的 HTTP 服务</p>' +
-          '<p class="hint">使用 <code>hs . -o</code> 启动一个服务</p></td></tr>';
-        return;
-      }
-
-      // User services
-      var totalMemory = 0;
-      servers.forEach(function(s) {
-        var isAlive = s.alive;
-        var statusClass = isAlive ? 'alive' : 'dead';
-        var statusIcon = isAlive ? '🟢' : '🔴';
-        var statusText = isAlive ? '运行中' : '已停止';
-        var stats = s.stats || {};
-        var cpu = stats.cpu || '-';
-        var mem = stats.memory || '-';
-        var memoryNum = parseFloat(stats.memory_num) || 0;
-        if (isAlive) totalMemory += memoryNum;
-        var started = s.started_at ? s.started_at.slice(0, 19).replace('T', ' ') : '-';
-        var lastAccess = s.last_access_at ? s.last_access_at.slice(0, 19).replace('T', ' ') : '-';
-        var btnClass = isAlive ? 'stop' : 'start';
-        var btnIcon = isAlive ? '⏹' : '▶';
-        var btnText = isAlive ? '关闭' : '启动';
-        var btnDisabled = '';
-        var btnAction = isAlive ? "confirmClose(" + s.port + ")" : '';
-
-        html += '<tr>' +
-          '<td class="url-cell"><a href="http://localhost:' + s.port + '" target="_blank" title="Open in new tab">http://localhost:' + s.port + ' <span class="external-link-icon">&#8599;</span></a></td>' +
-          '<td class="path-cell">' + esc(s.path_display || s.path) + '</td>' +
-          '<td class="pid-cell">' + (s.pid || '-') + '</td>' +
-          '<td><span class="status-badge ' + statusClass + '">' + statusIcon + ' ' + statusText + '</span></td>' +
-          '<td class="stats-cell">' + cpu + '</td>' +
-          '<td class="stats-cell">' + mem + '</td>' +
-          '<td class="time-cell">' + started + '</td>' +
-          '<td class="time-cell">' + lastAccess + '</td>' +
-          '<td><button class="action-btn ' + btnClass + '" ' + btnDisabled +
-          ' onclick="' + btnAction + '">' + btnIcon + ' ' + btnText + '</button></td>' +
-          '</tr>';
-      });
-      tbody.innerHTML = html;
-
-      // Update stats cards
-      var paths = [...new Set(servers.map(function(s) { return s.path; }))];
-      var ports = servers.filter(function(s) { return s.alive; }).length;
-      document.getElementById('count-instances').textContent = servers.length;
-      document.getElementById('count-ports').textContent = ports;
-      document.getElementById('count-paths').textContent = paths.length;
-      document.getElementById('count-memory').textContent = totalMemory.toFixed(1) + ' MB';
-    }
-
-    function esc(s) {
-      var d = document.createElement('div');
-      d.appendChild(document.createTextNode(s || ''));
-      return d.innerHTML;
-    }
-
-    function loadServers() {
-      fetchAPI('/api/servers', 'GET', function(err, data) {
-        if (err) { showToast('获取服务列表失败', 'error'); return; }
-        var servers = (data.data && data.data.servers) || [];
-        var managed = (data.data && data.data.managed) || [];
-        render(servers, managed);
-      });
-    }
-
-    function confirmClose(port) {
-      fetchAPI('/api/status/' + port, 'GET', function(err, data) {
-        if (err || !data.success) { showToast('获取服务信息失败', 'error'); return; }
-        var info = data.data || {};
-        var msg = '确定关闭此服务？\n\n'
-          + '端口: ' + info.port + '\n'
-          + '路径: ' + (info.path || '-') + '\n'
-          + 'PID: ' + (info.pid || '-') + '\n'
-          + '内存: ' + (info.stats ? (info.stats.memory || '-') : '-') + '\n'
-          + '启动时间: ' + (info.started_at ? info.started_at.slice(0, 19) : '-');
-        if (confirm(msg)) {
-          killServer(port);
-        }
-      });
-    }
-
-    function killServer(port) {
-      var btn = event && event.target;
-      if (btn) btn.disabled = true;
-      fetchAPI('/api/kill/' + port, 'POST', function(err, data) {
-        if (btn) btn.disabled = false;
-        if (err || !data.success) { showToast('关闭端口 ' + port + ' 失败', 'error'); return; }
-        showToast('端口 ' + port + ' 已关闭', 'success');
-        loadServers();
-      });
-    }
-
-    function killAll() {
-      if (!confirm('确定关闭所有 HTTP 服务？')) return;
-      var btn = document.getElementById('btn-kill-all');
-      btn.disabled = true;
-      fetchAPI('/api/kill-all', 'POST', function(err, data) {
-        btn.disabled = false;
-        if (err || !data.success) { showToast('关闭全部失败', 'error'); return; }
-        showToast('所有服务已关闭', 'success');
-        loadServers();
-      });
-    }
-
-    loadServers();
-    setInterval(loadServers, 5000);
-  </script>
-</body>
-</html>"""
-
-# ── HTTP Handler ────────────────────────────────────────
+# ── Dashboard HTTP Handler ─────────────────────────────
 
 class DashboardHandler(BaseHTTPRequestHandler):
     """Web 仪表盘 HTTP 请求处理器。"""
@@ -363,7 +79,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == '/':
-            self._html(_HTML_PAGE)
+            self._html(_get_html())
         elif self.path == '/api/servers':
             self._handle_get_servers()
         elif self.path.startswith('/api/status/'):

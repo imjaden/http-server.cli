@@ -2,4 +2,5 @@ include http-server-cli.spec.yaml
 include README.md
 include README.en.md
 include pyproject.toml
+recursive-include src/http_server_cli *.html
 include LICENSE

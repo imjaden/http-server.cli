@@ -133,18 +133,19 @@ class TestJsonMode:
 class TestHTMLPage:
     def test_html_page_contains_dashboard_title(self):
         """HTML 页面包含关键 UI 元素"""
-        from http_server_cli.dashboard import _HTML_PAGE
-        assert 'hs dashboard' in _HTML_PAGE
-        assert '运行中' in _HTML_PAGE
-        assert '关闭全部' in _HTML_PAGE
-        assert 'URL' in _HTML_PAGE
-        assert 'fetch' in _HTML_PAGE or '/api/servers' in _HTML_PAGE
+        from http_server_cli.dashboard import _get_html
+        html = _get_html()
+        assert 'hs dashboard' in html
+        assert 'Kill All' in html
+        assert 'URL' in html
+        assert 'fetch' in html or '/api/servers' in html
 
     def test_html_has_refresh_script(self):
         """HTML 包含自动刷新逻辑"""
-        from http_server_cli.dashboard import _HTML_PAGE
-        assert 'setInterval' in _HTML_PAGE
-        assert 'loadServers' in _HTML_PAGE
+        from http_server_cli.dashboard import _get_html
+        html = _get_html()
+        assert 'setInterval' in html
+        assert 'loadServers' in html
 
 
 class TestHandlerBehavior:
