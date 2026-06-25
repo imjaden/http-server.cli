@@ -135,9 +135,10 @@ _HTML_PAGE = """<!DOCTYPE html>
     <div class="header-row">
       <h1>📊 hs dashboard <small>HTTP 服务管理面板</small></h1>
       <div class="header-stats" id="stats">
-        <span class="stat-pill"><span class="num green" id="count-alive">—</span> <span class="label">运行中</span></span>
-        <span class="stat-pill"><span class="num red" id="count-dead">—</span> <span class="label">已停止</span></span>
-        <span class="stat-pill"><span class="num blue" id="count-total">—</span> <span class="label">总端口</span></span>
+        <span class="stat-pill"><span class="num green" id="count-instances">—</span> <span class="label">Total Instances</span></span>
+        <span class="stat-pill"><span class="num blue" id="count-ports">—</span> <span class="label">Total Ports</span></span>
+        <span class="stat-pill"><span class="num orange" id="count-paths">—</span> <span class="label">Total Paths</span></span>
+        <span class="stat-pill"><span class="num purple" id="count-memory">—</span> <span class="label">Total Memory</span></span>
       </div>
       <div class="header-toolbar">
         <button class="btn-danger" id="btn-kill-all" onclick="killAll()">🛑 关闭全部</button>
@@ -153,6 +154,8 @@ _HTML_PAGE = """<!DOCTYPE html>
           <th>状态</th>
           <th>CPU</th>
           <th>内存</th>
+          <th>启动时间</th>
+          <th>最新访问</th>
           <th>操作</th>
         </tr>
       </thead>
@@ -219,6 +222,7 @@ _HTML_PAGE = """<!DOCTYPE html>
       }
 
       // User services
+      var totalMemory = 0;
       servers.forEach(function(s) {
         var isAlive = s.alive;
         var statusClass = isAlive ? 'alive' : 'dead';
@@ -227,24 +231,38 @@ _HTML_PAGE = """<!DOCTYPE html>
         var stats = s.stats || {};
         var cpu = stats.cpu || '-';
         var mem = stats.memory || '-';
+        var memoryNum = parseFloat(stats.memory_num) || 0;
+        if (isAlive) totalMemory += memoryNum;
+        var started = s.started_at ? s.started_at.slice(0, 19).replace('T', ' ') : '-';
+        var lastAccess = s.last_access_at ? s.last_access_at.slice(0, 19).replace('T', ' ') : '-';
         var btnClass = isAlive ? 'stop' : 'start';
         var btnIcon = isAlive ? '⏹' : '▶';
         var btnText = isAlive ? '关闭' : '启动';
         var btnDisabled = '';
-        var btnAction = isAlive ? "killServer(" + s.port + ")" : '';
+        var btnAction = isAlive ? "confirmClose(" + s.port + ")" : '';
 
         html += '<tr>' +
-          '<td class="url-cell">http://localhost:' + s.port + '</td>' +
+          '<td class="url-cell"><a href="http://localhost:' + s.port + '" target="_blank">http://localhost:' + s.port + '</a></td>' +
           '<td class="path-cell">' + esc(s.path_display || s.path) + '</td>' +
           '<td class="pid-cell">' + (s.pid || '-') + '</td>' +
           '<td><span class="status-badge ' + statusClass + '">' + statusIcon + ' ' + statusText + '</span></td>' +
           '<td class="stats-cell">' + cpu + '</td>' +
           '<td class="stats-cell">' + mem + '</td>' +
+          '<td class="time-cell">' + started + '</td>' +
+          '<td class="time-cell">' + lastAccess + '</td>' +
           '<td><button class="action-btn ' + btnClass + '" ' + btnDisabled +
           ' onclick="' + btnAction + '">' + btnIcon + ' ' + btnText + '</button></td>' +
           '</tr>';
       });
       tbody.innerHTML = html;
+
+      // Update stats cards
+      var paths = [...new Set(servers.map(function(s) { return s.path; }))];
+      var ports = servers.filter(function(s) { return s.alive; }).length;
+      document.getElementById('count-instances').textContent = servers.length;
+      document.getElementById('count-ports').textContent = ports;
+      document.getElementById('count-paths').textContent = paths.length;
+      document.getElementById('count-memory').textContent = totalMemory.toFixed(1) + ' MB';
     }
 
     function esc(s) {
@@ -259,6 +277,22 @@ _HTML_PAGE = """<!DOCTYPE html>
         var servers = (data.data && data.data.servers) || [];
         var managed = (data.data && data.data.managed) || [];
         render(servers, managed);
+      });
+    }
+
+    function confirmClose(port) {
+      fetchAPI('/api/status/' + port, 'GET', function(err, data) {
+        if (err || !data.success) { showToast('获取服务信息失败', 'error'); return; }
+        var info = data.data || {};
+        var msg = '确定关闭此服务？\n\n'
+          + '端口: ' + info.port + '\n'
+          + '路径: ' + (info.path || '-') + '\n'
+          + 'PID: ' + (info.pid || '-') + '\n'
+          + '内存: ' + (info.stats ? (info.stats.memory || '-') : '-') + '\n'
+          + '启动时间: ' + (info.started_at ? info.started_at.slice(0, 19) : '-');
+        if (confirm(msg)) {
+          killServer(port);
+        }
       });
     }
 
