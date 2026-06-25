@@ -95,6 +95,10 @@ _HTML_PAGE = """<!DOCTYPE html>
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: #1c2128; }
     .url-cell { font-family: 'SF Mono', Monaco, monospace; color: #58a6ff; font-size: 13px; }
+    .url-cell a { color: #58a6ff; text-decoration: none; }
+    .url-cell a:hover { text-decoration: underline; }
+    .external-link-icon { font-size: 12px; opacity: 0.6; margin-left: 2px; }
+    .url-cell a:hover .external-link-icon { opacity: 1; }
     .path-cell { font-family: 'SF Mono', Monaco, monospace; font-size: 13px; color: #c9d1d9; }
     .pid-cell { font-family: 'SF Mono', Monaco, monospace; font-size: 13px; color: #8b949e; }
     .status-badge {
@@ -242,7 +246,7 @@ _HTML_PAGE = """<!DOCTYPE html>
         var btnAction = isAlive ? "confirmClose(" + s.port + ")" : '';
 
         html += '<tr>' +
-          '<td class="url-cell"><a href="http://localhost:' + s.port + '" target="_blank">http://localhost:' + s.port + '</a></td>' +
+          '<td class="url-cell"><a href="http://localhost:' + s.port + '" target="_blank" title="在新标签页中打开">http://localhost:' + s.port + ' <span class="external-link-icon">↗</span></a></td>' +
           '<td class="path-cell">' + esc(s.path_display || s.path) + '</td>' +
           '<td class="pid-cell">' + (s.pid || '-') + '</td>' +
           '<td><span class="status-badge ' + statusClass + '">' + statusIcon + ' ' + statusText + '</span></td>' +

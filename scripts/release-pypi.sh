@@ -87,13 +87,13 @@ if [[ $SHOW_HELP -eq 1 ]] || [[ -z "$TARGET" ]]; then
     echo "用法: bash scripts/release-pypi.sh [options]"
     echo ""
     echo "Options:"
-    echo "  --production, -p   构建并发布到 PyPI"
     echo "  --versions         打印版本信息"
-    echo "  -t, --test        发布到 TestPyPI"
-    echo "  -n, --dry-run     仅构建，不上传"
-    echo "  --skip-build      跳过构建步骤（使用已有 dist/）"
-    echo "  -v, --verbose     显示详细输出"
-    echo "  -h, --help        显示帮助"
+    echo "  -t, --test         发布到 TestPyPI"
+    echo "  -p, --production   构建并发布到 PyPI"
+    echo "  -n, --dry-run      仅构建，不上传"
+    echo "  --skip-build       跳过构建步骤（使用已有 dist/）"
+    echo "  -v, --verbose      显示详细输出"
+    echo "  -h, --help         显示帮助"
     exit 0
 fi
 
