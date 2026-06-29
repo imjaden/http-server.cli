@@ -25,6 +25,8 @@
   - API `_get_server_list` 增加 `url` + `log_path` 字段
   - API `_handle_get_status` 增加 `log_path` + `last_access_at` 字段
   - 测试用例从 7 → 18 个（覆盖中英文加载/error handler/列头/API 字段）
+  - 仅显示 Running 实例（`render()` 中 `servers.filter(alive)`）
+  - H1 标题右侧添加 GitHub 图标，链接至 https://github.com/imjaden/http-server-cli
 - `hs mcp` — MCP Server for AI Agent integration
   - JSON-RPC 2.0 over SSE (default, auto-daemon) or stdio transport
   - 6 tools: hs_list, hs_status, hs_start, hs_kill, hs_kill_all, hs_config
