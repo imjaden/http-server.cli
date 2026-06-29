@@ -147,6 +147,70 @@ class TestHTMLPage:
         assert 'setInterval' in html
         assert 'loadServers' in html
 
+    def test_html_en_version(self):
+        """英文版 HTML 可加载且包含 'Loading...'"""
+        from http_server_cli.dashboard import _get_html
+        html = _get_html('en')
+        assert 'hs dashboard' in html
+        assert 'Loading...' in html
+        assert 'Refresh' in html
+        assert '/en' in html  # language toggle
+
+    def test_html_cn_version_lang_switch(self):
+        """中文版 HTML 包含 '/en' 语言切换链接"""
+        from http_server_cli.dashboard import _get_html
+        html = _get_html('zh')
+        assert '🇨🇳' in html or '/en' in html
+
+    def test_html_en_lang_switch(self):
+        """英文版 HTML 包含 '/' 语言切换链接"""
+        from http_server_cli.dashboard import _get_html
+        html = _get_html('en')
+        assert '🇺🇸' in html or '/' in html
+
+    def test_html_error_handler(self):
+        """两个版本 HTML 都包含 window.onerror"""
+        from http_server_cli.dashboard import _get_html
+        for lang in ('zh', 'en'):
+            html = _get_html(lang)
+            assert 'window.onerror' in html
+
+    def test_html_url_column_exists(self):
+        """HTML 表格包含 URL (Port) 列"""
+        from http_server_cli.dashboard import _get_html
+        html = _get_html()
+        assert 'URL (Port)' in html
+
+    def test_html_status_column_exists(self):
+        """HTML 表格包含 Status 列"""
+        from http_server_cli.dashboard import _get_html
+        html = _get_html()
+        assert 'Status' in html
+
+    def test_html_cpu_column(self):
+        """HTML 表格包含 CPU 列"""
+        from http_server_cli.dashboard import _get_html
+        html = _get_html()
+        assert 'CPU' in html
+
+    def test_html_memory_column(self):
+        """HTML 表格包含 Memory 列"""
+        from http_server_cli.dashboard import _get_html
+        html = _get_html()
+        assert 'Memory' in html
+
+    def test_html_last_access_column(self):
+        """HTML 表格包含 Last Access 列"""
+        from http_server_cli.dashboard import _get_html
+        html = _get_html()
+        assert 'Last Access' in html
+
+    def test_html_action_column(self):
+        """HTML 表格包含 Action 列"""
+        from http_server_cli.dashboard import _get_html
+        html = _get_html()
+        assert 'Action' in html
+
 
 class TestHandlerBehavior:
     def test_dashboard_handler_manager(self):

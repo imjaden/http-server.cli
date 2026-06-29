@@ -16,7 +16,7 @@
 - [x] **Process Resource Monitoring** — Real-time CPU, memory usage and runtime (`hs list`)
 - [x] **Multiple Launch Modes** — Daemon background or foreground (`-d` daemon / `-f` foreground)
 - [x] **JSON Output** — All commands support `--json` for API/MCP consumption
-- [x] **Web Dashboard** — `hs dashboard -o` GUI management for HTTP services
+- [x] **Web Dashboard** — `hs dashboard -o` GUI management for HTTP services (CN/EN toggle, 60s countdown, Kill All, error handler)
 - [x] **MCP Server** — `hs mcp` AI Agent integration (SSE/stdio, 6 tools)
 - [x] **Managed Registry** — Infrastructure services isolated from user services
 

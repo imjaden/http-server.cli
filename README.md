@@ -16,7 +16,7 @@
 - [x] **进程资源监控** — 实时显示 CPU、内存使用和运行时长（`hs list`）
 - [x] **多种启动模式** — daemon 后台运行、foreground 前台运行（`-d` daemon / `-f` foreground）
 - [x] **JSON 输出** — 所有命令支持 `--json` 供 API/MCP 消费
-- [x] **Web 仪表盘** — `hs dashboard -o` 图形化管理 HTTP 服务
+- [x] **Web 仪表盘** — `hs dashboard -o` 图形化管理 HTTP 服务（中英文切换 / 60s 倒计时 / Kill All / 异常捕捉）
 - [x] **MCP Server** — `hs mcp` AI Agent 集成（SSE/stdio，6 个工具）
 - [x] **Managed Registry** — 基础设施服务与用户服务隔离管理
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -141,8 +141,8 @@
 <body>
   <div class="lang-switch">
     <div class="lang-toggle">
-      <a href="/" class="active">🇨🇳</a>
-      <a href="/en">🇺🇸</a>
+      <a href="/">🇨🇳</a>
+      <a href="/en" class="active">🇺🇸</a>
     </div>
   </div>
 
@@ -150,12 +150,12 @@
     <div class="header-row">
       <h1>📊 hs dashboard <small>HTTP Server Dashboard</small></h1>
       <div class="header-stats" id="stats">
-        <span class="stat-pill"><span class="num green" id="count-instances">—</span> <span class="label">实例数</span></span>
-        <span class="stat-pill"><span class="num purple" id="count-memory">—</span> <span class="label">总内存</span></span>
+        <span class="stat-pill"><span class="num green" id="count-instances">—</span> <span class="label">Instances</span></span>
+        <span class="stat-pill"><span class="num purple" id="count-memory">—</span> <span class="label">Total Memory</span></span>
       </div>
       <div class="header-toolbar">
         <span class="countdown" id="countdown">60</span>
-        <button class="btn-refresh" id="btn-refresh" onclick="loadServers()">🔄 刷新</button>
+        <button class="btn-refresh" id="btn-refresh" onclick="loadServers()">🔄 Refresh</button>
         <button class="btn-danger" id="btn-kill-all" onclick="killAll()">🛑 Kill All</button>
       </div>
     </div>
@@ -173,8 +173,8 @@
       </thead>
       <tbody id="servers-tbody">
         <tr><td colspan="6" class="empty-state">
-          <p>加载中...</p>
-          <p class="hint">正在获取服务列表</p>
+          <p>Loading...</p>
+          <p class="hint">Fetching server list</p>
         </td></tr>
       </tbody>
     </table>
@@ -183,30 +183,30 @@
   <div id="toast"></div>
   <div id="error-overlay">
     <div id="error-box">
-      <h3>⚠️ 出现异常</h3>
+      <h3>⚠️ An Error Occurred</h3>
       <pre id="error-detail"></pre>
-      <button class="btn-close-error" onclick="closeError()">关闭</button>
+      <button class="btn-close-error" onclick="closeError()">Close</button>
     </div>
   </div>
 
   <script>
-    // ── 全局异常捕捉 ──
+    // ── Global error handler ──
     window.onerror = function(msg, url, line, col, err) {
-      var detail = '消息: ' + msg + '\n文件: ' + (url || 'unknown') + '\n行号: ' + (line || '-') + '\n列号: ' + (col || '-');
-      if (err && err.stack) detail += '\n\n堆栈:\n' + err.stack;
+      var detail = 'Message: ' + msg + '\nFile: ' + (url || 'unknown') + '\nLine: ' + (line || '-') + '\nCol: ' + (col || '-');
+      if (err && err.stack) detail += '\n\nStack:\n' + err.stack;
       document.getElementById('error-detail').textContent = detail;
       document.getElementById('error-overlay').classList.add('show');
       return true;
     };
     window.addEventListener('unhandledrejection', function(e) {
-      var detail = '未捕获的 Promise 异常: ' + (e.reason ? (e.reason.message || e.reason) : 'unknown');
-      if (e.reason && e.reason.stack) detail += '\n\n堆栈:\n' + e.reason.stack;
+      var detail = 'Unhandled Promise rejection: ' + (e.reason ? (e.reason.message || e.reason) : 'unknown');
+      if (e.reason && e.reason.stack) detail += '\n\nStack:\n' + e.reason.stack;
       document.getElementById('error-detail').textContent = detail;
       document.getElementById('error-overlay').classList.add('show');
     });
     function closeError() { document.getElementById('error-overlay').classList.remove('show'); }
 
-    // ── 60s 倒计时 ──
+    // ── 60s countdown ──
     var countdownValue = 60;
     function resetCountdown() { countdownValue = 60; document.getElementById('countdown').textContent = '60'; }
     setInterval(function() {
@@ -228,13 +228,13 @@
         .catch(function(e){ cb(e, null); });
     }
 
-    // ── 渲染 ──
+    // ── Render ──
     function render(servers) {
       var tbody = document.getElementById('servers-tbody');
       if (servers.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="empty-state">' +
-          '<p>没有正在运行的 HTTP 服务</p>' +
-          '<p class="hint">使用 <code>hs . -o</code> 启动一个</p></td></tr>';
+          '<p>No HTTP servers running</p>' +
+          '<p class="hint">Use <code>hs . -o</code> to start one</p></td></tr>';
         return;
       }
       var totalMemory = 0;
@@ -256,7 +256,7 @@
         var urlDisplay = s.url || ('http://localhost:' + s.port);
 
         html += '<tr>' +
-          '<td class="url-cell"><a href="' + urlDisplay + '" target="_blank" title="\u5728\u65b0\u6807\u7b7e\u9875\u4e2d\u6253\u5f00">' + urlDisplay + ' <span class="external-link-icon">\u2197</span></a></td>' +
+          '<td class="url-cell"><a href="' + urlDisplay + '" target="_blank" title="Open in new tab">' + urlDisplay + ' <span class="external-link-icon">\u2197</span></a></td>' +
           '<td><span class="status-badge ' + statusClass + '" onclick="showServerInfo(' + s.port + ')">' + statusIcon + ' ' + statusText + '</span></td>' +
           '<td class="stats-cell">' + cpu + '</td>' +
           '<td class="stats-cell">' + mem + '</td>' +
@@ -270,39 +270,33 @@
       resetCountdown();
     }
 
-    function esc(s) {
-      var d = document.createElement('div');
-      d.appendChild(document.createTextNode(s || ''));
-      return d.innerHTML;
-    }
-
-    // ── STATUS 点击弹框 ──
+    // ── STATUS click dialog ──
     function showServerInfo(port) {
       fetchAPI('/api/status/' + port, 'GET', function(err, data) {
-        if (err || !data.success) { showToast('\u83b7\u53d6\u670d\u52a1\u4fe1\u606f\u5931\u8d25', 'error'); return; }
+        if (err || !data.success) { showToast('Failed to get server info', 'error'); return; }
         var info = data.data || {};
-        var msg = '\u7aef\u53e3: ' + info.port + '\n'
-          + '\u8def\u5f84: ' + (info.path || '-') + '\n'
+        var msg = 'Port: ' + info.port + '\n'
+          + 'Path: ' + (info.path || '-') + '\n'
           + 'PID: ' + (info.pid || '-') + '\n'
-          + '\u5185\u5b58: ' + (info.stats ? (info.stats.memory || '-') : '-') + '\n'
-          + '\u542f\u52a8\u65f6\u95f4: ' + (info.started_at ? info.started_at.slice(0, 19).replace('T', ' ') : '-') + '\n'
-          + '\u65e5\u5fd7\u8def\u5f84: ' + (info.log_path || '-') + '\n'
-          + '\u6700\u8fd1\u8bbf\u95ee: ' + (info.last_access_at ? info.last_access_at.slice(0, 19).replace('T', ' ') : '-');
+          + 'Memory: ' + (info.stats ? (info.stats.memory || '-') : '-') + '\n'
+          + 'Started: ' + (info.started_at ? info.started_at.slice(0, 19).replace('T', ' ') : '-') + '\n'
+          + 'Log: ' + (info.log_path || '-') + '\n'
+          + 'Last Access: ' + (info.last_access_at ? info.last_access_at.slice(0, 19).replace('T', ' ') : '-');
         alert(msg);
       });
     }
 
-    // ── 关闭 ──
+    // ── Kill ──
     function confirmClose(port) {
       fetchAPI('/api/status/' + port, 'GET', function(err, data) {
-        if (err || !data.success) { showToast('\u83b7\u53d6\u670d\u52a1\u4fe1\u606f\u5931\u8d25', 'error'); return; }
+        if (err || !data.success) { showToast('Failed to get server info', 'error'); return; }
         var info = data.data || {};
-        var msg = '\u786e\u5b9a\u5173\u95ed\u6b64\u670d\u52a1\uff1f\n\n'
-          + '\u7aef\u53e3: ' + info.port + '\n'
-          + '\u8def\u5f84: ' + (info.path || '-') + '\n'
+        var msg = 'Are you sure you want to close this server?\n\n'
+          + 'Port: ' + info.port + '\n'
+          + 'Path: ' + (info.path || '-') + '\n'
           + 'PID: ' + (info.pid || '-') + '\n'
-          + '\u5185\u5b58: ' + (info.stats ? (info.stats.memory || '-') : '-') + '\n'
-          + '\u542f\u52a8\u65f6\u95f4: ' + (info.started_at ? info.started_at.slice(0, 19).replace('T', ' ') : '-');
+          + 'Memory: ' + (info.stats ? (info.stats.memory || '-') : '-') + '\n'
+          + 'Started: ' + (info.started_at ? info.started_at.slice(0, 19).replace('T', ' ') : '-');
         if (confirm(msg)) { killServer(port); }
       });
     }
@@ -311,27 +305,27 @@
       if (btn) btn.disabled = true;
       fetchAPI('/api/kill/' + port, 'POST', function(err, data) {
         if (btn) btn.disabled = false;
-        if (err || !data.success) { showToast('\u5173\u95ed\u5931\u8d25: ' + port, 'error'); return; }
-        showToast('\u7aef\u53e3 ' + port + ' \u5df2\u5173\u95ed', 'success');
+        if (err || !data.success) { showToast('Failed to close port ' + port, 'error'); return; }
+        showToast('Port ' + port + ' closed', 'success');
         loadServers();
       });
     }
     function killAll() {
-      if (!confirm('\u786e\u5b9a\u5173\u95ed\u6240\u6709 HTTP \u670d\u52a1\uff1f')) return;
+      if (!confirm('Are you sure you want to close all HTTP servers?')) return;
       var btn = document.getElementById('btn-kill-all');
       btn.disabled = true;
       fetchAPI('/api/kill-all', 'POST', function(err, data) {
         btn.disabled = false;
-        if (err || !data.success) { showToast('\u5173\u95ed\u5168\u90e8\u5931\u8d25', 'error'); return; }
-        showToast('\u6240\u6709\u670d\u52a1\u5df2\u5173\u95ed', 'success');
+        if (err || !data.success) { showToast('Failed to kill all', 'error'); return; }
+        showToast('All servers closed', 'success');
         loadServers();
       });
     }
 
-    // ── 加载 ──
+    // ── Load ──
     function loadServers() {
       fetchAPI('/api/servers', 'GET', function(err, data) {
-        if (err) { showToast('\u83b7\u53d6\u670d\u52a1\u5217\u8868\u5931\u8d25', 'error'); return; }
+        if (err) { showToast('Failed to fetch server list', 'error'); return; }
         var servers = (data.data && data.data.servers) || [];
         render(servers);
       });

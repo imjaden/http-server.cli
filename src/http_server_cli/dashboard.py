@@ -31,18 +31,19 @@ from http_server_cli.utils import (
 
 # ── HTML 页面（从独立文件加载）─────────────────────────────
 
-_DASHBOARD_HTML = None
+_DASHBOARD_CACHE: dict = {}
 
-def _get_html() -> str:
-    global _DASHBOARD_HTML
-    if _DASHBOARD_HTML is None:
-        html_path = os.path.join(SCRIPT_DIR, 'dashboard.html')
+def _get_html(lang: str = 'zh') -> str:
+    """加载 HTML 页面，支持 'zh' (中文) 和 'en' (英文)"""
+    filename = 'dashboard.html' if lang == 'zh' else 'dashboard.en.html'
+    if lang not in _DASHBOARD_CACHE:
+        html_path = os.path.join(SCRIPT_DIR, filename)
         try:
             with open(html_path, 'r', encoding='utf-8') as f:
-                _DASHBOARD_HTML = f.read()
+                _DASHBOARD_CACHE[lang] = f.read()
         except FileNotFoundError:
-            _DASHBOARD_HTML = '<html><body><h1>Dashboard HTML not found</h1></body></html>'
-    return _DASHBOARD_HTML
+            _DASHBOARD_CACHE[lang] = f'<html><body><h1>Dashboard HTML ({filename}) not found</h1></body></html>'
+    return _DASHBOARD_CACHE[lang]
 
 
 # ── Dashboard HTTP Handler ─────────────────────────────
@@ -79,7 +80,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == '/':
-            self._html(_get_html())
+            self._html(_get_html('zh'))
+        elif self.path == '/en':
+            self._html(_get_html('en'))
         elif self.path == '/api/servers':
             self._handle_get_servers()
         elif self.path.startswith('/api/status/'):
@@ -103,6 +106,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             stats = get_process_stats(pid)
             started = entry.get('started_at', '')
             servers.append({
+                'url': f"http://{entry.get('domain', 'localhost')}:{entry['port']}",
                 'port': entry['port'],
                 'path': entry['path'],
                 'path_display': format_path(entry['path']),
@@ -114,6 +118,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 'started_at': started,
                 'last_access_at': entry.get('last_access_at', ''),
                 'duration': self._format_duration(started),
+                'log_path': format_path(os.path.join(LOG_DIR, f"{entry['port']}.log")),
                 'index_page': entry.get('index_page', 'index.html'),
                 'stats': stats,
             })
@@ -170,7 +175,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             'mode': 'daemon' if entry.get('daemon') else
                     ('foreground' if entry.get('foreground') else 'normal'),
             'started_at': entry.get('started_at'),
+            'last_access_at': entry.get('last_access_at', ''),
             'duration': duration,
+            'log_path': format_path(os.path.join(LOG_DIR, f"{port}.log")),
             'index_page': entry.get('index_page', 'index.html'),
             'stats': stats,
         }})

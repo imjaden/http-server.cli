@@ -1,7 +1,7 @@
 # http-server-cli 功能特性
 
 > 版本: 1.0.7
-> 更新: 2026-06-24
+> 更新: 2026-06-29
 
 ## CLI 命令
 
@@ -33,6 +33,12 @@
 8. **进程组管理** — daemon 模式使用 os.killpg 防孤儿进程
 9. **JSON 输出** — 所有命令支持 `--json`
 10. **Web Dashboard** — 图形化管理面板
+    - 中英文语言切换（🇨🇳 `/` ↔ 🇺🇸 `/en`），右上角悬浮 pill
+    - 工具栏：60s 倒计时自动刷新、刷新按钮、Kill All 一键关闭
+    - 服务器表格：URL(Port) | Status | CPU | Memory | Last Access | Action
+    - Status 点击弹框：显示端口/路径/PID/内存/启动时间/日志路径/最近访问
+    - `window.onerror` 全局异常捕捉，覆盖层弹框显示完整 stack trace
+    - API：list / status / kill / kill-all
 
 ## 数据结构
 

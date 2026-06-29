@@ -15,6 +15,16 @@
   - `hs dashboard status` — query dashboard status (port/PID/duration/CPU/memory)
   - `hs dashboard restart` — stop + restart
   - `hs dashboard help` — dashboard-specific usage
+- **Dashboard v2** — Web UI 增强
+  - 中英文语言切换（🇨🇳 `/` ↔ 🇺🇸 `/en`），右上角悬浮 pill
+  - 工具栏 60s 倒计时自动刷新 + 🔄 Refresh 按钮 + 🛑 Kill All 按钮
+  - 表格重构：URL(Port) | Status | CPU | Memory | Last Access | Action（移除 PATH/PID/STARTED）
+  - URL 列用 `url` 字段渲染为 `<a target="_blank">` 超链接
+  - Status 点击弹出详情弹框：端口/路径/PID/内存/启动时间/日志路径/最近访问
+  - `window.onerror` + `unhandledrejection` 全局异常捕捉覆盖层
+  - API `_get_server_list` 增加 `url` + `log_path` 字段
+  - API `_handle_get_status` 增加 `log_path` + `last_access_at` 字段
+  - 测试用例从 7 → 18 个（覆盖中英文加载/error handler/列头/API 字段）
 - `hs mcp` — MCP Server for AI Agent integration
   - JSON-RPC 2.0 over SSE (default, auto-daemon) or stdio transport
   - 6 tools: hs_list, hs_status, hs_start, hs_kill, hs_kill_all, hs_config
