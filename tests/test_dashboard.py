@@ -132,12 +132,12 @@ class TestJsonMode:
 
 class TestHTMLPage:
     def test_html_page_contains_dashboard_title(self):
-        """HTML 页面包含关键 UI 元素"""
+        """中文版 HTML 包含中文 UI 元素"""
         from http_server_cli.dashboard import _get_html
         html = _get_html()
-        assert 'hs dashboard' in html
-        assert 'Kill All' in html
-        assert 'URL' in html
+        assert 'hs dashboard' in html or 'HTTP Server Dashboard' in html
+        assert '全部关闭' in html
+        assert 'URL（端口）' in html
         assert 'fetch' in html or '/api/servers' in html
 
     def test_html_has_refresh_script(self):
@@ -148,12 +148,15 @@ class TestHTMLPage:
         assert 'loadServers' in html
 
     def test_html_en_version(self):
-        """英文版 HTML 可加载且包含 'Loading...'"""
+        """英文版 HTML 可加载且包含英文 UI 文字"""
         from http_server_cli.dashboard import _get_html
         html = _get_html('en')
-        assert 'hs dashboard' in html
+        assert 'HTTP Server Dashboard' in html
         assert 'Loading...' in html
         assert 'Refresh' in html
+        assert 'Kill All' in html
+        assert 'Status' in html
+        assert 'Last Access' in html
         assert '/en' in html  # language toggle
 
     def test_html_cn_version_lang_switch(self):
@@ -176,39 +179,57 @@ class TestHTMLPage:
             assert 'window.onerror' in html
 
     def test_html_url_column_exists(self):
-        """HTML 表格包含 URL (Port) 列"""
+        """中文版表格包含 URL（端口）列"""
         from http_server_cli.dashboard import _get_html
         html = _get_html()
-        assert 'URL (Port)' in html
+        assert 'URL（端口）' in html
 
     def test_html_status_column_exists(self):
-        """HTML 表格包含 Status 列"""
+        """中文版表格包含 状态 列"""
         from http_server_cli.dashboard import _get_html
         html = _get_html()
-        assert 'Status' in html
+        assert '状态' in html
 
     def test_html_cpu_column(self):
-        """HTML 表格包含 CPU 列"""
+        """两个版本表格都包含 CPU 列"""
         from http_server_cli.dashboard import _get_html
-        html = _get_html()
-        assert 'CPU' in html
+        for lang in ('zh', 'en'):
+            html = _get_html(lang)
+            assert 'CPU' in html
 
     def test_html_memory_column(self):
-        """HTML 表格包含 Memory 列"""
+        """中文版表格包含 内存 列"""
         from http_server_cli.dashboard import _get_html
         html = _get_html()
-        assert 'Memory' in html
+        assert '内存' in html
 
     def test_html_last_access_column(self):
-        """HTML 表格包含 Last Access 列"""
+        """中文版表格包含 最近访问 列"""
         from http_server_cli.dashboard import _get_html
         html = _get_html()
-        assert 'Last Access' in html
+        assert '最近访问' in html
 
     def test_html_action_column(self):
-        """HTML 表格包含 Action 列"""
+        """中文版表格包含 操作 列"""
         from http_server_cli.dashboard import _get_html
         html = _get_html()
+        assert '操作' in html
+
+    def test_html_version_footer(self):
+        """两个版本 HTML 都包含版本号 footer 元素"""
+        from http_server_cli.dashboard import _get_html
+        for lang in ('zh', 'en'):
+            html = _get_html(lang)
+            assert 'footer-version' in html
+            assert 'commands-body' in html
+
+    def test_html_en_columns(self):
+        """英文版表格列标题使用英文"""
+        from http_server_cli.dashboard import _get_html
+        html = _get_html('en')
+        assert 'Status' in html
+        assert 'Memory' in html
+        assert 'Last Access' in html
         assert 'Action' in html
 
 

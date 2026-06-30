@@ -184,6 +184,18 @@
     </table>
   </div>
 
+  <!-- Footer: version + commands -->
+  <div style="max-width:1000px;margin:24px auto 0;padding:0 24px;">
+    <details style="background:#161b22;border:1px solid #30363d;border-radius:8px;overflow:hidden;">
+      <summary style="padding:10px 16px;cursor:pointer;font-size:13px;color:#8b949e;display:flex;align-items:center;gap:8px;user-select:none;">
+        <span id="footer-version" style="font-weight:600;color:#58a6ff;">Version: —</span>
+        <span style="color:#484f58;">·</span>
+        <span style="color:#484f58;">Click to expand command reference</span>
+      </summary>
+      <div id="commands-body" style="padding:0 16px 12px;font-size:12px;color:#8b949e;line-height:1.8;"></div>
+    </details>
+  </div>
+
   <div id="toast"></div>
   <div id="error-overlay">
     <div id="error-box">
@@ -336,7 +348,24 @@
       });
     }
 
+    // ── Load version & commands ──
+    function loadInfo() {
+      fetchAPI('/api/info', 'GET', function(err, data) {
+        if (err || !data.success) return;
+        document.getElementById('footer-version').textContent = 'Version: ' + data.version;
+        var body = document.getElementById('commands-body');
+        if (!body) return;
+        var html = '';
+        data.commands.forEach(function(c) {
+          html += '<div style=\"display:flex;gap:12px;padding:3px 0;\">' +
+            '<code style=\"color:#c9d1d9;white-space:nowrap;min-width:300px;\">' + esc(c.cmd) + '</code>' +
+            '<span>' + esc(c.desc) + '</span></div>';
+        });
+        body.innerHTML = html;
+      });
+    }
     loadServers();
+    loadInfo();
   </script>
 </body>
 </html>

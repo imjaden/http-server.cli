@@ -27,6 +27,9 @@
   - 测试用例从 7 → 18 个（覆盖中英文加载/error handler/列头/API 字段）
   - 仅显示 Running 实例（`render()` 中 `servers.filter(alive)`）
   - H1 标题右侧添加 GitHub 图标，链接至 https://github.com/imjaden/http-server-cli
+  - 中英文各自使用母语：CN 全中文（列标题/按钮/状态文字）、EN 全英文
+  - 底部可折叠版本号（Version: 1.0.7）+ hs help 命令参考（通过 `/api/info` 获取）
+  - 测试用例从 18 → 20 个（新增 footer + EN columns 测试）
 - `hs mcp` — MCP Server for AI Agent integration
   - JSON-RPC 2.0 over SSE (default, auto-daemon) or stdio transport
   - 6 tools: hs_list, hs_status, hs_start, hs_kill, hs_kill_all, hs_config

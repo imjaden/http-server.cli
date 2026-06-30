@@ -91,6 +91,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._handle_get_status(int(port_str))
             else:
                 self._error('invalid port', 400)
+        elif self.path == '/api/info':
+            self._handle_get_info()
         else:
             self._error('not found')
 
@@ -181,6 +183,29 @@ class DashboardHandler(BaseHTTPRequestHandler):
             'index_page': entry.get('index_page', 'index.html'),
             'stats': stats,
         }})
+
+    def _handle_get_info(self) -> None:
+        """返回版本号与命令参考"""
+        from http_server_cli import __version__
+        commands = [
+            {'cmd': 'hs . [-o] [-d] [-f]', 'desc': '快捷启动（等价 hs start .）'},
+            {'cmd': 'hs start [path] [-o] [-d] [-f] [-i <file>]', 'desc': '启动 HTTP 服务'},
+            {'cmd': 'hs list [--port|--path|--short] [--json]', 'desc': '列出运行中服务'},
+            {'cmd': 'hs status <port|path> [--json]', 'desc': '查询服务状态'},
+            {'cmd': 'hs kill <port|path> [--json]', 'desc': '关闭指定服务'},
+            {'cmd': 'hs kill-all [--json]', 'desc': '关闭所有服务'},
+            {'cmd': 'hs history [--json]', 'desc': '历史记录'},
+            {'cmd': 'hs search <keyword> [--json]', 'desc': '搜索实例'},
+            {'cmd': 'hs dashboard [-p <port>] [-o] [--json]', 'desc': 'Web 管理面板'},
+            {'cmd': 'hs dashboard stop|status|restart|help', 'desc': 'dashboard 管理'},
+            {'cmd': 'hs mcp [--transport stdio|sse] [--port PORT]', 'desc': 'MCP Server（AI 集成）'},
+            {'cmd': 'hs mcp stop|status|restart|help', 'desc': 'MCP 管理'},
+            {'cmd': 'hs config [--json]', 'desc': '显示配置'},
+            {'cmd': 'hs set port|domain <value>', 'desc': '修改配置'},
+            {'cmd': 'hs help', 'desc': '显示帮助'},
+            {'cmd': 'hs version [--json]', 'desc': '版本号'},
+        ]
+        self._json({'success': True, 'version': __version__, 'commands': commands})
 
     # ── POST ──
 
