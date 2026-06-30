@@ -78,11 +78,24 @@ class DashboardHandler(BaseHTTPRequestHandler):
         """静默日志 — 不污染 stdout"""
         pass
 
+    def _detect_lang(self) -> str:
+        """根据 Accept-Language 头自动检测语言，返回 'zh' 或 'en'"""
+        accept = self.headers.get('Accept-Language', '')
+        # 检查首要语言是否以 en 开头（en, en-US, en-GB 等）
+        for part in accept.split(','):
+            lang = part.split(';')[0].strip().split('-')[0]
+            if lang == 'en':
+                return 'en'
+            if lang == 'zh':
+                return 'zh'
+        return 'zh'
+
     # ── GET ──
 
     def do_GET(self) -> None:
         if self.path == '/':
-            self._html(_get_html('zh'))
+            lang = self._detect_lang()
+            self._html(_get_html(lang))
         elif self.path == '/en':
             self._html(_get_html('en'))
         elif self.path == '/api/servers':

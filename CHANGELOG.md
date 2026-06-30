@@ -35,6 +35,9 @@
   - 一键复制 URL：每行 URL 右侧 📋 按钮，clipboard.writeText + toast
   - 日志尾部查看：新增 `/api/log/{port}` tail 50 行，集成至 Status 弹框
   - 测试用例：224 个（新增 9 个：ping/log API + copy/search/health/log HTML 元素）
+  - 搜索框默认隐藏，>10 个实例时自动显示
+  - Footer summary 文字居中 + 宽度对齐表格
+  - 自动语言检测：根据浏览器 Accept-Language 头切换 CN/EN（_detect_lang）
 - `hs mcp` — MCP Server for AI Agent integration
   - JSON-RPC 2.0 over SSE (default, auto-daemon) or stdio transport
   - 6 tools: hs_list, hs_status, hs_start, hs_kill, hs_kill_all, hs_config

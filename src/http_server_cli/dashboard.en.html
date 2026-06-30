@@ -107,6 +107,7 @@
     .github-icon svg { width: 20px; height: 20px; fill: #c9d1d9; }
     /* Search input */
     .search-bar { margin-bottom: 12px; }
+    .search-bar.hidden { display: none; }
     .search-bar input {
       width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #30363d;
       background: #161b22; color: #c9d1d9; font-size: 13px; outline: none;
@@ -185,7 +186,7 @@
       </div>
     </div>
 
-    <div class="search-bar">
+    <div class="search-bar hidden" id="search-bar">
       <input type="text" id="search-input" placeholder="🔍 Search port or project path..." onkeyup="doFilter()">
     </div>
 
@@ -213,7 +214,7 @@
   <!-- Footer: version + commands -->
   <div style="max-width:1000px;margin:24px auto 0;padding:0 24px;">
     <details style="background:#161b22;border:1px solid #30363d;border-radius:8px;overflow:hidden;">
-      <summary style="padding:10px 16px;cursor:pointer;font-size:13px;color:#8b949e;display:flex;align-items:center;gap:8px;user-select:none;">
+      <summary style="padding:10px 16px;cursor:pointer;font-size:13px;color:#8b949e;display:flex;align-items:center;justify-content:center;gap:8px;user-select:none;">
         <span id="footer-version" style="font-weight:600;color:#58a6ff;">Version: —</span>
         <span style="color:#484f58;">·</span>
         <span style="color:#484f58;">Click to expand command reference</span>
@@ -315,6 +316,12 @@
       tbody.innerHTML = html;
       document.getElementById('count-instances').textContent = servers.length;
       document.getElementById('count-memory').textContent = totalMemory.toFixed(1) + ' MB';
+      // Show search bar when >10 instances
+      var sb = document.getElementById('search-bar');
+      if (sb) {
+        if (servers.length > 10) { sb.classList.remove('hidden'); }
+        else { sb.classList.add('hidden'); }
+      }
       resetCountdown();
     }
 
