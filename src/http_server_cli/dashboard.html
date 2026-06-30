@@ -105,6 +105,27 @@
     .github-icon { display: inline-flex; vertical-align: middle; margin-left: 6px; opacity: 0.7; transition: opacity 0.15s; }
     .github-icon:hover { opacity: 1; }
     .github-icon svg { width: 20px; height: 20px; fill: #c9d1d9; }
+    /* Search input */
+    .search-bar { margin-bottom: 12px; }
+    .search-bar input {
+      width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #30363d;
+      background: #161b22; color: #c9d1d9; font-size: 13px; outline: none;
+    }
+    .search-bar input::placeholder { color: #484f58; }
+    .search-bar input:focus { border-color: #58a6ff; }
+    /* Health dot */
+    .health-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
+    .health-dot.green { background: #3fb950; }
+    .health-dot.yellow { background: #d29922; }
+    .health-dot.red { background: #f85149; }
+    .health-dot.gray { background: #484f58; }
+    /* Copy button */
+    .copy-btn {
+      cursor: pointer; opacity: 0.5; transition: opacity 0.15s;
+      border: none; background: none; color: #8b949e; font-size: 14px; padding: 0 4px;
+      vertical-align: middle;
+    }
+    .copy-btn:hover { opacity: 1; color: #c9d1d9; }
     /* Error overlay */
     #error-overlay {
       display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -159,15 +180,20 @@
       </div>
       <div class="header-toolbar">
         <span class="countdown" id="countdown">60</span>
-        <button class="btn-refresh" id="btn-refresh" onclick="loadServers()">🔄 刷新</button>
+        <button class="btn-refresh" id="btn-refresh" onclick="doFilter()">🔄 刷新</button>
         <button class="btn-danger" id="btn-kill-all" onclick="killAll()">🛑 全部关闭</button>
       </div>
+    </div>
+
+    <div class="search-bar">
+      <input type="text" id="search-input" placeholder="🔍 搜索端口号或项目路径..." onkeyup="doFilter()">
     </div>
 
     <table>
       <thead>
         <tr>
           <th>URL（端口）</th>
+          <th>健康</th>
           <th>状态</th>
           <th>CPU</th>
           <th>内存</th>
@@ -176,7 +202,7 @@
         </tr>
       </thead>
       <tbody id="servers-tbody">
-        <tr><td colspan="6" class="empty-state">
+        <tr><td colspan="7" class="empty-state">
           <p>加载中...</p>
           <p class="hint">正在获取服务列表</p>
         </td></tr>
@@ -208,15 +234,15 @@
   <script>
     // ── 全局异常捕捉 ──
     window.onerror = function(msg, url, line, col, err) {
-      var detail = '消息: ' + msg + '\n文件: ' + (url || 'unknown') + '\n行号: ' + (line || '-') + '\n列号: ' + (col || '-');
-      if (err && err.stack) detail += '\n\n堆栈:\n' + err.stack;
+      var detail = '\u6d88\u606f: ' + msg + '\n\u6587\u4ef6: ' + (url || 'unknown') + '\n\u884c\u53f7: ' + (line || '-') + '\n\u5217\u53f7: ' + (col || '-');
+      if (err && err.stack) detail += '\n\n\u5806\u6808:\n' + err.stack;
       document.getElementById('error-detail').textContent = detail;
       document.getElementById('error-overlay').classList.add('show');
       return true;
     };
     window.addEventListener('unhandledrejection', function(e) {
-      var detail = '未捕获的 Promise 异常: ' + (e.reason ? (e.reason.message || e.reason) : 'unknown');
-      if (e.reason && e.reason.stack) detail += '\n\n堆栈:\n' + e.reason.stack;
+      var detail = '\u672a\u6355\u83b7\u7684 Promise \u5f02\u5e38: ' + (e.reason ? (e.reason.message || e.reason) : 'unknown');
+      if (e.reason && e.reason.stack) detail += '\n\n\u5806\u6808:\n' + e.reason.stack;
       document.getElementById('error-detail').textContent = detail;
       document.getElementById('error-overlay').classList.add('show');
     });
@@ -227,9 +253,13 @@
     function resetCountdown() { countdownValue = 60; document.getElementById('countdown').textContent = '60'; }
     setInterval(function() {
       countdownValue--;
-      if (countdownValue <= 0) { countdownValue = 60; loadServers(); }
+      if (countdownValue <= 0) { countdownValue = 60; doFilter(); }
       document.getElementById('countdown').textContent = countdownValue;
     }, 1000);
+
+    // ── 状态缓存 ──
+    var _cachedServers = [];
+    var _healthCache = {};
 
     // ── API ──
     function showToast(msg, type) {
@@ -243,42 +273,48 @@
         .then(function(d){ cb(null, d); })
         .catch(function(e){ cb(e, null); });
     }
+    function esc(s) {
+      var d = document.createElement('div');
+      d.appendChild(document.createTextNode(s || ''));
+      return d.innerHTML;
+    }
 
     // ── 渲染 ──
     function render(servers) {
       var tbody = document.getElementById('servers-tbody');
       servers = servers.filter(function(s){ return s.alive; });
       if (servers.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">' +
-          '<p>没有正在运行的 HTTP 服务</p>' +
-          '<p class="hint">使用 <code>hs . -o</code> 启动一个</p></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">' +
+          '<p>\u6ca1\u6709\u6b63\u5728\u8fd0\u884c\u7684 HTTP \u670d\u52a1</p>' +
+          '<p class="hint">\u4f7f\u7528 <code>hs . -o</code> \u542f\u52a8\u4e00\u4e2a</p></td></tr>';
         return;
       }
       var totalMemory = 0;
       var html = '';
       servers.forEach(function(s) {
         var isAlive = s.alive;
-        var statusClass = isAlive ? 'alive' : 'dead';
-        var statusIcon = isAlive ? '\ud83d\udfe2' : '\ud83d\udd34';
-        var statusText = isAlive ? '运行中' : '已停止';
+        var health = _healthCache[s.port];
+        var healthDot = 'gray';
+        if (health && health.status_code !== null) {
+          var code = health.status_code;
+          healthDot = (code >= 200 && code < 400) ? 'green' : (code >= 400 && code < 500) ? 'yellow' : 'red';
+        }
         var cpu = (s.stats && s.stats.cpu) || '-';
         var mem = (s.stats && s.stats.memory) || '-';
         var memoryNum = parseFloat(s.stats && s.stats.memory_num) || 0;
         if (isAlive) totalMemory += memoryNum;
         var lastAccess = s.last_access_at ? s.last_access_at.slice(0, 19).replace('T', ' ') : '-';
-        var btnClass = isAlive ? 'stop' : 'start';
-        var btnIcon = isAlive ? '\u23f9' : '\u25b6';
-        var btnText = isAlive ? '关闭' : '启动';
-        var btnAction = isAlive ? "confirmClose(" + s.port + ")" : '';
         var urlDisplay = s.url || ('http://localhost:' + s.port);
 
         html += '<tr>' +
-          '<td class="url-cell"><a href="' + urlDisplay + '" target="_blank" title="\u5728\u65b0\u6807\u7b7e\u9875\u4e2d\u6253\u5f00">' + urlDisplay + ' <span class="external-link-icon">\u2197</span></a></td>' +
-          '<td><span class="status-badge ' + statusClass + '" onclick="showServerInfo(' + s.port + ')">' + statusIcon + ' ' + statusText + '</span></td>' +
+          '<td class="url-cell"><a href="' + urlDisplay + '" target="_blank" title="\u5728\u65b0\u6807\u7b7e\u9875\u4e2d\u6253\u5f00">' + urlDisplay + ' <span class="external-link-icon">\u2197</span></a>' +
+          '<button class="copy-btn" onclick="copyURL(event, \'' + urlDisplay + '\')" title="\u590d\u5236 URL">\ud83d\udccb</button></td>' +
+          '<td><span class="health-dot ' + healthDot + '"></span></td>' +
+          '<td><span class="status-badge alive" onclick="showServerInfo(' + s.port + ')">\ud83d\udfe2 \u8fd0\u884c\u4e2d</span></td>' +
           '<td class="stats-cell">' + cpu + '</td>' +
           '<td class="stats-cell">' + mem + '</td>' +
           '<td class="time-cell">' + lastAccess + '</td>' +
-          '<td><button class="action-btn ' + btnClass + '" onclick="' + btnAction + '">' + btnIcon + ' ' + btnText + '</button></td>' +
+          '<td><button class="action-btn stop" onclick="confirmClose(' + s.port + ')">\u23f9 \u5173\u95ed</button></td>' +
           '</tr>';
       });
       tbody.innerHTML = html;
@@ -287,25 +323,56 @@
       resetCountdown();
     }
 
-    function esc(s) {
-      var d = document.createElement('div');
-      d.appendChild(document.createTextNode(s || ''));
-      return d.innerHTML;
+    // ── 一键复制 ──
+    function copyURL(ev, url) {
+      ev.stopPropagation();
+      navigator.clipboard.writeText(url).then(function() {
+        showToast('URL \u5df2\u590d\u5236: ' + url, 'success');
+      }).catch(function() {
+        showToast('\u590d\u5236\u5931\u8d25', 'error');
+      });
     }
 
-    // ── STATUS 点击弹框 ──
+    // ── 搜索过滤 ──
+    function doFilter() {
+      var kw = document.getElementById('search-input').value.toLowerCase();
+      var filtered = _cachedServers;
+      if (kw) {
+        filtered = _cachedServers.filter(function(s) {
+          return ('' + s.port).indexOf(kw) >= 0 || (s.path || '').toLowerCase().indexOf(kw) >= 0;
+        });
+      }
+      render(filtered);
+    }
+
+    // ── 健康检查 ──
+    function pingServer(port) {
+      fetchAPI('/api/ping/' + port, 'GET', function(err, data) {
+        if (!err && data && data.success) {
+          _healthCache[port] = data;
+          doFilter();
+        }
+      });
+    }
+
+    // ── STATUS 弹框 ──
     function showServerInfo(port) {
-      fetchAPI('/api/status/' + port, 'GET', function(err, data) {
-        if (err || !data.success) { showToast('\u83b7\u53d6\u670d\u52a1\u4fe1\u606f\u5931\u8d25', 'error'); return; }
-        var info = data.data || {};
-        var msg = '\u7aef\u53e3: ' + info.port + '\n'
-          + '\u8def\u5f84: ' + (info.path || '-') + '\n'
-          + 'PID: ' + (info.pid || '-') + '\n'
-          + '\u5185\u5b58: ' + (info.stats ? (info.stats.memory || '-') : '-') + '\n'
-          + '\u542f\u52a8\u65f6\u95f4: ' + (info.started_at ? info.started_at.slice(0, 19).replace('T', ' ') : '-') + '\n'
-          + '\u65e5\u5fd7\u8def\u5f84: ' + (info.log_path || '-') + '\n'
-          + '\u6700\u8fd1\u8bbf\u95ee: ' + (info.last_access_at ? info.last_access_at.slice(0, 19).replace('T', ' ') : '-');
-        alert(msg);
+      fetchAPI('/api/status/' + port, 'GET', function(err1, statusData) {
+        if (err1 || !statusData.success) { showToast('\u83b7\u53d6\u670d\u52a1\u4fe1\u606f\u5931\u8d25', 'error'); return; }
+        fetchAPI('/api/log/' + port, 'GET', function(err2, logData) {
+          var info = statusData.data || {};
+          var log = (logData && logData.success) ? logData.log : '';
+          var msg = '\u7aef\u53e3: ' + info.port + '\n'
+            + '\u8def\u5f84: ' + (info.path || '-') + '\n'
+            + 'PID: ' + (info.pid || '-') + '\n'
+            + '\u5185\u5b58: ' + (info.stats ? (info.stats.memory || '-') : '-') + '\n'
+            + '\u542f\u52a8\u65f6\u95f4: ' + (info.started_at ? info.started_at.slice(0, 19).replace('T', ' ') : '-') + '\n'
+            + '\u65e5\u5fd7\u8def\u5f84: ' + (info.log_path || '-') + '\n'
+            + '\u6700\u8fd1\u8bbf\u95ee: ' + (info.last_access_at ? info.last_access_at.slice(0, 19).replace('T', ' ') : '-') + '\n'
+            + '\n\u2500\u2500 \u6700\u8fd1\u65e5\u5fd7 (50\u884c) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n'
+            + (log || '\u65e0\u65e5\u5fd7\u6570\u636e');
+          alert(msg);
+        });
       });
     }
 
@@ -330,7 +397,7 @@
         if (btn) btn.disabled = false;
         if (err || !data.success) { showToast('\u5173\u95ed\u5931\u8d25: ' + port, 'error'); return; }
         showToast('\u7aef\u53e3 ' + port + ' \u5df2\u5173\u95ed', 'success');
-        loadServers();
+        doFilter();
       });
     }
     function killAll() {
@@ -341,16 +408,18 @@
         btn.disabled = false;
         if (err || !data.success) { showToast('\u5173\u95ed\u5168\u90e8\u5931\u8d25', 'error'); return; }
         showToast('\u6240\u6709\u670d\u52a1\u5df2\u5173\u95ed', 'success');
-        loadServers();
+        doFilter();
       });
     }
 
-    // ── 加载 ──
+    // ── 加载服务器列表 ──
     function loadServers() {
       fetchAPI('/api/servers', 'GET', function(err, data) {
         if (err) { showToast('\u83b7\u53d6\u670d\u52a1\u5217\u8868\u5931\u8d25', 'error'); return; }
-        var servers = (data.data && data.data.servers) || [];
-        render(servers);
+        _cachedServers = (data.data && data.data.servers) || [];
+        // \u540e\u53f0 ping \u6bcf\u4e2a\u5b9e\u4f8b
+        _cachedServers.forEach(function(s) { pingServer(s.port); });
+        doFilter();
       });
     }
 
@@ -363,8 +432,8 @@
         if (!body) return;
         var html = '';
         data.commands.forEach(function(c) {
-          html += '<div style=\"display:flex;gap:12px;padding:3px 0;\">' +
-            '<code style=\"color:#c9d1d9;white-space:nowrap;min-width:300px;\">' + esc(c.cmd) + '</code>' +
+          html += '<div style="display:flex;gap:12px;padding:3px 0;">' +
+            '<code style="color:#c9d1d9;white-space:nowrap;min-width:300px;">' + esc(c.cmd) + '</code>' +
             '<span>' + esc(c.desc) + '</span></div>';
         });
         body.innerHTML = html;

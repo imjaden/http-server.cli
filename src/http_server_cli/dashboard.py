@@ -13,6 +13,8 @@ import signal
 import subprocess
 import sys
 import time
+import urllib.request
+import urllib.error
 import webbrowser
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Any, Optional
@@ -93,6 +95,18 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._error('invalid port', 400)
         elif self.path == '/api/info':
             self._handle_get_info()
+        elif self.path.startswith('/api/ping/'):
+            port_str = self.path.split('/')[-1]
+            if port_str.isdigit():
+                self._handle_ping(int(port_str))
+            else:
+                self._error('invalid port', 400)
+        elif self.path.startswith('/api/log/'):
+            port_str = self.path.split('/')[-1]
+            if port_str.isdigit():
+                self._handle_log(int(port_str))
+            else:
+                self._error('invalid port', 400)
         else:
             self._error('not found')
 
@@ -206,6 +220,46 @@ class DashboardHandler(BaseHTTPRequestHandler):
             {'cmd': 'hs version [--json]', 'desc': '版本号'},
         ]
         self._json({'success': True, 'version': __version__, 'commands': commands})
+
+    def _handle_ping(self, port: int) -> None:
+        """对实例发送 HTTP HEAD 健康检查（2s 超时）"""
+        entry = self.manager.registry.find(port=port)
+        if not entry:
+            self._json({'success': True, 'port': port, 'alive': False,
+                        'status_code': None, 'response_time_ms': None})
+            return
+        domain = entry.get('domain', 'localhost')
+        url = f'http://{domain}:{port}/'
+        start = time.time()
+        try:
+            req = urllib.request.Request(url, method='HEAD')
+            resp = urllib.request.urlopen(req, timeout=2)
+            elapsed = int((time.time() - start) * 1000)
+            self._json({'success': True, 'port': port, 'alive': True,
+                        'status_code': resp.getcode(), 'response_time_ms': elapsed})
+        except urllib.error.HTTPError as e:
+            elapsed = int((time.time() - start) * 1000)
+            self._json({'success': True, 'port': port, 'alive': True,
+                        'status_code': e.code, 'response_time_ms': elapsed})
+        except Exception:
+            self._json({'success': True, 'port': port, 'alive': False,
+                        'status_code': None, 'response_time_ms': None})
+
+    def _handle_log(self, port: int) -> None:
+        """返回端口对应日志文件的最近 50 行"""
+        log_path = os.path.join(LOG_DIR, f'{port}.log')
+        if not os.path.exists(log_path):
+            self._json({'success': True, 'port': port, 'log': '', 'lines': 0})
+            return
+        try:
+            with open(log_path, 'r', encoding='utf-8', errors='replace') as f:
+                lines = f.readlines()
+            tail = lines[-50:]
+            self._json({'success': True, 'port': port,
+                        'log': ''.join(tail), 'lines': len(tail)})
+        except Exception as e:
+            self._json({'success': True, 'port': port,
+                        'log': f'[error reading log] {e}', 'lines': 0})
 
     # ── POST ──
 

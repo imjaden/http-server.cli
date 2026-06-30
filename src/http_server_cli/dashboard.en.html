@@ -105,6 +105,27 @@
     .github-icon { display: inline-flex; vertical-align: middle; margin-left: 6px; opacity: 0.7; transition: opacity 0.15s; }
     .github-icon:hover { opacity: 1; }
     .github-icon svg { width: 20px; height: 20px; fill: #c9d1d9; }
+    /* Search input */
+    .search-bar { margin-bottom: 12px; }
+    .search-bar input {
+      width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #30363d;
+      background: #161b22; color: #c9d1d9; font-size: 13px; outline: none;
+    }
+    .search-bar input::placeholder { color: #484f58; }
+    .search-bar input:focus { border-color: #58a6ff; }
+    /* Health dot */
+    .health-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
+    .health-dot.green { background: #3fb950; }
+    .health-dot.yellow { background: #d29922; }
+    .health-dot.red { background: #f85149; }
+    .health-dot.gray { background: #484f58; }
+    /* Copy button */
+    .copy-btn {
+      cursor: pointer; opacity: 0.5; transition: opacity 0.15s;
+      border: none; background: none; color: #8b949e; font-size: 14px; padding: 0 4px;
+      vertical-align: middle;
+    }
+    .copy-btn:hover { opacity: 1; color: #c9d1d9; }
     /* Error overlay */
     #error-overlay {
       display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -159,15 +180,20 @@
       </div>
       <div class="header-toolbar">
         <span class="countdown" id="countdown">60</span>
-        <button class="btn-refresh" id="btn-refresh" onclick="loadServers()">🔄 Refresh</button>
+        <button class="btn-refresh" id="btn-refresh" onclick="doFilter()">🔄 Refresh</button>
         <button class="btn-danger" id="btn-kill-all" onclick="killAll()">🛑 Kill All</button>
       </div>
+    </div>
+
+    <div class="search-bar">
+      <input type="text" id="search-input" placeholder="🔍 Search port or project path..." onkeyup="doFilter()">
     </div>
 
     <table>
       <thead>
         <tr>
           <th>URL (Port)</th>
+          <th>Health</th>
           <th>Status</th>
           <th>CPU</th>
           <th>Memory</th>
@@ -176,7 +202,7 @@
         </tr>
       </thead>
       <tbody id="servers-tbody">
-        <tr><td colspan="6" class="empty-state">
+        <tr><td colspan="7" class="empty-state">
           <p>Loading...</p>
           <p class="hint">Fetching server list</p>
         </td></tr>
@@ -227,9 +253,13 @@
     function resetCountdown() { countdownValue = 60; document.getElementById('countdown').textContent = '60'; }
     setInterval(function() {
       countdownValue--;
-      if (countdownValue <= 0) { countdownValue = 60; loadServers(); }
+      if (countdownValue <= 0) { countdownValue = 60; doFilter(); }
       document.getElementById('countdown').textContent = countdownValue;
     }, 1000);
+
+    // ── State cache ──
+    var _cachedServers = [];
+    var _healthCache = {};
 
     // ── API ──
     function showToast(msg, type) {
@@ -249,7 +279,7 @@
       var tbody = document.getElementById('servers-tbody');
       servers = servers.filter(function(s){ return s.alive; });
       if (servers.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">' +
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">' +
           '<p>No HTTP servers running</p>' +
           '<p class="hint">Use <code>hs . -o</code> to start one</p></td></tr>';
         return;
@@ -258,27 +288,28 @@
       var html = '';
       servers.forEach(function(s) {
         var isAlive = s.alive;
-        var statusClass = isAlive ? 'alive' : 'dead';
-        var statusIcon = isAlive ? '\ud83d\udfe2' : '\ud83d\udd34';
-        var statusText = isAlive ? 'Running' : 'Stopped';
+        var health = _healthCache[s.port];
+        var healthDot = 'gray';
+        if (health && health.status_code !== null) {
+          var code = health.status_code;
+          healthDot = (code >= 200 && code < 400) ? 'green' : (code >= 400 && code < 500) ? 'yellow' : 'red';
+        }
         var cpu = (s.stats && s.stats.cpu) || '-';
         var mem = (s.stats && s.stats.memory) || '-';
         var memoryNum = parseFloat(s.stats && s.stats.memory_num) || 0;
         if (isAlive) totalMemory += memoryNum;
         var lastAccess = s.last_access_at ? s.last_access_at.slice(0, 19).replace('T', ' ') : '-';
-        var btnClass = isAlive ? 'stop' : 'start';
-        var btnIcon = isAlive ? '\u23f9' : '\u25b6';
-        var btnText = isAlive ? 'Close' : 'Start';
-        var btnAction = isAlive ? "confirmClose(" + s.port + ")" : '';
         var urlDisplay = s.url || ('http://localhost:' + s.port);
 
         html += '<tr>' +
-          '<td class="url-cell"><a href="' + urlDisplay + '" target="_blank" title="Open in new tab">' + urlDisplay + ' <span class="external-link-icon">\u2197</span></a></td>' +
-          '<td><span class="status-badge ' + statusClass + '" onclick="showServerInfo(' + s.port + ')">' + statusIcon + ' ' + statusText + '</span></td>' +
+          '<td class="url-cell"><a href="' + urlDisplay + '" target="_blank" title="Open in new tab">' + urlDisplay + ' <span class="external-link-icon">\u2197</span></a>' +
+          '<button class="copy-btn" onclick="copyURL(event, \'' + urlDisplay + '\')" title="Copy URL">\ud83d\udccb</button></td>' +
+          '<td><span class="health-dot ' + healthDot + '"></span></td>' +
+          '<td><span class="status-badge alive" onclick="showServerInfo(' + s.port + ')">\ud83d\udfe2 Running</span></td>' +
           '<td class="stats-cell">' + cpu + '</td>' +
           '<td class="stats-cell">' + mem + '</td>' +
           '<td class="time-cell">' + lastAccess + '</td>' +
-          '<td><button class="action-btn ' + btnClass + '" onclick="' + btnAction + '">' + btnIcon + ' ' + btnText + '</button></td>' +
+          '<td><button class="action-btn stop" onclick="confirmClose(' + s.port + ')">\u23f9 Close</button></td>' +
           '</tr>';
       });
       tbody.innerHTML = html;
@@ -287,19 +318,62 @@
       resetCountdown();
     }
 
-    // ── STATUS click dialog ──
+    function esc(s) {
+      var d = document.createElement('div');
+      d.appendChild(document.createTextNode(s || ''));
+      return d.innerHTML;
+    }
+
+    // ── Copy URL ──
+    function copyURL(ev, url) {
+      ev.stopPropagation();
+      navigator.clipboard.writeText(url).then(function() {
+        showToast('URL copied: ' + url, 'success');
+      }).catch(function() {
+        showToast('Copy failed', 'error');
+      });
+    }
+
+    // ── Search filter ──
+    function doFilter() {
+      var kw = document.getElementById('search-input').value.toLowerCase();
+      var filtered = _cachedServers;
+      if (kw) {
+        filtered = _cachedServers.filter(function(s) {
+          return ('' + s.port).indexOf(kw) >= 0 || (s.path || '').toLowerCase().indexOf(kw) >= 0;
+        });
+      }
+      render(filtered);
+    }
+
+    // ── Health check ──
+    function pingServer(port) {
+      fetchAPI('/api/ping/' + port, 'GET', function(err, data) {
+        if (!err && data && data.success) {
+          _healthCache[port] = data;
+          doFilter();
+        }
+      });
+    }
+
+    // ── STATUS dialog ──
     function showServerInfo(port) {
-      fetchAPI('/api/status/' + port, 'GET', function(err, data) {
-        if (err || !data.success) { showToast('Failed to get server info', 'error'); return; }
-        var info = data.data || {};
-        var msg = 'Port: ' + info.port + '\n'
-          + 'Path: ' + (info.path || '-') + '\n'
-          + 'PID: ' + (info.pid || '-') + '\n'
-          + 'Memory: ' + (info.stats ? (info.stats.memory || '-') : '-') + '\n'
-          + 'Started: ' + (info.started_at ? info.started_at.slice(0, 19).replace('T', ' ') : '-') + '\n'
-          + 'Log: ' + (info.log_path || '-') + '\n'
-          + 'Last Access: ' + (info.last_access_at ? info.last_access_at.slice(0, 19).replace('T', ' ') : '-');
-        alert(msg);
+      fetchAPI('/api/status/' + port, 'GET', function(err1, statusData) {
+        if (err1 || !statusData.success) { showToast('Failed to get server info', 'error'); return; }
+        fetchAPI('/api/log/' + port, 'GET', function(err2, logData) {
+          var info = statusData.data || {};
+          var log = (logData && logData.success) ? logData.log : '';
+          var msg = 'Port: ' + info.port + '\n'
+            + 'Path: ' + (info.path || '-') + '\n'
+            + 'PID: ' + (info.pid || '-') + '\n'
+            + 'Memory: ' + (info.stats ? (info.stats.memory || '-') : '-') + '\n'
+            + 'Started: ' + (info.started_at ? info.started_at.slice(0, 19).replace('T', ' ') : '-') + '\n'
+            + 'Log: ' + (info.log_path || '-') + '\n'
+            + 'Last Access: ' + (info.last_access_at ? info.last_access_at.slice(0, 19).replace('T', ' ') : '-') + '\n'
+            + '\n-- Recent Log (50 lines) ------------------\n'
+            + (log || 'No log data');
+          alert(msg);
+        });
       });
     }
 
@@ -324,7 +398,7 @@
         if (btn) btn.disabled = false;
         if (err || !data.success) { showToast('Failed to close port ' + port, 'error'); return; }
         showToast('Port ' + port + ' closed', 'success');
-        loadServers();
+        doFilter();
       });
     }
     function killAll() {
@@ -335,16 +409,18 @@
         btn.disabled = false;
         if (err || !data.success) { showToast('Failed to kill all', 'error'); return; }
         showToast('All servers closed', 'success');
-        loadServers();
+        doFilter();
       });
     }
 
-    // ── Load ──
+    // ── Load servers ──
     function loadServers() {
       fetchAPI('/api/servers', 'GET', function(err, data) {
         if (err) { showToast('Failed to fetch server list', 'error'); return; }
-        var servers = (data.data && data.data.servers) || [];
-        render(servers);
+        _cachedServers = (data.data && data.data.servers) || [];
+        // Ping each server in background
+        _cachedServers.forEach(function(s) { pingServer(s.port); });
+        doFilter();
       });
     }
 

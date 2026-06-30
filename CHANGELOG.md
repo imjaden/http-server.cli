@@ -30,6 +30,11 @@
   - 中英文各自使用母语：CN 全中文（列标题/按钮/状态文字）、EN 全英文
   - 底部可折叠版本号（Version: 1.0.7）+ hs help 命令参考（通过 `/api/info` 获取）
   - 测试用例从 18 → 20 个（新增 footer + EN columns 测试）
+  - 健康检查探活：新增 `/api/ping/{port}` HEAD 请求（2s 超时），前端 🟢/🟡/🔴 圆点
+  - 搜索过滤框：表格上方 input 实时按端口/路径关键字过滤（纯前端）
+  - 一键复制 URL：每行 URL 右侧 📋 按钮，clipboard.writeText + toast
+  - 日志尾部查看：新增 `/api/log/{port}` tail 50 行，集成至 Status 弹框
+  - 测试用例：224 个（新增 9 个：ping/log API + copy/search/health/log HTML 元素）
 - `hs mcp` — MCP Server for AI Agent integration
   - JSON-RPC 2.0 over SSE (default, auto-daemon) or stdio transport
   - 6 tools: hs_list, hs_status, hs_start, hs_kill, hs_kill_all, hs_config

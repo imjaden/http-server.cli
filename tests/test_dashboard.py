@@ -261,3 +261,92 @@ class TestDaemonMode:
         output = captured.getvalue()
         assert 'daemon' in output
         assert 'PID:' in output
+
+
+class TestApiEndpoints:
+    def test_api_ping_missing_port(self):
+        """/api/ping 不存在的端口返回 alive=False"""
+        from http_server_cli.dashboard import DashboardHandler
+        from http_server_cli.server import ServerManager
+        import json
+        mgr = ServerManager()
+        DashboardHandler.manager = mgr
+        handler = DashboardHandler.__new__(DashboardHandler)
+        handler.manager = mgr
+        handler._json = lambda d, s=200: setattr(handler, '_resp', (d, s))
+        handler._handle_ping(99999)
+        resp, _ = handler._resp
+        assert resp['success']
+        assert resp['alive'] is False
+
+    def test_api_log_empty(self):
+        """/api/log 不存在日志文件时返回空字符串"""
+        from http_server_cli.dashboard import DashboardHandler
+        from http_server_cli.server import ServerManager
+        mgr = ServerManager()
+        DashboardHandler.manager = mgr
+        handler = DashboardHandler.__new__(DashboardHandler)
+        handler.manager = mgr
+        handler._json = lambda d, s=200: setattr(handler, '_resp', (d, s))
+        handler._handle_log(99999)
+        resp, _ = handler._resp
+        assert resp['success']
+        assert resp['log'] == ''
+
+    def test_html_has_health_column(self):
+        """中文版 HTML 包含健康列"""
+        from http_server_cli.dashboard import _get_html
+        html = _get_html('zh')
+        assert '健康' in html
+
+    def test_html_en_has_health_column(self):
+        """英文版 HTML 包含 Health 列"""
+        from http_server_cli.dashboard import _get_html
+        html = _get_html('en')
+        assert 'Health' in html
+
+    def test_html_has_search_input(self):
+        """两个版本 HTML 都包含搜索输入框"""
+        from http_server_cli.dashboard import _get_html
+        for lang in ('zh', 'en'):
+            html = _get_html(lang)
+            assert 'search-input' in html
+            assert 'doFilter' in html
+
+    def test_html_has_copy_btn(self):
+        """两个版本 HTML 都包含复制按钮"""
+        from http_server_cli.dashboard import _get_html
+        for lang in ('zh', 'en'):
+            html = _get_html(lang)
+            assert 'copyURL' in html
+            assert 'clipboard' in html
+
+    def test_html_has_ping(self):
+        """两个版本 HTML 都包含 pingServer 和 _healthCache"""
+        from http_server_cli.dashboard import _get_html
+        for lang in ('zh', 'en'):
+            html = _get_html(lang)
+            assert 'pingServer' in html
+            assert '_healthCache' in html
+
+    def test_html_has_log_viewer(self):
+        """两个版本 HTML 的 showServerInfo 调用 /api/log"""
+        from http_server_cli.dashboard import _get_html
+        for lang in ('zh', 'en'):
+            html = _get_html(lang)
+            assert '/api/log/' in html
+
+    def test_api_info_has_version_and_commands(self):
+        """/api/info 返回版本号和命令列表"""
+        from http_server_cli.dashboard import DashboardHandler
+        from http_server_cli.server import ServerManager
+        mgr = ServerManager()
+        DashboardHandler.manager = mgr
+        handler = DashboardHandler.__new__(DashboardHandler)
+        handler.manager = mgr
+        handler._json = lambda d, s=200: setattr(handler, '_resp', (d, s))
+        handler._handle_get_info()
+        resp, _ = handler._resp
+        assert resp['success']
+        assert 'version' in resp
+        assert len(resp['commands']) > 5
