@@ -26,10 +26,11 @@ on:
 | 1. Checkout | 拉取源码 |
 | 2. 设置 Python | 3.12 环境 |
 | 3. 安装依赖 | `pip install build twine pytest` |
-| 4. 运行测试 | `python -m pytest tests/ -q` |
-| 5. 构建 | `python -m build` |
-| 6. 创建 GitHub Release | 自动生成 changelog + 上传 dist/*.whl |
-| 7. 发布到 PyPI | `twine upload dist/*`（需配置 PyPI Token） |
+| 4. 安装项目 | `pip install -e .` |
+| 5. 运行测试 | `python -m pytest tests/ -q` |
+| 6. 构建 | `python -m build` |
+| 7. 创建 GitHub Release | 自动生成 changelog + 上传 dist/*.whl |
+| 8. 发布到 PyPI | `twine upload dist/*`（需配置 PyPI Token） |
 
 ### 所需 Secrets
 
@@ -67,6 +68,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install build twine pytest
+      - run: pip install -e .
       - run: python -m pytest tests/ -q
       - run: python -m build
       - uses: softprops/action-gh-release@v2
@@ -100,6 +102,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install pytest
+      - run: pip install -e .
       - run: python -m pytest tests/ -q
 ```
 

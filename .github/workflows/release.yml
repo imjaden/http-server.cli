@@ -13,6 +13,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install build twine pytest
+      - run: pip install -e .
       - run: python -m pytest tests/ -q
       - run: python -m build
       - uses: softprops/action-gh-release@v2
