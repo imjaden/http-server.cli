@@ -50,7 +50,7 @@ def is_port_in_use(port):
 ```
 include http-server-cli.spec.yaml
 include README.md
-include README.en.md
+include README.zh.md
 include pyproject.toml
 ```
 

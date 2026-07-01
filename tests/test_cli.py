@@ -238,7 +238,7 @@ class TestHistoryCommand:
         from http_server_cli.cli import _cmd_history
         _cmd_history(None, [])
         captured = capsys.readouterr()
-        assert '暂无历史记录' in captured.out
+        assert 'No history records' in captured.out
 
     def test_history_json_empty(self, capsys):
         """空历史 --json 应返回合法 JSON"""
@@ -307,7 +307,7 @@ class TestSearchCommand:
         from http_server_cli.cli import _cmd_search
         _cmd_search(None, [])
         captured = capsys.readouterr()
-        assert '用法' in captured.out
+        assert 'Usage' in captured.out
 
     def test_search_by_port(self, search_manager, capsys):
         """按端口搜索应匹配"""
@@ -336,7 +336,7 @@ class TestSearchCommand:
         from http_server_cli.cli import _cmd_search
         _cmd_search(search_manager, ['nonexistent'])
         captured = capsys.readouterr()
-        assert '未找到匹配' in captured.out
+        assert 'No services matching' in captured.out
 
     def test_search_json(self, search_manager, capsys):
         """--json 应输出合法 JSON"""

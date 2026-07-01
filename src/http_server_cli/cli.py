@@ -79,11 +79,11 @@ def _handle_set(args):
     if len(clean_args) < 2:
         if json_mode:
             from http_server_cli.utils import json_output
-            json_output(False, 'set', error='用法: set <port|domain> <值>')
+            json_output(False, 'set', error='Usage: set <port|domain> <value>')
         else:
-            eprint('用法: set <port|domain> <值>', '⚠️')
-            eprint('  set port 8080      设置默认端口', '💡')
-            eprint('  set domain 0.0.0.0 设置绑定域名', '💡')
+            eprint('Usage: set <port|domain> <value>', '⚠️')
+            eprint('  set port 8080      Set default port', '💡')
+            eprint('  set domain 0.0.0.0 Set bind domain', '💡')
         return
 
     key, value = clean_args[0], clean_args[1]
@@ -95,9 +95,9 @@ def _handle_set(args):
             if port < 1024 or port > 65535:
                 if json_mode:
                     from http_server_cli.utils import json_output
-                    json_output(False, 'set', error='端口号应在 1024-65535 之间')
+                    json_output(False, 'set', error='Port must be between 1024-65535')
                 else:
-                    eprint('端口号应在 1024-65535 之间', '⚠️')
+                    eprint('Port must be between 1024-65535', '⚠️')
                 return
             old_value = config.port
             config.set_port(port)
@@ -105,13 +105,13 @@ def _handle_set(args):
                 from http_server_cli.utils import json_output
                 json_output(True, 'set', data={'key': 'port', 'old_value': old_value, 'new_value': port})
             else:
-                eprint(f'默认端口已设置为 {port}', '✅')
+                eprint(f'Default port set to {port}', '✅')
         except ValueError:
             if json_mode:
                 from http_server_cli.utils import json_output
-                json_output(False, 'set', error=f'无效端口号: {value}')
+                json_output(False, 'set', error=f'Invalid port number: {value}')
             else:
-                eprint(f'无效端口号: {value}', '❌')
+                eprint(f'Invalid port number: {value}', '❌')
     elif key == 'domain':
         old_value = config.domain
         config.set_domain(value)
@@ -119,13 +119,13 @@ def _handle_set(args):
             from http_server_cli.utils import json_output
             json_output(True, 'set', data={'key': 'domain', 'old_value': old_value, 'new_value': value})
         else:
-            eprint(f'默认域名已设置为 {value}', '✅')
+            eprint(f'Default domain set to {value}', '✅')
     else:
         if json_mode:
             from http_server_cli.utils import json_output
-            json_output(False, 'set', error=f'未知配置项: {key}（支持: port, domain）')
+            json_output(False, 'set', error=f'Unknown config key: {key} (supported: port, domain)')
         else:
-            eprint(f'未知配置项: {key}（支持: port, domain）', '⚠️')
+            eprint(f'Unknown config key: {key} (supported: port, domain)', '⚠️')
 
 # ── 命令分派 ──────────────────────────────────────────
 
@@ -221,8 +221,8 @@ def _list_servers(manager, json: bool = False, port_only: bool = False,
 
     total = len(user_servers) + len(managed_servers)
     if total == 0:
-        eprint('没有正在运行的 HTTP 服务', 'ℹ️')
-        eprint('使用 hs start [path] -o 启动一个', '💡')
+        eprint('No running HTTP services', 'ℹ️')
+        eprint('Use hs start [path] -o to start one', '💡')
         return
 
     # 过滤输出模式（优先级: --port > --path > --short）
@@ -240,7 +240,7 @@ def _list_servers(manager, json: bool = False, port_only: bool = False,
         return
 
     # 用户服务
-    eprint(f'共 {len(user_servers)} 个 HTTP 服务:', '📊')
+    eprint(f'Total {len(user_servers)} HTTP services:', '📊')
     print()
     for entry in user_servers:
         alive = entry['_alive']
@@ -254,19 +254,19 @@ def _list_servers(manager, json: bool = False, port_only: bool = False,
             print(f'📍  http://{domain}:{port} （current）')
         else:
             status_icon = '✅' if alive else '❌'
-            status_text = '' if alive else ' (已停止)'
+            status_text = '' if alive else ' (stopped)'
             mode_tag = ' 🖥' if entry.get('daemon') else (' ⌨' if entry.get('foreground') else '')
             print(f'{status_icon}  http://{domain}:{port}{status_text}{mode_tag}')
         print(f'    📁  {path}')
         stats = get_process_stats(entry.get('pid'))
         duration = format_duration(started)
-        print(f'    🔧  PID: {pid}  |  启动时间: {started}')
-        print(f'    📊  CPU: {stats["cpu"]}  |  内存: {stats["memory"]} ({stats["memory_percent"]}) | 时长: {duration}')
+        print(f'    🔧  PID: {pid}  |  Started: {started}')
+        print(f'    📊  CPU: {stats["cpu"]}  |  Memory: {stats["memory"]} ({stats["memory_percent"]}) | Duration: {duration}')
         print()
 
     # Managed 基础设施服务
     if managed_servers:
-        eprint(f'共 {len(managed_servers)} 个基础设施服务:', '🔧')
+        eprint(f'Total {len(managed_servers)} infrastructure services:', '🔧')
         print()
         for entry in managed_servers:
             port = entry['port']
@@ -278,7 +278,7 @@ def _list_servers(manager, json: bool = False, port_only: bool = False,
             tag = f' ({transport})' if transport else ''
             icon = '🟢' if alive else '🔴'
             print(f'{icon}  {name}{tag}  →  http://127.0.0.1:{port}')
-            print(f'    🔧  PID: {pid}  |  启动时间: {started}')
+            print(f'    🔧  PID: {pid}  |  Started: {started}')
             print()
 
 @_register
@@ -347,18 +347,18 @@ def _cmd_history(manager, args):
         json_output(True, 'history', data={'count': len(records), 'records': records})
         return
     if not records:
-        eprint('暂无历史记录', 'ℹ️')
+        eprint('No history records', 'ℹ️')
         return
-    eprint(f'共 {len(records)} 条历史记录:', '📊')
+    eprint(f'Total {len(records)} history records:', '📊')
     print()
     for r in records:
         port = r.get('port', '-')
         path = r.get('path', '-')
         started = r.get('started_at', '-')[:19]
-        ended = r.get('ended_at', '-')[:19] if r.get('ended_at') else '运行中'
+        ended = r.get('ended_at', '-')[:19] if r.get('ended_at') else 'running'
         mem = r.get('memory_mb', 0)
         print(f'  {port}:{path}')
-        print(f'    开始: {started}  结束: {ended}  内存: {mem} MB')
+        print(f'    Start: {started}  End: {ended}  Memory: {mem} MB')
         print()
 
 @_register
@@ -377,7 +377,7 @@ def _cmd_search(manager, args):
         return
     if not parsed.keyword:
         from http_server_cli.utils import eprint
-        eprint('用法: hs search <keyword>', '⚠️')
+        eprint('Usage: hs search <keyword>', '⚠️')
         return
 
     # 从 registry 中搜索匹配项
@@ -400,10 +400,10 @@ def _cmd_search(manager, args):
         return
 
     if not matches:
-        eprint(f'未找到匹配 "{parsed.keyword}" 的服务', 'ℹ️')
+        eprint(f'No services matching "{parsed.keyword}"', 'ℹ️')
         return
 
-    eprint(f'找到 {len(matches)} 个匹配 "{parsed.keyword}" 的服务:', '📊')
+    eprint(f'Found {len(matches)} matching "{parsed.keyword}":', '📊')
     print()
     for entry in matches:
         port = entry['port']
@@ -470,19 +470,19 @@ def _manage_dashboard(subcmd: str) -> None:
 
     if subcmd == 'help':
         print('━━━ hs dashboard ━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-        print('  hs dashboard              前台启动（调试模式）')
-        print('  hs dashboard -o           后台运行 + 打开浏览器')
-        print('  hs dashboard -d           后台运行')
-        print('  hs dashboard -p PORT      指定端口')
-        print('  hs dashboard --json       一次性查询服务列表')
-        print('  hs dashboard stop         停止仪表盘')
-        print('  hs dashboard status       查看运行状态')
-        print('  hs dashboard restart      重启仪表盘')
+        print('  hs dashboard              Foreground start (debug mode)')
+        print('  hs dashboard -o           Background + open browser')
+        print('  hs dashboard -d           Background daemon')
+        print('  hs dashboard -p PORT      Specify port')
+        print('  hs dashboard --json       One-shot server list')
+        print('  hs dashboard stop         Stop dashboard')
+        print('  hs dashboard status       View status')
+        print('  hs dashboard restart      Restart dashboard')
         print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
         return
 
     if subcmd in ('stop', 'status', 'restart') and not entry:
-        eprint('dashboard 未在运行', 'ℹ️')
+        eprint('dashboard not running', 'ℹ️')
         return
 
     port = entry.get('port', '?')
@@ -494,8 +494,8 @@ def _manage_dashboard(subcmd: str) -> None:
         stats = get_process_stats(pid)
         icon = '🟢' if alive else '🔴'
         print(f'{icon}  hs dashboard  →  http://127.0.0.1:{port}')
-        print(f'    🔧  PID: {pid}  |  时长: {duration}')
-        print(f'    📊  CPU: {stats["cpu"]}  |  内存: {stats["memory"]} ({stats["memory_percent"]})')
+        print(f'    🔧  PID: {pid}  |  Duration: {duration}')
+        print(f'    📊  CPU: {stats["cpu"]}  |  Memory: {stats["memory"]} ({stats["memory_percent"]})')
         return
 
     if subcmd in ('stop', 'restart'):
@@ -522,7 +522,7 @@ def _manage_dashboard(subcmd: str) -> None:
                     os.remove(lp)
                 except OSError:
                     pass
-        eprint(f'dashboard (端口 {port}) 已停止', '🛑')
+        eprint(f'dashboard (port {port}) stopped', '🛑')
 
     if subcmd == 'restart':
         from http_server_cli.dashboard import serve
@@ -564,17 +564,17 @@ def _manage_mcp(subcmd: str) -> None:
 
     if subcmd == 'help':
         print('━━━ hs mcp ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-        print('  hs mcp                    后台运行 SSE（默认）')
-        print('  hs mcp --transport stdio  前台运行 stdio 模式')
-        print('  hs mcp --port PORT        指定端口')
-        print('  hs mcp stop               停止 MCP 服务')
-        print('  hs mcp status             查看运行状态')
-        print('  hs mcp restart            重启 MCP 服务')
+        print('  hs mcp                    Background SSE (default)')
+        print('  hs mcp --transport stdio  Foreground stdio mode')
+        print('  hs mcp --port PORT        Specify port')
+        print('  hs mcp stop               Stop MCP service')
+        print('  hs mcp status             View status')
+        print('  hs mcp restart            Restart MCP service')
         print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
         return
 
     if subcmd in ('stop', 'status', 'restart') and not entry:
-        eprint('MCP 未在运行', 'ℹ️')
+        eprint('MCP not running', 'ℹ️')
         return
 
     port = entry.get('port', '?')
@@ -585,7 +585,7 @@ def _manage_mcp(subcmd: str) -> None:
         duration = format_duration(entry.get('started_at', ''))
         icon = '🟢' if alive else '🔴'
         print(f'{icon}  hs mcp (SSE)  →  http://127.0.0.1:{port}/sse')
-        print(f'    🔧  PID: {pid}  |  时长: {duration}')
+        print(f'    🔧  PID: {pid}  |  Duration: {duration}')
         return
 
     if subcmd in ('stop', 'restart'):
@@ -599,7 +599,7 @@ def _manage_mcp(subcmd: str) -> None:
             except (ProcessLookupError, PermissionError, OSError):
                 pass
         mreg.remove(name='mcp')
-        eprint(f'MCP (端口 {port}) 已停止', '🛑')
+        eprint(f'MCP (port {port}) stopped', '🛑')
 
     if subcmd == 'restart':
         from http_server_cli.mcp import serve_sse
@@ -629,7 +629,7 @@ def main():
             parsed.args = [parsed.command] + parsed.args
             cmd = 'start'
         else:
-            eprint(f'未知命令: {cmd}', '❌')
+            eprint(f'Unknown command: {cmd}', '❌')
             _cmd_help(None, [])
             sys.exit(1)
 

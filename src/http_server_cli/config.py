@@ -73,11 +73,11 @@ class Config:
             }
             json_output(success=True, command='config', data=data)
             return
-        print('📋 http-server-cli 配置')
+        print('📋 http-server-cli configuration')
         print(f'  port:   {self.port}')
         print(f'  domain: {self.domain}')
-        print(f'  数据目录: {CONFIG_PATH.replace(os.path.expanduser("~"), "~")}')
+        print(f'  data dir: {CONFIG_PATH.replace(os.path.expanduser("~"), "~")}')
         print()
-        print('💡 修改配置:')
-        print(f'  hs set port {self.port}    修改默认端口')
-        print(f'  hs set domain {self.domain}  修改绑定域名')
+        print('💡 Change configuration:')
+        print(f'  hs set port {self.port}    Change default port')
+        print(f'  hs set domain {self.domain}  Change binding domain')

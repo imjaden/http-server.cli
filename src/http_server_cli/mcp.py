@@ -377,10 +377,10 @@ def _serve_sse(port: int = 8181) -> None:
         if epid and is_process_alive(epid) and is_port_in_use(eport):
             from http_server_cli.utils import format_duration as _fd
             duration = _fd(existing.get('started_at', ''))
-            print(f'📡  hs mcp 已在运行')
-            print(f'    🔧  http://127.0.0.1:{eport}/sse  (PID: {epid})')
-            print(f'    📊  时长: {duration}')
-            print(f'    💡  SSE endpoint: http://127.0.0.1:{eport}/sse')
+            print(f'📡 hs mcp already running')
+            print(f'    🔧 http://127.0.0.1:{eport}/sse  (PID: {epid})')
+            print(f'    📊 Duration: {duration}')
+            print(f'    💡 SSE endpoint: http://127.0.0.1:{eport}/sse')
             return
         else:
             mreg.remove(name='mcp')
@@ -470,14 +470,14 @@ def _serve_sse(port: int = 8181) -> None:
     server = HTTPServer(('127.0.0.1', port), SSEHandler)
     # 注册 managed
     mreg.add(name='mcp', type_='sse', port=port, pid=os.getpid(), transport='sse')
-    print(f'📡  hs mcp (SSE)  →  http://127.0.0.1:{port}/sse')
-    print('⏹  按 Ctrl+C 停止\n')
+    print(f'📡 hs mcp (SSE) -> http://127.0.0.1:{port}/sse')
+    print('⏹ Press Ctrl+C to stop\n')
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         print()
         mreg.remove(name='mcp')
-        print('📡  MCP SSE 服务已停止')
+        print('📡 MCP SSE service stopped')
         server.server_close()
 
 # ── 入口函数 ───────────────────────────────────────────
@@ -516,7 +516,7 @@ def serve_sse(port: int = 8181, daemon: bool = False) -> None:
         from http_server_cli.registry_managed import ManagedRegistry
         mreg = ManagedRegistry()
         mreg.add(name='mcp', type_='sse', port=port, pid=proc.pid, transport='sse')
-        print(f'📡  hs mcp (SSE daemon) →  http://127.0.0.1:{port}/sse  (PID: {proc.pid})')
-        print(f'⏹  使用 hs kill {port} 或 kill {proc.pid} 停止')
+        print(f'📡 hs mcp (SSE daemon) -> http://127.0.0.1:{port}/sse  (PID: {proc.pid})')
+        print(f'⏹ Use hs kill {port} or kill {proc.pid} to stop')
         return
     _serve_sse(port=port)

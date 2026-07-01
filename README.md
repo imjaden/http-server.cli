@@ -4,112 +4,116 @@
 
 # http-server-cli
 
-> 忘记端口，只管预览 — Forget ports. Just preview.
+> Forget ports. Just preview.
 >
-> 基于 `python3 -m http.server`，零外部依赖。项目目录下 `hs . -o` 一键预览。
+> Based on `python3 -m http.server`, zero external dependencies. Just `hs . -o` to preview your project.
 
-- [x] **零外部依赖** — 仅需 Python 3.7+，macOS/Linux/Windows 全平台支持（`pip install http-server-cli`）
-- [x] **端口自动分配+预览** — 默认 8080，冲突时自动递增找空闲端口（`hs . -o`）
-- [x] **智能首页** — 无 index.html 时自动重定向到最近修改的 html 文件
-- [x] **自定义首页** — 通过 `-i`/`--index` 指定首页文件
-- [x] **项目追踪** — 持久化记录项目路径↔端口映射（`hs list`）
-- [x] **进程资源监控** — 实时显示 CPU、内存使用和运行时长（`hs list`）
-- [x] **多种启动模式** — daemon 后台运行、foreground 前台运行（`-d` daemon / `-f` foreground）
-- [x] **JSON 输出** — 所有命令支持 `--json` 供 API/MCP 消费
-- [x] **Web 仪表盘** — `hs dashboard -o` 图形化管理 HTTP 服务（中英文切换 / 60s 倒计时 / Kill All / 异常捕捉）
-- [x] **MCP Server** — `hs mcp` AI Agent 集成（SSE/stdio，6 个工具）
-- [x] **Managed Registry** — 基础设施服务与用户服务隔离管理
+- [x] **Zero External Dependencies** — Requires Python 3.7+ only, cross-platform (macOS/Linux/Windows) (`pip install http-server-cli`)
+- [x] **Auto Port Allocation + Preview** — Default 8080, auto-increment on conflict (`hs . -o`)
+- [x] **Smart Homepage** — Auto-redirect to most recently modified HTML file when no index.html
+- [x] **Custom Index Page** — Specify default HTML file with `-i`/`--index`
+- [x] **Project Tracking** — Persistent project path ↔ port mapping (`hs list`)
+- [x] **Process Resource Monitoring** — Real-time CPU, memory usage and runtime (`hs list`)
+- [x] **Multiple Launch Modes** — Daemon background or foreground (`-d` daemon / `-f` foreground)
+- [x] **JSON Output** — All commands support `--json` for API/MCP consumption
+- [x] **Web Dashboard** — `hs dashboard -o` GUI management for HTTP services (CN/EN toggle, 60s countdown, Kill All, error handler)
+- [x] **MCP Server** — `hs mcp` AI Agent integration (SSE/stdio, 6 tools)
+- [x] **Managed Registry** — Infrastructure services isolated from user services
 
-## 为什么用 `hs`
+## Why `hs`
 
-同时开发多个前端项目时，总在记 "A 用了几号端口" 和 "8080 被谁占了" 之间切换。
+When developing multiple frontend projects, you constantly switch between "Which port did A use?" and "Who's occupying 8080?".
 
-`hs` 把**启动 → 追踪 → 列出 → 关闭**闭环了：自动找空闲端口、记住哪个项目用哪个端口、随时查看和关闭。
+`hs` closes the loop: **Start → Track → List → Kill** — auto-find free ports, remember which project uses which port, view and close anytime.
 
-## 对比一览
+## Comparison
 
-| 场景 | 以前 | 用 `hs` |
+| Scenario | Before | With `hs` |
 |:---------|:-----|:--------|
-| 启动服务 | `python3 -m http.server 8080` + 手动开浏览器 | `hs . -o` 已启动则直接打开浏览器，否则自动找空闲端口|
-| 查看服务 | `lsof -i :8080`，再 `ps` 看路径 | `hs list` |
-| 切换项目 | 先关旧的，再开新的（或冲突） | `hs ../project-b` |
-| 关掉服务 | `lsof` 查 PID → `kill` | `hs kill 8080` |
+| Start server | `python3 -m http.server 8080` + manually open browser | `hs . -o` — auto-find free port, open browser |
+| View servers | `lsof -i :8080`, then `ps` to see path | `hs list` |
+| Switch projects | Kill old one, start new (or conflict) | `hs ../project-b` |
+| Kill server | `lsof` to find PID → `kill` | `hs kill 8080` |
 
-## 安装
+## Installation
 
 ```bash
 pip install http-server-cli
 
-# 升级到最新版本
+# Upgrade to latest version
 pip install --upgrade http-server-cli
 ```
 
-验证：
+Verify:
 ```
 hs version     # → http-server-cli v1.0.x
-hs . -o        # 当前目录启动 + 打开浏览器
+hs . -o        # Start in current directory + open browser
 ```
 
-## 用法
+## Usage
 
-### 日常三件事
+### Daily Workflow
 
 ```bash
-# 1. 到项目下无脑预览
+# 1. Preview your project
 cd ~/project-alpha
-hs . -o                     # 自动找空闲端口，打开浏览器
+hs . -o                     # Auto-find free port, open browser
 
-# 2. 看看都起了哪些
+# 2. Check running servers
 hs list
 # ✅  http://localhost:8080   →  ~/project-alpha
 # ✅  http://localhost:8081   →  ~/project-beta  (daemon)
 
-# 3. 关掉不需要的
-hs kill 8080                # 按端口
-hs kill ~/project-alpha     # 按路径
-hs kill-all                 # 一键全关
+# 3. Kill unwanted servers
+hs kill 8080                # By port
+hs kill ~/project-alpha     # By path
+hs kill-all                 # Kill all
 ```
 
-### 所有命令
+### All Commands
 
-| 命令 | 说明 |
+| Command | Description |
 |:-----|:------|
-| `hs . [-o] [-d] [-f]` | **快捷方式**，等价 `hs start .` |
-| `hs start [path] [-o] [-d] [-f] [-i <file>]` | 启动服务；`-i` 指定首页文件 |
-| `hs list [--json]` | 列出所有运行中服务 |
-| `hs status [--json] [port\|path]` | 查询单个服务状态 |
-| `hs kill <port\|path> [--json]` | 关闭指定服务 |
-| `hs dashboard [-p PORT] [-o] [-d] [--json]` | Web 仪表盘（默认端口 8180） |
-| `hs dashboard stop\|status\|restart\|help` | dashboard 管理子命令 |
-| `hs mcp [--transport stdio\|sse] [--port PORT]` | MCP Server（供 AI Agent 集成） |
-| `hs mcp stop\|status\|restart\|help` | MCP 管理子命令 |
-| `hs kill-all [--json]` | 关闭所有服务 |
-| `hs config [--json]` | 显示配置 |
-| `hs set port|domain <value> [--json]` | 修改配置 |
+| `hs . [-o] [-d] [-f]` | **Shortcut**, equivalent to `hs start .` |
+| `hs start [path] [-o] [-d] [-f] [-i <file>]` | Start server (path defaults to `.`; `-o` open browser; `-d` daemon; `-f` foreground; `-i` custom index) |
+| `hs list` | List all running servers |
+| `hs list --json` | JSON format list |
+| `hs status [port\|path]` | Query single server status |
+| `hs status --json [port\|path]` | JSON format status |
+| `hs kill <port\|path>` | Kill specified server |
+| `hs dashboard [-p PORT] [-o] [--json]` | Web dashboard (default port 8180) |
+| `hs dashboard stop\|status\|restart\|help` | Dashboard management subcommands |
+| `hs mcp [--transport stdio\|sse] [--port PORT]` | MCP Server for AI Agent integration |
+| `hs mcp stop\|status\|restart\|help` | MCP management subcommands |
+| `hs kill-all` | Kill all servers |
+| `hs config` | Show configuration |
+| `hs config --json` | JSON format configuration |
+| `hs set port <num>` | Set default port (default 8080) |
+| `hs set domain <str>` | Set bind domain (default localhost) |
 
-### 小贴士
+### Tips
 
-- **`hs . -o`** = `hs start . -o`，敲起来更快
-- **`hs . -d`**：daemon 模式，后台运行，可用 `hs list` 查看
-- **`hs . -f`**：前台模式，Ctrl+C 终止服务
-- **`hs`** 不带参数 = `hs start .`（当前目录启动）
-- **`hs . -i app.html`**：以 `app.html` 为首页
+- **`hs . -o`** = `hs start . -o`, faster to type
+- **`hs . -d`**: daemon mode, runs in background, check with `hs list`
+- **`hs . -f`**: foreground mode, Ctrl+C to stop
+- **`hs`** without args = `hs start .` (start in current directory)
+- **`hs . -i app.html`**: use `app.html` as the index page
 
-## 数据目录
+## Data Directory
 
 ```
 ~/.http-server-cli/
-├── config.json            # 默认端口/域名配置
+├── config.json            # Default port/domain configuration
 ├── registry.json          # port → {path, pid, domain, daemon, foreground, started_at}
-├── registry-managed.json  # 基础设施服务（dashboard、MCP SSE）
-└── logs/{port}.log        # http.server 日志
+├── registry-managed.json  # Infrastructure services (dashboard, MCP SSE)
+└── logs/{port}.log        # http.server logs
 ```
 
-## 平台要求
+## Platform Requirements
 
-支持 **macOS**、**Linux**、**Windows**（macOS 使用 `lsof` 加速端口检测，其他平台自动降级为 socket 直连）。
+Supports **macOS**, **Linux**, and **Windows** (macOS uses `lsof` for accelerated port detection; other platforms fall back to direct socket checking).
 
-## 本地开发
+## Local Development
 
 ```bash
 git clone git@github.com:imjaden/http-server-cli.git
@@ -118,9 +122,9 @@ pip install -e .
 python3 -m pytest tests/
 ```
 
-## 这是在造轮子么
+## Is This Reinventing the Wheel?
 
-| 工具 | 启动服务 | 自动分配端口 | 追踪项目↔端口 | 列出所有 | 按名杀死 | 打开浏览器 |
+| Tool | Start Server | Auto Port | Track Project↔Port | List All | Kill by Name | Open Browser |
 |:---|:---:|:---:|:---:|:---:|:---:|:---:|
 | `python3 -m http.server` | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | `http-server` (npm) | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
@@ -128,5 +132,5 @@ python3 -m pytest tests/
 | `live-server` | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
 | `portless` (npm) | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
 | `kill-port-cli` (npm) | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ |
-| `lsof` / `netstat` | ❌ | ❌ | ❌ | 手动 | 手动 | ❌ |
+| `lsof` / `netstat` | ❌ | ❌ | ❌ | Manual | Manual | ❌ |
 | **`http-server-cli`** | **✅** | **✅** | **✅** | **✅** | **✅** | **✅** |

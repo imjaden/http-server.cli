@@ -445,16 +445,16 @@ def serve(port: int = 8180, open_browser: bool = False,
             from http_server_cli.utils import format_duration as _fd
             duration = _fd(existing.get('started_at', ''))
             stats = get_process_stats(epid)
-            print(f'📊  hs dashboard 已在运行')
-            print(f'    🔧  http://127.0.0.1:{eport}  (PID: {epid})')
+            print(f'📊 hs dashboard already running')
+            print(f'    🔧 http://127.0.0.1:{eport}  (PID: {epid})')
             cpu_s = stats.get('cpu', '-')
             mem_s = stats.get('memory', '-')
-            print(f'    📊  时长: {duration}  |  CPU: {cpu_s}  |  内存: {mem_s}')
+            print(f'    📊 Duration: {duration}  |  CPU: {cpu_s}  |  Memory: {mem_s}')
             if open_browser:
                 webbrowser.open(f'http://127.0.0.1:{eport}')
-                print('🌐  浏览器已打开')
+                print('🌐 Browser opened')
             else:
-                print(f'    💡  打开浏览器: hs dashboard -o')
+                print(f'    💡 Open browser: hs dashboard -o')
             return
         else:
             # 残留记录，清理
@@ -466,9 +466,9 @@ def serve(port: int = 8180, open_browser: bool = False,
         from http_server_cli.utils import find_available_port
         new_port = find_available_port(port + 1)
         if new_port is None:
-            print(f'❌  端口 {port}-10000 已全部被占用')
+            print(f'❌ Ports {port}-10000 are all occupied')
             sys.exit(1)
-        print(f'🔀  端口 {port} 已被占用，自动分配端口 {new_port}')
+        print(f'🔀 Port {port} is in use, auto-assigned port {new_port}')
         port = new_port
 
     if daemon:
@@ -484,12 +484,12 @@ def serve(port: int = 8180, open_browser: bool = False,
         )
         # 注册 managed 条目
         mreg.add(name='dashboard', type_='http', port=port, pid=proc.pid)
-        print(f'📊  hs dashboard (daemon) →  http://127.0.0.1:{port}  (PID: {proc.pid})')
+        print(f'📊 hs dashboard (daemon) -> http://127.0.0.1:{port}  (PID: {proc.pid})')
         if open_browser:
             time.sleep(0.5)
             webbrowser.open(f'http://127.0.0.1:{port}')
-            print('🌐  浏览器已打开')
-        print(f'⏹  使用 hs kill {port} 或 kill {proc.pid} 停止')
+            print('🌐 Browser opened')
+        print(f'⏹ Use hs kill {port} or kill {proc.pid} to stop')
         return
 
     # ── 前台模式 ──
@@ -499,17 +499,17 @@ def serve(port: int = 8180, open_browser: bool = False,
 
     # 注册 managed
     mreg.add(name='dashboard', type_='http', port=port, pid=os.getpid())
-    print(f'📊  hs dashboard  →  {url}')
+    print(f'📊 hs dashboard -> {url}')
 
     if open_browser:
         webbrowser.open(url)
-        print('🌐  浏览器已打开')
+        print('🌐 Browser opened')
 
-    print('⏹  按 Ctrl+C 停止\n')
+    print('⏹ Press Ctrl+C to stop\n')
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         print()
         mreg.remove(name='dashboard')
-        print('📊  仪表盘已停止')
+        print('📊 Dashboard stopped')
         server.server_close()

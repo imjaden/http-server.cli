@@ -73,7 +73,7 @@ class TestStart:
         mgr = ServerManager()
         mgr.start(path=temp_project)
         captured = capsys.readouterr()
-        assert '自动分配端口' in captured.out or '8081' in captured.out
+        assert 'auto-assigned port' in captured.out or '8081' in captured.out
 
     def test_start_no_port_available(self, monkeypatch, temp_project, capsys):
         """所有端口被占时应报错"""
@@ -84,7 +84,7 @@ class TestStart:
         mgr = ServerManager()
         mgr.start(path=temp_project)
         captured = capsys.readouterr()
-        assert '已全部被占用' in captured.out
+        assert 'all in use, cannot start' in captured.out
 
     def test_start_registers_in_registry(self, temp_project):
         mgr = ServerManager()
@@ -125,13 +125,13 @@ class TestStart:
 
         mgr.start(path=temp_project)
         captured = capsys.readouterr()
-        assert '清理后重新启动' in captured.out
+        assert 'cleaning up before restart' in captured.out
 
     def test_start_invalid_path(self, capsys):
         mgr = ServerManager()
         mgr.start(path='/nonexistent/path')
         captured = capsys.readouterr()
-        assert '路径不存在' in captured.out
+        assert 'Path does not exist' in captured.out
         assert mgr.registry.count() == 0
 
     def test_start_with_open_browser(self, monkeypatch, temp_project):
@@ -176,7 +176,7 @@ class TestList:
         mgr = ServerManager()
         mgr.list()
         captured = capsys.readouterr()
-        assert '没有正在运行' in captured.out
+        assert 'No running HTTP services' in captured.out
 
     def test_list_with_servers(self, capsys):
         mgr = ServerManager()
@@ -209,15 +209,14 @@ class TestStatus:
         monkeypatch.setattr('http_server_cli.registry.is_port_in_use', lambda p: True)
         mgr.status('8080')
         captured = capsys.readouterr()
-        # 新格式使用 emoji
-        assert '运行中' in captured.out or '✅' in captured.out
+        # 新格式使用 emoji\n        assert '✅' in captured.out
 
     def test_status_unregistered_port(self, monkeypatch, capsys):
         """未注册端口应提示"""
         mgr = ServerManager()
         mgr.status('9999')
         captured = capsys.readouterr()
-        assert '未注册' in captured.out
+        assert 'not registered' in captured.out
 
     def test_status_port_occupied_by_other(self, monkeypatch, capsys):
         """端口被非本工具进程占用时给出提示"""
@@ -225,7 +224,7 @@ class TestStatus:
         mgr = ServerManager()
         mgr.status('8080')
         captured = capsys.readouterr()
-        assert '但非本工具管理' in captured.out
+        assert 'not managed by this tool' in captured.out
 
 class TestDaemon:
     """daemon 模式专用测试"""
@@ -247,7 +246,7 @@ class TestDaemon:
         mgr = ServerManager()
         mgr.start(path=temp_project, daemon=True)
         captured = capsys.readouterr()
-        assert '仍在后台运行' in captured.out
+        assert 'still running in background' in captured.out
 
     def test_daemon_registers_flag(self, temp_project):
         """daemon 模式条目应标记 daemon=True"""
@@ -286,7 +285,7 @@ class TestDaemon:
         captured = capsys.readouterr()
         # daemon 模式在启动时显示，status 时可能不显示
         # 检查是否显示运行状态
-        assert '运行中' in captured.out or '✅' in captured.out or 'daemon' in captured.out
+        assert '✅' in captured.out or 'daemon' in captured.out
 
 # ── kill ────────────────────────────────────────────────
 
@@ -297,8 +296,7 @@ class TestKill:
         mgr.start(path='/tmp')
         mgr.kill('8080')
         captured = capsys.readouterr()
-        # 新格式使用 emoji
-        assert '已终止进程' in captured.out or '🛑' in captured.out
+        assert '🛑' in captured.out
         assert mgr.registry.count() == 0
 
     def test_kill_by_path(self, temp_project, capsys):
@@ -306,25 +304,25 @@ class TestKill:
         mgr.start(path=temp_project)
         mgr.kill(temp_project)
         captured = capsys.readouterr()
-        assert '已终止进程' in captured.out
+        assert 'Terminated' in captured.out
 
     def test_kill_unregistered_port(self, capsys):
         mgr = ServerManager()
         mgr.kill('9999')
         captured = capsys.readouterr()
-        assert '未注册' in captured.out
+        assert 'not registered' in captured.out
 
     def test_kill_unregistered_path(self, capsys):
         mgr = ServerManager()
         mgr.kill('/nonexistent')
         captured = capsys.readouterr()
-        assert '未注册' in captured.out
+        assert 'not registered' in captured.out
 
     def test_kill_no_arg(self, capsys):
         mgr = ServerManager()
         mgr.kill('')
         captured = capsys.readouterr()
-        assert '请指定' in captured.out
+        assert 'Please specify' in captured.out
 
 # ── kill_all ────────────────────────────────────────────
 
@@ -334,14 +332,14 @@ class TestKillAll:
         mgr = ServerManager()
         mgr.kill_all()
         captured = capsys.readouterr()
-        assert '没有正在运行' in captured.out
+        assert 'No running services' in captured.out
 
     def test_kill_all_clears_all(self, temp_project, capsys):
         mgr = ServerManager()
         mgr.start(path=temp_project)
         mgr.kill_all()
         captured = capsys.readouterr()
-        assert '已关闭' in captured.out
+        assert 'service(s) closed' in captured.out
         assert mgr.registry.count() == 0
 
 
@@ -355,7 +353,7 @@ class TestResourceMonitoring:
         mgr = ServerManager()
         mgr.start(path=temp_project)
         captured = capsys.readouterr()
-        assert '启动时间' in captured.out
+        assert 'Started:' in captured.out
 
     def test_list_shows_cpu_memory(self, temp_project, capsys):
         """列出服务时显示 CPU 和内存信息"""
@@ -365,7 +363,7 @@ class TestResourceMonitoring:
         mgr.list()
         captured = capsys.readouterr()
         assert 'CPU' in captured.out
-        assert '内存' in captured.out
+        assert 'Memory:' in captured.out
 
     def test_list_shows_duration(self, temp_project, capsys):
         """列出服务时显示运行时长"""
@@ -374,7 +372,7 @@ class TestResourceMonitoring:
         captured = capsys.readouterr()  # 清掉启动输出
         mgr.list()
         captured = capsys.readouterr()
-        assert '时长' in captured.out
+        assert 'Duration:' in captured.out
 
 
 # ── 日志管理 ──────────────────────────────────────────
@@ -489,7 +487,7 @@ class TestStartJson:
         result = json.loads(captured.out)
         assert result['success'] is False
         assert result['command'] == 'start'
-        assert '路径不存在' in result['error']
+        assert 'Path does not exist' in result['error']
 
     def test_start_no_port_available_json(self, monkeypatch, temp_project, capsys):
         monkeypatch.setattr('http_server_cli.server.find_available_port', lambda sp: None)
@@ -498,7 +496,7 @@ class TestStartJson:
         captured = capsys.readouterr()
         result = json.loads(captured.out)
         assert result['success'] is False
-        assert '已全部被占用' in result['error']
+        assert 'all in use, cannot start' in result['error']
 
     def test_start_json_contains_index_page(self, temp_project, capsys):
         """start --json 输出应包含 index_page"""
@@ -627,7 +625,7 @@ class TestKillJson:
         captured = capsys.readouterr()
         result = json.loads(captured.out)
         assert result['success'] is False
-        assert '未注册' in result['error']
+        assert 'not registered' in result['error']
 
     def test_kill_no_arg_json(self, capsys):
         mgr = ServerManager()
@@ -635,7 +633,7 @@ class TestKillJson:
         captured = capsys.readouterr()
         result = json.loads(captured.out)
         assert result['success'] is False
-        assert '请指定' in result['error']
+        assert 'Please specify' in result['error']
 
 
 class TestKillAllJson:
