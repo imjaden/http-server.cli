@@ -21,4 +21,5 @@ jobs:
           files: dist/*
       - run: twine upload dist/*
         env:
-          TWINE_TOKEN: ${{ secrets.PYPI_TOKEN }}
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}

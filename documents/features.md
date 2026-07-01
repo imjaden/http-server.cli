@@ -1,7 +1,7 @@
 # http-server-cli 功能特性
 
-> 版本: 1.0.7
-> 更新: 2026-06-29
+> 版本: 1.0.8
+> 更新: 2026-07-01
 
 ## CLI 命令
 
@@ -32,13 +32,20 @@
 7. **原子写入** — 防多进程并发脏读
 8. **进程组管理** — daemon 模式使用 os.killpg 防孤儿进程
 9. **JSON 输出** — 所有命令支持 `--json`
-10. **Web Dashboard** — 图形化管理面板
-    - 中英文语言切换（🇨🇳 `/` ↔ 🇺🇸 `/en`），右上角悬浮 pill
+10. **仅运行中** — `hs list` / `hs search` 仅显示运行中的实例
+11. **智能历史** — `hs history` 自动过滤系统临时目录
+12. **英文 CLI 输出** — 统一英文消息，规范格式化
+13. **Web Dashboard** — 图形化管理面板
+    - 中英文语言切换（🇨🇳 `/?lang=zh` ↔ 🇺🇸 `/en`），右上角悬浮 pill
     - 工具栏：60s 倒计时自动刷新、刷新按钮、Kill All 一键关闭
-    - 服务器表格：URL(Port) | Status | CPU | Memory | Last Access | Action
-    - Status 点击弹框：显示端口/路径/PID/内存/启动时间/日志路径/最近访问
+    - 服务器表格：URL(Port) | Health | Status | CPU | Memory | Last Access | Action
+    - Status 点击弹框：显示端口/路径/PID/内存/启动时间/日志路径/最近访问 + 最近 50 行日志
     - `window.onerror` 全局异常捕捉，覆盖层弹框显示完整 stack trace
-    - API：list / status / kill / kill-all
+    - 健康检查探活：🟢/🟡/🔴 圆点标识 HTTP 响应状态
+    - 搜索过滤框：实例 >10 时自动显示，实时按端口/路径关键字过滤
+    - 一键复制 URL：📋 按钮点击复制到剪贴板
+    - 底部版本号 + 可折叠命令参考
+    - API：list / status / kill / kill-all / ping / log / info
 
 ## 数据结构
 

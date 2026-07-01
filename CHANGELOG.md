@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.0.8 (2026-07-01)
+
+### Added
+- `hs list` now only shows running/alive servers (filtered by `_alive` flag)
+- `hs search` now only searches running/alive servers
+- `hs history` filters out system temp directory entries (`/tmp/`, `/private/var/folders/`)
+- `/?lang=zh` query parameter support — language toggle now works regardless of browser `Accept-Language`
+- `hs dashboard -d` daemon mode logs to `~/.http-server-cli/logs/dashboard.log`
+- `hs dashboard status` now prints log path in output
+- GitHub CI/CD workflow: `.github/workflows/release.yml` — auto Release + PyPI on tag push
+- CI/CD recommendation document: `documents/github-ci-cd-recommendation.md`
+
+### Changed
+- CLI output unified to English — all ~108 `print()`/`eprint()` calls across 5 files
+- Emoji formatting: 1 space after emoji, ` -> ` arrow spacing, ` | ` pipe spacing
+- README restructured: `README.md` (English) → default, `README.zh.md` (Chinese)
+- Dashboard auto-language detection: `Accept-Language` header with URL query param override
+
+### Fixed
+- Language toggle BUG: clicking 🇨🇳 with English browser now correctly switches to Chinese
+- `/?lang=zh` route returning 404 — `do_GET` now strips query params before routing
+- Test suite expanded from 182 → 224 tests
+
 ## 1.0.7 (2026-06-24)
 
 ### Added
@@ -28,7 +51,7 @@
   - 仅显示 Running 实例（`render()` 中 `servers.filter(alive)`）
   - H1 标题右侧添加 GitHub 图标，链接至 https://github.com/imjaden/http-server-cli
   - 中英文各自使用母语：CN 全中文（列标题/按钮/状态文字）、EN 全英文
-  - 底部可折叠版本号（Version: 1.0.7）+ hs help 命令参考（通过 `/api/info` 获取）
+  - 底部可折叠版本号（Version: 1.0.x）+ hs help 命令参考（通过 `/api/info` 获取）
   - 测试用例从 18 → 20 个（新增 footer + EN columns 测试）
   - 健康检查探活：新增 `/api/ping/{port}` HEAD 请求（2s 超时），前端 🟢/🟡/🔴 圆点
   - 搜索过滤框：表格上方 input 实时按端口/路径关键字过滤（纯前端）
@@ -67,7 +90,6 @@
 - `hs dashboard -o` now auto-daemons (no need for `-d`)
 - Dashboard web layout: h1 + stats + toolbar on same line (compact flexbox)
 - `_execute_hs()`: parses full JSON output first, handles multi-line `indent=2` output
-- `__version__` bumped to 1.0.7
 
 ### Fixed
 - Dashboard API returning empty user services (Registry cached at server start;

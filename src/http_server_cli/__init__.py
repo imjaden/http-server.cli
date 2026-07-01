@@ -23,4 +23,4 @@ Dependency
 - 需要管理多个 HTTP 服务时
 """
 
-__version__ = '1.0.7'
+__version__ = '1.0.8'
