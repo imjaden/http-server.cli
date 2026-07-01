@@ -159,11 +159,27 @@ git checkout -b hotfix v1.0.8    # 从 tag 创建分支做紧急修复
 
 ### 工作流示意
 
-```
+```text
 开发 → 测试通过 → bump 版本号 → commit
 → git tag v1.0.8               # 本地打 tag
 → git push origin v1.0.8       # 推送 tag → GitHub Actions 自动 Release + PyPI
 ```
+
+### tag 打错位置？重打
+
+如果 tag 指向了错误的 commit，可以删除重打：
+
+```bash
+git tag -d v1.0.8              # 删除本地 tag
+git push origin --delete v1.0.8  # 删除远程 tag
+# 切到正确的 commit 重新打
+git tag v1.0.8                 # 在 HEAD（最新 commit）上打 tag
+git push origin v1.0.8         # 推送新 tag → 触发 CI/CD
+```
+
+也可以用 `git tag v1.0.8 <commit-sha>` 在任意提交上打 tag。
+
+> **Actions 运行状态查看**：<https://github.com/imjaden/http-server-cli/actions>
 
 > 注意：`git push` 推送代码和 `git push origin <tag>` 推送 tag 是两个独立操作。
 > 只有推送 tag 才会触发 `.github/workflows/release.yml` 中的 `on: push: tags: ['v*']` 条件。
