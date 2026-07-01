@@ -1,10 +1,10 @@
 # GitHub CI/CD 推荐方案
 
-> 版本: 1.0
-> 更新: 2026-06-29
+> 版本: 1.1
+> 更新: 2026-07-01
 > 项目: http-server-cli
 
-## 方案 A：GitHub Actions — 自动 Release + PyPI 发布
+## GitHub Actions — 自动 Release + PyPI 发布
 
 ### 工作流文件位置
 
@@ -19,6 +19,18 @@ on:
       - 'v*'           # 推送 v1.0.8, v1.1.0 等标签时触发
 ```
 
+### 工作流架构
+
+```
+tag push
+    │
+test-and-build (测试 + 构建 wheel)
+    ├──► publish-testpypi (TestPyPI 验证，可选)
+    └──► release (GitHub Release + PyPI 发布)
+```
+
+`publish-testpypi` 和 `release` 在 `test-and-build` 成功后并行执行，互不阻塞。
+
 ### 工作流步骤
 
 | 步骤 | 说明 |
@@ -28,27 +40,20 @@ on:
 | 3. 安装依赖 | `pip install build twine pytest` |
 | 4. 安装项目 | `pip install -e .` |
 | 5. 运行测试 | `python -m pytest tests/ -q` |
-| 6. 构建 | `python -m build` |
-| 7. 创建 GitHub Release | 自动生成 changelog + 上传 dist/*.whl |
-| 8. 发布到 PyPI | `twine upload dist/*`（需配置 PyPI Token） |
+| 6. 构建 wheel | `python -m build` |
+| 7. 上传构建产物 | `actions/upload-artifact` 供下游 job 使用 |
+| 8. (可选) 发布 TestPyPI | `twine upload --repository testpypi` — 验证包结构 |
+| 9. 创建 GitHub Release | 自动生成 changelog + 上传 `dist/*.whl` |
+| 10. 发布到 PyPI | `twine upload dist/*` |
 
 ### 所需 Secrets
 
 | Secret 名 | 用途 | 获取方式 |
 |:----------|:-----|:---------|
-| `PYPI_TOKEN` | PyPI 发布权限 | https://pypi.org/manage/account/token/ → "Add API token" → 作用域选 "Entire account" 或具体项目 → 复制 token 字符串 |
+| `PYPI_TOKEN` | PyPI 发布权限 | https://pypi.org/manage/account/token/ → "Add API token" |
+| `TESTPYPI_TOKEN` | TestPyPI 发布权限（可选） | https://test.pypi.org/manage/account/token/ → "Add API token" |
 
-### 配置步骤（详细）
-
-1. 打开 PyPI → https://pypi.org/manage/account/token/ → "Add API token"
-   - Token name: `http-server-cli-github-actions`
-   - Scope: 选择项目 `http-server-cli`（推荐）或 "Entire account"
-   - 创建后 **立即复制** token 字符串（只显示一次）
-2. 打开 GitHub 仓库 → `Settings` → `Secrets and variables` → `Actions`
-   - 点击 `New repository secret`
-   - Name: `PYPI_TOKEN`
-   - Secret: 粘贴上一步复制的 token
-   - 点击 `Add secret`
+TestPyPI 是可选步骤（`continue-on-error: true`），不配置 `TESTPYPI_TOKEN` 不影响正式发布。
 
 ### 完整 YAML
 
@@ -60,7 +65,7 @@ on:
     tags: ['v*']
 
 jobs:
-  release:
+  test-and-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -71,6 +76,36 @@ jobs:
       - run: pip install -e .
       - run: python -m pytest tests/ -q
       - run: python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish-testpypi:
+    needs: test-and-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - run: twine upload --repository testpypi dist/*
+        continue-on-error: true
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TESTPYPI_TOKEN }}
+
+  release:
+    needs: test-and-build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
       - uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
@@ -81,7 +116,7 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
 ```
 
-## 方案 B（可选）：自动测试 PR
+## 可选方案：自动测试 PR
 
 ```yaml
 name: CI
@@ -106,9 +141,21 @@ jobs:
       - run: python -m pytest tests/ -q
 ```
 
+## TestPyPI 配置步骤
+
+1. 打开 https://test.pypi.org/manage/account/token/ → "Add API token"
+   - Token name: `http-server-cli-github-actions-test`
+   - 创建后复制 token
+2. GitHub 仓库 → `Settings` → `Secrets and variables` → `Actions`
+   - `New repository secret` → Name: `TESTPYPI_TOKEN` → 粘贴 token
+3. 下次发版时，`publish-testpypi` job 会自动执行验证
+
+> TestPyPI 的包名与 PyPI 相同，版本号建议使用类似 `1.0.8.dev1` 的格式避免冲突。
+> 实际发布流程：TestPyPI 验证通过后，再决定是否正式发布到 PyPI。
+
 ## 实施步骤
 
-1. 按上方「配置步骤」在 PyPI 创建 token + GitHub 添加 `PYPI_TOKEN` Secret
+1. 按上方配置步骤创建 PyPI token + GitHub Secrets
 2. 确认 `.github/workflows/release.yml` 已存在且内容正确
 3. 推送到 main 分支
 4. 打 tag 触发自动发布: `git tag v1.0.8 && git push origin v1.0.8`
@@ -184,6 +231,6 @@ git push origin v1.0.8         # 推送新 tag → 触发 CI/CD
 也可以用 `git tag v1.0.8 <commit-sha>` 在任意提交上打 tag。
 
 > **Actions 运行状态查看**：<https://github.com/imjaden/http-server-cli/actions>
-
+>
 > 注意：`git push` 推送代码和 `git push origin <tag>` 推送 tag 是两个独立操作。
 > 只有推送 tag 才会触发 `.github/workflows/release.yml` 中的 `on: push: tags: ['v*']` 条件。

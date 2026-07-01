@@ -55,12 +55,8 @@ while [[ $# -gt 0 ]]; do
             HAS_ARGS=1
             shift
             ;;
-        -h|--help)
+        -h|--help|*)
             SHOW_HELP=1
-            HAS_ARGS=1
-            shift
-            ;;
-        *)
             HAS_ARGS=1
             shift
             ;;
