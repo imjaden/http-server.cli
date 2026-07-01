@@ -332,7 +332,7 @@ def _cmd_config(manager, args):
 
 @_register
 def _cmd_history(manager, args):
-    """显示所有历史记录"""
+    """显示所有历史记录（过滤掉系统临时目录条目）"""
     parser = argparse.ArgumentParser(prog='hs history', add_help=False)
     parser.add_argument('--json', action='store_true')
     try:
@@ -342,14 +342,38 @@ def _cmd_history(manager, args):
     from http_server_cli.history import HistoryStore
     from http_server_cli.utils import json_output, eprint
     history = HistoryStore()
-    records = history.records()
+    all_records = history.records()
+    # 过滤掉系统临时目录的条目（当 hs 在没有指定项目路径或某些工具创建临时服务器时
+    # 会自动使用系统临时目录，这些条目对用户没有意义）
+    temp_prefixes = ('/tmp/', '/private/var/folders/')
+    records = [r for r in all_records
+               if not r.get('path', '').startswith(temp_prefixes)]
+    filtered_count = len(all_records) - len(records)
     if parsed.json:
-        json_output(True, 'history', data={'count': len(records), 'records': records})
+        data = {'count': len(records), 'records': records}
+        if filtered_count:
+            data['filtered_temp_count'] = filtered_count
+            data['filtered_temp_note'] = (
+                f'{filtered_count} system temp directory entr'
+                f'{"y" if filtered_count == 1 else "ies"} excluded '
+                f'(paths starting with {temp_prefixes})'
+            )
+        json_output(True, 'history', data=data)
         return
     if not records:
-        eprint('No history records', 'ℹ️')
+        if filtered_count:
+            eprint(f'No meaningful history records ('
+                   f'{filtered_count} temp entr'
+                   f'{"y" if filtered_count == 1 else "ies"} filtered out)', 'ℹ️')
+        else:
+            eprint('No history records', 'ℹ️')
         return
     eprint(f'Total {len(records)} history records:', '📊')
+    if filtered_count:
+        eprint(f'  ({filtered_count} system temp entr'
+               f'{"y" if filtered_count == 1 else "ies"} excluded'
+               f' — they appear when `hs` runs without a project path'
+               f' or when external tools create temporary servers)', '🔎')
     print()
     for r in records:
         port = r.get('port', '-')
@@ -380,8 +404,9 @@ def _cmd_search(manager, args):
         eprint('Usage: hs search <keyword>', '⚠️')
         return
 
-    # 从 registry 中搜索匹配项
+    # 从 registry 中搜索匹配项（仅搜索运行中的服务）
     servers = manager.registry.active_servers()
+    servers = [s for s in servers if s.get('_alive')]
     keyword = parsed.keyword.lower()
     matches = [s for s in servers
                if keyword in str(s.get('port', ''))
@@ -493,9 +518,12 @@ def _manage_dashboard(subcmd: str) -> None:
         duration = format_duration(entry.get('started_at', ''))
         stats = get_process_stats(pid)
         icon = '🟢' if alive else '🔴'
+        from http_server_cli.utils import LOG_DIR, format_path
+        dashboard_log = format_path(os.path.join(LOG_DIR, 'dashboard.log'))
         print(f'{icon}  hs dashboard  →  http://127.0.0.1:{port}')
         print(f'    🔧  PID: {pid}  |  Duration: {duration}')
         print(f'    📊  CPU: {stats["cpu"]}  |  Memory: {stats["memory"]} ({stats["memory_percent"]})')
+        print(f'    📋  Log: {dashboard_log}')
         return
 
     if subcmd in ('stop', 'restart'):

@@ -258,21 +258,21 @@ class TestHistoryCommand:
         from http_server_cli.history import HistoryStore
         store = HistoryStore()
         store.clear()
-        store.add(port=8080, path='/tmp/test', started_at='2026-06-20T10:00:00')
-        store.close(port=8080, path='/tmp/test')
+        store.add(port=8080, path='/Users/test/project', started_at='2026-06-20T10:00:00')
+        store.close(port=8080, path='/Users/test/project')
         from http_server_cli.cli import _cmd_history
         _cmd_history(None, [])
         captured = capsys.readouterr()
         assert '8080' in captured.out
-        assert '/tmp/test' in captured.out
+        assert '/Users/test/project' in captured.out
 
     def test_history_json_with_records(self, capsys):
         """历史记录 --json 应输出合法 JSON"""
         from http_server_cli.history import HistoryStore
         store = HistoryStore()
         store.clear()
-        store.add(port=8080, path='/tmp/test', started_at='2026-06-20T10:00:00')
-        store.close(port=8080, path='/tmp/test')
+        store.add(port=8080, path='/Users/test/project', started_at='2026-06-20T10:00:00')
+        store.close(port=8080, path='/Users/test/project')
         from http_server_cli.cli import _cmd_history
         _cmd_history(None, ['--json'])
         captured = capsys.readouterr()

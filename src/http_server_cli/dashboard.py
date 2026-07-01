@@ -99,29 +99,30 @@ class DashboardHandler(BaseHTTPRequestHandler):
     # ── GET ──
 
     def do_GET(self) -> None:
-        if self.path == '/':
+        path = self.path.split('?')[0]
+        if path == '/':
             lang = self._detect_lang()
             self._html(_get_html(lang))
-        elif self.path == '/en':
+        elif path == '/en':
             self._html(_get_html('en'))
-        elif self.path == '/api/servers':
+        elif path == '/api/servers':
             self._handle_get_servers()
-        elif self.path.startswith('/api/status/'):
-            port_str = self.path.split('/')[-1]
+        elif path.startswith('/api/status/'):
+            port_str = path.split('/')[-1]
             if port_str.isdigit():
                 self._handle_get_status(int(port_str))
             else:
                 self._error('invalid port', 400)
-        elif self.path == '/api/info':
+        elif path == '/api/info':
             self._handle_get_info()
-        elif self.path.startswith('/api/ping/'):
-            port_str = self.path.split('/')[-1]
+        elif path.startswith('/api/ping/'):
+            port_str = path.split('/')[-1]
             if port_str.isdigit():
                 self._handle_ping(int(port_str))
             else:
                 self._error('invalid port', 400)
-        elif self.path.startswith('/api/log/'):
-            port_str = self.path.split('/')[-1]
+        elif path.startswith('/api/log/'):
+            port_str = path.split('/')[-1]
             if port_str.isdigit():
                 self._handle_log(int(port_str))
             else:
@@ -476,15 +477,23 @@ def serve(port: int = 8180, open_browser: bool = False,
         import subprocess as _sp
         hs_entry = os.path.join(os.path.dirname(__file__), '__main__.py')
         cmd = [sys.executable, hs_entry, 'dashboard', '-p', str(port)]
+        # 将守护进程的输出重定向到日志文件
+        os.makedirs(LOG_DIR, exist_ok=True)
+        dashboard_log = os.path.join(LOG_DIR, 'dashboard.log')
+        log_fh = open(dashboard_log, 'a', buffering=1)
         proc = _sp.Popen(
             cmd,
-            stdout=_sp.DEVNULL,
-            stderr=_sp.DEVNULL,
+            stdout=log_fh,
+            stderr=_sp.STDOUT,
             preexec_fn=os.setsid if hasattr(os, 'setsid') else None,
         )
+        # 写入启动日志
+        log_fh.write(f'[{time.strftime("%Y-%m-%d %H:%M:%S")}] hs dashboard started (PID: {proc.pid}) → http://127.0.0.1:{port}\n')
+        log_fh.flush()
         # 注册 managed 条目
         mreg.add(name='dashboard', type_='http', port=port, pid=proc.pid)
         print(f'📊 hs dashboard (daemon) -> http://127.0.0.1:{port}  (PID: {proc.pid})')
+        print(f'    📋 Log: {format_path(dashboard_log)}')
         if open_browser:
             time.sleep(0.5)
             webbrowser.open(f'http://127.0.0.1:{port}')

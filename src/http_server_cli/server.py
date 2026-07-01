@@ -238,6 +238,9 @@ class ServerManager:
         # 按端口排序
         servers = sorted(servers, key=lambda x: x['port'])
 
+        # 只显示存活的正在运行的服务
+        servers = [s for s in servers if s.get('_alive', False)]
+
         # 获取当前目录
         current_dir = os.getcwd()
 

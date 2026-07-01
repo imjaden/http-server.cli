@@ -355,21 +355,27 @@ class TestResourceMonitoring:
         captured = capsys.readouterr()
         assert 'Started:' in captured.out
 
-    def test_list_shows_cpu_memory(self, temp_project, capsys):
+    def test_list_shows_cpu_memory(self, temp_project, capsys, monkeypatch):
         """列出服务时显示 CPU 和内存信息"""
         mgr = ServerManager()
         mgr.start(path=temp_project)
         captured = capsys.readouterr()  # 清掉启动输出
+        # list() now checks is_port_in_use via active_servers()
+        # The subprocess may not have bound the port yet, so monkeypatch
+        # is_port_in_use in the registry module to simulate an alive server
+        monkeypatch.setattr('http_server_cli.registry.is_port_in_use', lambda p: True)
         mgr.list()
         captured = capsys.readouterr()
         assert 'CPU' in captured.out
         assert 'Memory:' in captured.out
 
-    def test_list_shows_duration(self, temp_project, capsys):
+    def test_list_shows_duration(self, temp_project, capsys, monkeypatch):
         """列出服务时显示运行时长"""
         mgr = ServerManager()
         mgr.start(path=temp_project)
         captured = capsys.readouterr()  # 清掉启动输出
+        # Same reasoning as test_list_shows_cpu_memory — simulate port in use
+        monkeypatch.setattr('http_server_cli.registry.is_port_in_use', lambda p: True)
         mgr.list()
         captured = capsys.readouterr()
         assert 'Duration:' in captured.out
