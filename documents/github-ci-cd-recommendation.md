@@ -25,7 +25,7 @@ on:
 |:-----|:------|
 | 1. Checkout | 拉取源码 |
 | 2. 设置 Python | 3.12 环境 |
-| 3. 安装依赖 | `pip install build twine` |
+| 3. 安装依赖 | `pip install build twine pytest` |
 | 4. 运行测试 | `python -m pytest tests/ -q` |
 | 5. 构建 | `python -m build` |
 | 6. 创建 GitHub Release | 自动生成 changelog + 上传 dist/*.whl |
@@ -66,7 +66,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install build twine
+      - run: pip install build twine pytest
       - run: python -m pytest tests/ -q
       - run: python -m build
       - uses: softprops/action-gh-release@v2
@@ -99,6 +99,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - run: pip install pytest
       - run: python -m pytest tests/ -q
 ```
 
