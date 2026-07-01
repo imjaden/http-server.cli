@@ -107,4 +107,63 @@ jobs:
 1. 按上方「配置步骤」在 PyPI 创建 token + GitHub 添加 `PYPI_TOKEN` Secret
 2. 确认 `.github/workflows/release.yml` 已存在且内容正确
 3. 推送到 main 分支
-4. 打 tag 触发自动发布: `git tag v1.0.8 && git push --tags`
+4. 打 tag 触发自动发布: `git tag v1.0.8 && git push origin v1.0.8`
+
+---
+
+## Git Tag 使用指南
+
+### 查看 tag
+
+```bash
+git tag                          # 列出所有本地 tag
+git tag -l 'v1.0.*'              # 按模式过滤
+git tag --sort=-version:refname  # 按版本号降序
+git tag -n                       # 列出 tag + 附注信息
+```
+
+### 创建 tag
+
+```bash
+git tag v1.0.8                   # 轻量 tag（推荐，仅指针）
+git tag -a v1.0.8 -m "release"   # 附注 tag（含作者/日期/消息）
+```
+
+### 推送 / 删除 tag
+
+```bash
+git push origin v1.0.8           # 推送单个 tag ✅ 推荐
+git push origin --tags           # 推送所有本地未推送的 tag ⚠️ 慎用
+
+git tag -d v1.0.8                # 删除本地 tag
+git push origin --delete v1.0.8  # 删除远程 tag
+```
+
+### 检出 tag
+
+```bash
+git checkout v1.0.8              # 切换到 tag 指向的 commit（detached HEAD）
+git checkout -b hotfix v1.0.8    # 从 tag 创建分支做紧急修复
+```
+
+### 常用场景速查
+
+| 场景 | 命令 |
+|:-----|:------|
+| 发版后打 tag | `git tag v1.0.8 && git push origin v1.0.8` |
+| 补打之前的 commit | `git tag v1.0.7 <commit-sha>` |
+| 确认当前版本对应哪个 tag | `git describe --tags` |
+| 查看两个版本之间的提交 | `git log v1.0.7..v1.0.8 --oneline` |
+| 比较两个版本的代码差异 | `git diff v1.0.7..v1.0.8 --stat` |
+| 回滚到某个发布版本 | `git checkout v1.0.7` |
+
+### 工作流示意
+
+```
+开发 → 测试通过 → bump 版本号 → commit
+→ git tag v1.0.8               # 本地打 tag
+→ git push origin v1.0.8       # 推送 tag → GitHub Actions 自动 Release + PyPI
+```
+
+> 注意：`git push` 推送代码和 `git push origin <tag>` 推送 tag 是两个独立操作。
+> 只有推送 tag 才会触发 `.github/workflows/release.yml` 中的 `on: push: tags: ['v*']` 条件。
