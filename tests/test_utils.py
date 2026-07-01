@@ -86,9 +86,8 @@ class TestResolvePath:
         assert os.path.isabs(abs_path)
 
     def test_resolve_absolute(self):
-        # macOS 上 /tmp 是 /private/tmp 的符号链接，resolve() 会还原
         resolved = resolve_path('/tmp')
-        assert resolved == '/private/tmp'
+        assert resolved == os.path.realpath('/tmp')
 
     def test_resolve_home(self):
         resolved = resolve_path('~')
