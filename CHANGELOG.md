@@ -38,6 +38,8 @@
   - 搜索框默认隐藏，>10 个实例时自动显示
   - Footer summary 文字居中 + 宽度对齐表格
   - 自动语言检测：根据浏览器 Accept-Language 头切换 CN/EN（_detect_lang）
+  - 语言切换 BUG 修复：/?lang=zh 显式参数覆盖自动检测，非英文浏览器必切中文
+  - CI/CD 推荐文档 → documents/ci-cd-recommendation.md
 - `hs mcp` — MCP Server for AI Agent integration
   - JSON-RPC 2.0 over SSE (default, auto-daemon) or stdio transport
   - 6 tools: hs_list, hs_status, hs_start, hs_kill, hs_kill_all, hs_config

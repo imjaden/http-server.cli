@@ -79,9 +79,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
         pass
 
     def _detect_lang(self) -> str:
-        """根据 Accept-Language 头自动检测语言，返回 'zh' 或 'en'"""
+        """根据 Accept-Language 头自动检测语言，返回 'zh' 或 'en'
+        优先检查 URL 查询参数 ?lang=zh / ?lang=en"""
+        # 查询参数优先
+        if '?lang=zh' in self.path or '&lang=zh' in self.path:
+            return 'zh'
+        if '?lang=en' in self.path or '&lang=en' in self.path:
+            return 'en'
+        # 后备：Accept-Language 头
         accept = self.headers.get('Accept-Language', '')
-        # 检查首要语言是否以 en 开头（en, en-US, en-GB 等）
         for part in accept.split(','):
             lang = part.split(';')[0].strip().split('-')[0]
             if lang == 'en':
