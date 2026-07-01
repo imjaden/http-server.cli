@@ -35,7 +35,19 @@ on:
 
 | Secret 名 | 用途 | 获取方式 |
 |:----------|:-----|:---------|
-| `PYPI_TOKEN` | PyPI 发布权限 | https://pypi.org/manage/account/token/ |
+| `PYPI_TOKEN` | PyPI 发布权限 | https://pypi.org/manage/account/token/ → "Add API token" → 作用域选 "Entire account" 或具体项目 → 复制 token 字符串 |
+
+### 配置步骤（详细）
+
+1. 打开 PyPI → https://pypi.org/manage/account/token/ → "Add API token"
+   - Token name: `http-server-cli-github-actions`
+   - Scope: 选择项目 `http-server-cli`（推荐）或 "Entire account"
+   - 创建后 **立即复制** token 字符串（只显示一次）
+2. 打开 GitHub 仓库 → `Settings` → `Secrets and variables` → `Actions`
+   - 点击 `New repository secret`
+   - Name: `PYPI_TOKEN`
+   - Secret: 粘贴上一步复制的 token
+   - 点击 `Add secret`
 
 ### 完整 YAML
 
@@ -63,7 +75,8 @@ jobs:
           files: dist/*
       - run: twine upload dist/*
         env:
-          TWINE_TOKEN: ${{ secrets.PYPI_TOKEN }}
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
 ```
 
 ## 方案 B（可选）：自动测试 PR
@@ -91,7 +104,7 @@ jobs:
 
 ## 实施步骤
 
-1. 在 GitHub 仓库 Settings → Secrets 添加 `PYPI_TOKEN`
-2. 创建 `.github/workflows/release.yml` 粘贴方案 A 内容
+1. 按上方「配置步骤」在 PyPI 创建 token + GitHub 添加 `PYPI_TOKEN` Secret
+2. 确认 `.github/workflows/release.yml` 已存在且内容正确
 3. 推送到 main 分支
-4. 下次发布时打 tag: `git tag v1.0.8 && git push --tags`
+4. 打 tag 触发自动发布: `git tag v1.0.8 && git push --tags`
