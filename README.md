@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="README.md">🇨🇳</a> · <a href="README.en.md">🇬🇧</a>
+  <a href="README.zh.md">🇨🇳</a> · <a href="README.md">🇬🇧</a>
 </p>
 
 # http-server-cli
