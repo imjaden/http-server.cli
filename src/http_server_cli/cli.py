@@ -184,6 +184,8 @@ def _list_servers(manager, json: bool = False, port_only: bool = False,
 
     user_servers = manager.registry.active_servers()
     user_servers = sorted(user_servers, key=lambda x: x['port'])
+    # 仅显示运行中的实例
+    user_servers = [s for s in user_servers if s.get('_alive')]
 
     mreg = ManagedRegistry()
     managed_servers = mreg.active_servers()
