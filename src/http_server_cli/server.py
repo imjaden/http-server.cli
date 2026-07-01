@@ -57,6 +57,13 @@ class ServerManager:
         """
         path = path or '.'
         abs_path = resolve_path(path)
+
+        # 若传入的是 html 文件路径，提取目录 + 设 index_page
+        if os.path.isfile(abs_path) and abs_path.lower().endswith(('.html', '.htm')):
+            index_page = os.path.basename(abs_path)
+            abs_path = os.path.dirname(abs_path)
+            path = abs_path
+
         domain = self.config.domain
         default_port = self.config.port
 
@@ -100,8 +107,12 @@ class ServerManager:
                     print(f'    📋  Log: {format_path(log_path)}')
                 
                 if open_browser:
-                    webbrowser.open(f'http://{domain}:{port}')
+                    url = f'http://{domain}:{port}'
+                    if index_page:
+                        url += f'/{index_page}'
+                    webbrowser.open(url)
                 return
+
             else:
                 eprint('Found stale registry entry, cleaning up before restart', '🔄')
                 self.registry.remove(path=abs_path)
@@ -196,7 +207,10 @@ class ServerManager:
 
         if open_browser:
             time.sleep(0.5)  # wait for service to start
-            webbrowser.open(f'http://{domain}:{port}')
+            url = f'http://{domain}:{port}'
+            if index_page:
+                url += f'/{index_page}'
+            webbrowser.open(url)
             if not json:
                 eprint('Browser opened', '🌐')
 

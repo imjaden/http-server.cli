@@ -654,7 +654,7 @@ def main():
     elif cmd is None:
         cmd = 'start'
     elif cmd not in _COMMANDS:
-        # 快捷方式：路径（如 .、~/site）隐式作为 start 的 path 参数
+        # 快捷方式：路径（如 .、~/site、/path/to/file.html）隐式作为 start 的 path 参数
         if cmd.startswith(('.', '/', '~')) or cmd == '..':
             parsed.args = [parsed.command] + parsed.args
             cmd = 'start'

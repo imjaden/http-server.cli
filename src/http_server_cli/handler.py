@@ -55,7 +55,8 @@ class SmartHTTPRequestHandler(SimpleHTTPRequestHandler):
             if latest_html:
                 self.log_message(f'🔀 首页无 {self.index_page}，重定向到: {latest_html}')
                 self.send_response(302)
-                self.send_header('Location', f'/{latest_html}')
+                from urllib.parse import quote
+                self.send_header('Location', f'/{quote(latest_html)}')
                 self.end_headers()
                 return
             else:
