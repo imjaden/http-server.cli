@@ -11,7 +11,7 @@
 >
 > Based on `python3 -m http.server`, zero external dependencies. Just `hs . -o` to preview your project.
 
-- [x] **Zero External Dependencies** — Python 3.7+, cross-platform (macOS/Linux/Windows) (`pip install http-server-cli`)
+- [x] **Zero External Dependencies** — Python 3.7+, macOS/Linux/Windows (`pip install http-server-cli`)
 - [x] **Auto Port + Smart Index** — Default 8080, auto-increment on conflict; auto-open most-recent HTML when no index.html; specify with `-i` (`hs . -o`)
 - [x] **Project Management** — Track port↔path mapping, monitor CPU/memory, JSON output (`hs list`)
 - [x] **Multiple Launch Modes** — Daemon or foreground (`-d`/`-f`)
@@ -20,26 +20,24 @@
 
 ## Why `hs`
 
-When developing multiple frontend projects, you constantly switch between "Which port did A use?" and "Who's occupying 8080?".
+Multiple frontend projects → constant context switching: "Which port is A on?" "Who's occupying 8080?".
 
-`hs` closes the loop: **Start → Track → List → Kill** — auto-find free ports, remember which project uses which port, view and close anytime.
+`hs` closes the loop: **Start → Track → List → Kill**.
 
 ## Comparison
 
 | Scenario | Before | With `hs` |
 |:---------|:-----|:--------|
-| Start server | `python3 -m http.server 8080` + manually open browser | `hs . -o` — auto-find free port, open browser |
-| View servers | `lsof -i :8080`, then `ps` to see path | `hs list` |
-| Switch projects | Kill old one, start new (or conflict) | `hs ../project-b` |
-| Kill server | `lsof` to find PID → `kill` | `hs kill 8080` |
+| Start server | `python3 -m http.server 8080` + open browser manually | `hs . -o` — auto-find free port, open browser |
+| View servers | `lsof -i :8080`, then `ps` | `hs list` |
+| Switch projects | Kill old, start new (or conflict) | `hs ../project-b` |
+| Kill server | `lsof` → `kill <pid>` | `hs kill 8080` |
 
 ## Installation
 
 ```bash
 pip install http-server-cli
-
-# Upgrade to latest version
-pip install --upgrade http-server-cli
+# or: pip install --upgrade http-server-cli
 ```
 
 Verify:
@@ -55,7 +53,7 @@ hs . -o        # Start in current directory + open browser
 ```bash
 # 1. Preview your project
 cd ~/project-alpha
-hs . -o                     # Auto-find free port, open browser
+hs . -o                     # Auto port + open browser
 
 # 2. Check running servers
 hs list
@@ -91,9 +89,6 @@ hs kill-all                 # Kill all
 
 ### Tips
 
-- **`hs . -o`** = `hs start . -o`, faster to type
-- **`hs . -d`**: daemon mode, runs in background, check with `hs list`
-- **`hs . -f`**: foreground mode, Ctrl+C to stop
 - **`hs`** without args = `hs start .` (start in current directory)
 - **`hs . -i app.html`**: use `app.html` as the index page
 
@@ -102,14 +97,10 @@ hs kill-all                 # Kill all
 ```
 ~/.http-server-cli/
 ├── config.json            # Default port/domain configuration
-├── registry.json          # port → {path, pid, domain, daemon, foreground, started_at}
+├── registry.json          # port → {path, pid, domain, started_at, index_page}
 ├── registry-managed.json  # Infrastructure services (dashboard, MCP SSE)
 └── logs/{port}.log        # http.server logs
 ```
-
-## Platform Requirements
-
-Supports **macOS**, **Linux**, and **Windows** (macOS uses `lsof` for accelerated port detection; other platforms fall back to direct socket checking).
 
 ## Local Development
 

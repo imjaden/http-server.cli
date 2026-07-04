@@ -11,7 +11,7 @@
 >
 > 基于 `python3 -m http.server`，零外部依赖。项目目录下 `hs . -o` 一键预览。
 
-- [x] **零外部依赖** — 仅需 Python 3.7+，macOS/Linux/Windows 全平台支持（`pip install http-server-cli`）
+- [x] **零外部依赖** — 仅需 Python 3.7+，macOS/Linux/Windows（`pip install http-server-cli`）
 - [x] **自动端口 + 智能首页** — 默认 8080，冲突自动递增；无 index.html 时自动打开最近修改的 html；支持 `-i` 指定（`hs . -o`）
 - [x] **项目管理** — 追踪路径↔端口映射、监控 CPU/内存、JSON 输出（`hs list`）
 - [x] **多种启动模式** — daemon 后台或 foreground 前台（`-d`/`-f`）
@@ -22,13 +22,13 @@
 
 同时开发多个前端项目时，总在记 "A 用了几号端口" 和 "8080 被谁占了" 之间切换。
 
-`hs` 把**启动 → 追踪 → 列出 → 关闭**闭环了：自动找空闲端口、记住哪个项目用哪个端口、随时查看和关闭。
+`hs` 把**启动 → 追踪 → 列出 → 关闭**闭环了。
 
 ## 对比一览
 
 | 场景 | 以前 | 用 `hs` |
 |:---------|:-----|:--------|
-| 启动服务 | `python3 -m http.server 8080` + 手动开浏览器 | `hs . -o` 已启动则直接打开浏览器，否则自动找空闲端口|
+| 启动服务 | `python3 -m http.server 8080` + 手动开浏览器 | `hs . -o` — 自动找空闲端口，打开浏览器 |
 | 查看服务 | `lsof -i :8080`，再 `ps` 看路径 | `hs list` |
 | 切换项目 | 先关旧的，再开新的（或冲突） | `hs ../project-b` |
 | 关掉服务 | `lsof` 查 PID → `kill` | `hs kill 8080` |
@@ -37,9 +37,7 @@
 
 ```bash
 pip install http-server-cli
-
-# 升级到最新版本
-pip install --upgrade http-server-cli
+# 或：pip install --upgrade http-server-cli
 ```
 
 验证：
@@ -55,7 +53,7 @@ hs . -o        # 当前目录启动 + 打开浏览器
 ```bash
 # 1. 到项目下无脑预览
 cd ~/project-alpha
-hs . -o                     # 自动找空闲端口，打开浏览器
+hs . -o                     # 自动找端口 + 打开浏览器
 
 # 2. 看看都起了哪些
 hs list
@@ -74,7 +72,7 @@ hs kill-all                 # 一键全关
 |:-----|:------|
 | `hs . [-o] [-d] [-f] [-i <file>]` | **快捷方式**，等价 `hs start .` |
 | `hs start [path] [-o] [-d] [-f] [-i <file>]` | 启动服务；`-i` 指定首页文件 |
-| `hs list [--port|--path|--short] [--json]` | 列出运行中服务（ `--port` 仅端口，`--path` 仅路径，`--short` 端口:路径） |
+| `hs list [--port|--path|--short] [--json]` | 列出运行中服务（`--port` 仅端口，`--path` 仅路径，`--short` 端口:路径） |
 | `hs status <port|path> [--json]` | 查询服务状态 |
 | `hs kill <port|path> [--json]` | 关闭指定服务 |
 | `hs kill-all [--json]` | 关闭所有服务 |
@@ -91,9 +89,6 @@ hs kill-all                 # 一键全关
 
 ### 小贴士
 
-- **`hs . -o`** = `hs start . -o`，敲起来更快
-- **`hs . -d`**：daemon 模式，后台运行，可用 `hs list` 查看
-- **`hs . -f`**：前台模式，Ctrl+C 终止服务
 - **`hs`** 不带参数 = `hs start .`（当前目录启动）
 - **`hs . -i app.html`**：以 `app.html` 为首页
 
@@ -102,14 +97,10 @@ hs kill-all                 # 一键全关
 ```
 ~/.http-server-cli/
 ├── config.json            # 默认端口/域名配置
-├── registry.json          # port → {path, pid, domain, daemon, foreground, started_at}
+├── registry.json          # port → {path, pid, domain, started_at, index_page}
 ├── registry-managed.json  # 基础设施服务（dashboard、MCP SSE）
 └── logs/{port}.log        # http.server 日志
 ```
-
-## 平台要求
-
-支持 **macOS**、**Linux**、**Windows**（macOS 使用 `lsof` 加速端口检测，其他平台自动降级为 socket 直连）。
 
 ## 本地开发
 
