@@ -11,17 +11,12 @@
 >
 > Based on `python3 -m http.server`, zero external dependencies. Just `hs . -o` to preview your project.
 
-- [x] **Zero External Dependencies** — Requires Python 3.7+ only, cross-platform (macOS/Linux/Windows) (`pip install http-server-cli`)
-- [x] **Auto Port Allocation + Preview** — Default 8080, auto-increment on conflict (`hs . -o`)
-- [x] **Smart Homepage** — Auto-redirect to most recently modified HTML file when no index.html
-- [x] **Custom Index Page** — Specify default HTML file with `-i`/`--index`
-- [x] **Project Tracking** — Persistent project path ↔ port mapping (`hs list`)
-- [x] **Process Resource Monitoring** — Real-time CPU, memory usage and runtime (`hs list`)
-- [x] **Multiple Launch Modes** — Daemon background or foreground (`-d` daemon / `-f` foreground)
-- [x] **JSON Output** — All commands support `--json` for API/MCP consumption
-- [x] **Web Dashboard** — `hs dashboard -o` GUI management for HTTP services (CN/EN toggle, 60s countdown, Kill All, error handler)
-- [x] **MCP Server** — `hs mcp` AI Agent integration (SSE/stdio, 6 tools)
-- [x] **Managed Registry** — Infrastructure services isolated from user services
+- [x] **Zero External Dependencies** — Python 3.7+, cross-platform (macOS/Linux/Windows) (`pip install http-server-cli`)
+- [x] **Auto Port + Smart Index** — Default 8080, auto-increment on conflict; auto-open most-recent HTML when no index.html; specify with `-i` (`hs . -o`)
+- [x] **Project Management** — Track port↔path mapping, monitor CPU/memory, JSON output (`hs list`)
+- [x] **Multiple Launch Modes** — Daemon or foreground (`-d`/`-f`)
+- [x] **Web Dashboard** — `hs dashboard -o` GUI (CN/EN toggle, 60s countdown, Kill All, error handler)
+- [x] **AI Agent Integration** — `hs mcp` MCP Server (SSE/stdio, 6 tools), managed infrastructure isolation
 
 ## Why `hs`
 

@@ -12,16 +12,11 @@
 > 基于 `python3 -m http.server`，零外部依赖。项目目录下 `hs . -o` 一键预览。
 
 - [x] **零外部依赖** — 仅需 Python 3.7+，macOS/Linux/Windows 全平台支持（`pip install http-server-cli`）
-- [x] **端口自动分配+预览** — 默认 8080，冲突时自动递增找空闲端口（`hs . -o`）
-- [x] **智能首页** — 无 index.html 时自动重定向到最近修改的 html 文件
-- [x] **自定义首页** — 通过 `-i`/`--index` 指定首页文件
-- [x] **项目追踪** — 持久化记录项目路径↔端口映射（`hs list`）
-- [x] **进程资源监控** — 实时显示 CPU、内存使用和运行时长（`hs list`）
-- [x] **多种启动模式** — daemon 后台运行、foreground 前台运行（`-d` daemon / `-f` foreground）
-- [x] **JSON 输出** — 所有命令支持 `--json` 供 API/MCP 消费
-- [x] **Web 仪表盘** — `hs dashboard -o` 图形化管理 HTTP 服务（中英文切换 / 60s 倒计时 / Kill All / 异常捕捉）
-- [x] **MCP Server** — `hs mcp` AI Agent 集成（SSE/stdio，6 个工具）
-- [x] **Managed Registry** — 基础设施服务与用户服务隔离管理
+- [x] **自动端口 + 智能首页** — 默认 8080，冲突自动递增；无 index.html 时自动打开最近修改的 html；支持 `-i` 指定（`hs . -o`）
+- [x] **项目管理** — 追踪路径↔端口映射、监控 CPU/内存、JSON 输出（`hs list`）
+- [x] **多种启动模式** — daemon 后台或 foreground 前台（`-d`/`-f`）
+- [x] **Web 仪表盘** — `hs dashboard -o` 图形化管理（中英文切换 / 60s 倒计时 / Kill All / 异常捕捉）
+- [x] **AI Agent 集成** — `hs mcp` MCP Server（SSE/stdio，6 个工具），托管服务隔离管理
 
 ## 为什么用 `hs`
 
