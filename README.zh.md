@@ -2,10 +2,7 @@
   <a href="README.zh.md">🇨🇳</a> · <a href="README.md">🇬🇧</a>
 </p>
 
-<h1 align="center">
-  <svg viewBox="0 0 16 16" width="28" height="28" style="vertical-align:middle;margin-right:6px;fill:#58a6ff;"><text x="8" y="11.5" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="900" font-size="9">hs</text></svg>
-  http-server-cli
-</h1>
+# http-server-cli
 
 > 忘记端口，只管预览 — Forget ports. Just preview.
 >
@@ -62,25 +59,15 @@ hs . -o        # 当前目录启动 + 打开浏览器
 cd ~/project-alpha
 hs . -o                     # 自动找空闲端口，打开浏览器
 
-# 2. 指定首页预览
-hs . -o --index app.html    # 浏览器打开 http://host:port/app.html
-hs path/to/detail.html      # 文件路径 → URL 包含 /detail.html
-
-# 3. 看看都起了哪些
+# 2. 看看都起了哪些
 hs list
 # ✅  http://localhost:8080   →  ~/project-alpha
 # ✅  http://localhost:8081   →  ~/project-beta  (daemon)
 
-# 4. 关掉不需要的
+# 3. 关掉不需要的
 hs kill 8080                # 按端口
-hs kill 8080 8081           # 按多端口
 hs kill ~/project-alpha     # 按路径
 hs kill-all                 # 一键全关
-
-# 4. 查看服务状态
-hs status 8080              # 单端口（详细信息）
-hs status 8080 8083         # 多端口（紧凑输出）
-hs info 8080                # status 的别名
 ```
 
 ### 所有命令
@@ -89,11 +76,9 @@ hs info 8080                # status 的别名
 |:-----|:------|
 | `hs . [-o] [-d] [-f]` | **快捷方式**，等价 `hs start .` |
 | `hs start [path] [-o] [-d] [-f] [-i <file>]` | 启动服务；`-i` 指定首页文件 |
-| `hs <file.html>` | 以文件所在目录启动服务，URL 包含文件名 |
 | `hs list [--json]` | 列出所有运行中服务 |
-| `hs status [--json] [port\|path...]` | 查询服务状态（支持多端口、lsof 探测未注册端口） |
-| `hs info [--json] [port\|path...]` | `status` 的别名 |
-| `hs kill <port\|path...> [--json]` | 关闭指定服务（支持多端口） |
+| `hs status [--json] [port\|path]` | 查询单个服务状态 |
+| `hs kill <port\|path> [--json]` | 关闭指定服务 |
 | `hs dashboard [-p PORT] [-o] [-d] [--json]` | Web 仪表盘（默认端口 8180） |
 | `hs dashboard stop\|status\|restart\|help` | dashboard 管理子命令 |
 | `hs mcp [--transport stdio\|sse] [--port PORT]` | MCP Server（供 AI Agent 集成） |

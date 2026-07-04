@@ -2,10 +2,7 @@
   <a href="README.zh.md">🇨🇳</a> · <a href="README.md">🇬🇧</a>
 </p>
 
-<h1 align="center">
-  <svg viewBox="0 0 16 16" width="28" height="28" style="vertical-align:middle;margin-right:6px;fill:#58a6ff;"><text x="8" y="11.5" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="900" font-size="9">hs</text></svg>
-  http-server-cli
-</h1>
+# http-server-cli
 
 > Forget ports. Just preview.
 >
@@ -62,25 +59,15 @@ hs . -o        # Start in current directory + open browser
 cd ~/project-alpha
 hs . -o                     # Auto-find free port, open browser
 
-# 2. Preview with custom index page
-hs . -o --index app.html    # Open browser with http://host:port/app.html
-hs path/to/detail.html      # File path → URL includes /detail.html
-
-# 3. Check running servers
+# 2. Check running servers
 hs list
 # ✅  http://localhost:8080   →  ~/project-alpha
 # ✅  http://localhost:8081   →  ~/project-beta  (daemon)
 
 # 3. Kill unwanted servers
 hs kill 8080                # By port
-hs kill 8080 8081           # By multiple ports
 hs kill ~/project-alpha     # By path
 hs kill-all                 # Kill all
-
-# 4. Check server status
-hs status 8080              # Single port (detailed info)
-hs status 8080 8083         # Multiple ports (compact)
-hs info 8080                # Alias for status
 ```
 
 ### All Commands
@@ -89,12 +76,11 @@ hs info 8080                # Alias for status
 |:-----|:------|
 | `hs . [-o] [-d] [-f]` | **Shortcut**, equivalent to `hs start .` |
 | `hs start [path] [-o] [-d] [-f] [-i <file>]` | Start server (path defaults to `.`; `-o` open browser; `-d` daemon; `-f` foreground; `-i` custom index) |
-| `hs <file.html>` | Start server at file's directory, URL includes filename |
 | `hs list` | List all running servers |
 | `hs list --json` | JSON format list |
-| `hs status [--json] [port\|path...]` | Query service status (multi-port, unregistered port detection via lsof) |
-| `hs info [--json] [port\|path...]` | Alias for `status` |
-| `hs kill <port\|path...> [--json]` | Kill specified server(s) (multi-port supported) |
+| `hs status [port\|path]` | Query single server status |
+| `hs status --json [port\|path]` | JSON format status |
+| `hs kill <port\|path>` | Kill specified server |
 | `hs dashboard [-p PORT] [-o] [--json]` | Web dashboard (default port 8180) |
 | `hs dashboard stop\|status\|restart\|help` | Dashboard management subcommands |
 | `hs mcp [--transport stdio\|sse] [--port PORT]` | MCP Server for AI Agent integration |
