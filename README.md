@@ -2,7 +2,10 @@
   <a href="README.zh.md">🇨🇳</a> · <a href="README.md">🇬🇧</a>
 </p>
 
-# http-server-cli
+<h1 align="center">
+  <svg viewBox="0 0 16 16" width="28" height="28" style="vertical-align:middle;margin-right:6px;"><circle cx="8" cy="8" r="7.5" fill="#e0e0e0"/><text x="8" y="11.5" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="900" font-size="9" fill="#333">hs</text></svg>
+  http-server-cli
+</h1>
 
 > Forget ports. Just preview.
 >
@@ -74,22 +77,22 @@ hs kill-all                 # Kill all
 
 | Command | Description |
 |:-----|:------|
-| `hs . [-o] [-d] [-f]` | **Shortcut**, equivalent to `hs start .` |
-| `hs start [path] [-o] [-d] [-f] [-i <file>]` | Start server (path defaults to `.`; `-o` open browser; `-d` daemon; `-f` foreground; `-i` custom index) |
-| `hs list` | List all running servers |
-| `hs list --json` | JSON format list |
-| `hs status [port\|path]` | Query single server status |
-| `hs status --json [port\|path]` | JSON format status |
-| `hs kill <port\|path>` | Kill specified server |
+| `hs . [-o] [-d] [-f] [-i <file>]` | **Shortcut**, equivalent to `hs start .` |
+| `hs start [path] [-o] [-d] [-f] [-i <file>]` | Start server (`-o` open browser; `-d` daemon; `-f` foreground; `-i` custom index) |
+| `hs list [--port|--path|--short] [--json]` | List running servers (filter: `--port` only ports, `--path` only paths, `--short` port:path) |
+| `hs status <port|path> [--json]` | Query single server status |
+| `hs kill <port|path> [--json]` | Kill specified server |
+| `hs kill-all [--json]` | Kill all servers |
+| `hs search <keyword> [--json]` | Search servers by port or path keyword |
+| `hs history [--json]` | Show server start/stop history |
 | `hs dashboard [-p PORT] [-o] [--json]` | Web dashboard (default port 8180) |
-| `hs dashboard stop\|status\|restart\|help` | Dashboard management subcommands |
-| `hs mcp [--transport stdio\|sse] [--port PORT]` | MCP Server for AI Agent integration |
-| `hs mcp stop\|status\|restart\|help` | MCP management subcommands |
-| `hs kill-all` | Kill all servers |
-| `hs config` | Show configuration |
-| `hs config --json` | JSON format configuration |
-| `hs set port <num>` | Set default port (default 8080) |
-| `hs set domain <str>` | Set bind domain (default localhost) |
+| `hs dashboard stop|status|restart|help` | Dashboard management subcommands |
+| `hs mcp [--transport stdio|sse] [--port PORT]` | MCP Server for AI Agent integration |
+| `hs mcp stop|status|restart|help` | MCP management subcommands |
+| `hs config [--json]` | Show configuration |
+| `hs set port|domain <value>` | Set configuration |
+| `hs version [--json]` | Show version |
+| `hs help` | Show help |
 
 ### Tips
 

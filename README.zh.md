@@ -2,7 +2,10 @@
   <a href="README.zh.md">🇨🇳</a> · <a href="README.md">🇬🇧</a>
 </p>
 
-# http-server-cli
+<h1 align="center">
+  <svg viewBox="0 0 16 16" width="28" height="28" style="vertical-align:middle;margin-right:6px;"><circle cx="8" cy="8" r="7.5" fill="#e0e0e0"/><text x="8" y="11.5" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="900" font-size="9" fill="#333">hs</text></svg>
+  http-server-cli
+</h1>
 
 > 忘记端口，只管预览 — Forget ports. Just preview.
 >
@@ -74,18 +77,22 @@ hs kill-all                 # 一键全关
 
 | 命令 | 说明 |
 |:-----|:------|
-| `hs . [-o] [-d] [-f]` | **快捷方式**，等价 `hs start .` |
+| `hs . [-o] [-d] [-f] [-i <file>]` | **快捷方式**，等价 `hs start .` |
 | `hs start [path] [-o] [-d] [-f] [-i <file>]` | 启动服务；`-i` 指定首页文件 |
-| `hs list [--json]` | 列出所有运行中服务 |
-| `hs status [--json] [port\|path]` | 查询单个服务状态 |
-| `hs kill <port\|path> [--json]` | 关闭指定服务 |
-| `hs dashboard [-p PORT] [-o] [-d] [--json]` | Web 仪表盘（默认端口 8180） |
-| `hs dashboard stop\|status\|restart\|help` | dashboard 管理子命令 |
-| `hs mcp [--transport stdio\|sse] [--port PORT]` | MCP Server（供 AI Agent 集成） |
-| `hs mcp stop\|status\|restart\|help` | MCP 管理子命令 |
+| `hs list [--port|--path|--short] [--json]` | 列出运行中服务（ `--port` 仅端口，`--path` 仅路径，`--short` 端口:路径） |
+| `hs status <port|path> [--json]` | 查询服务状态 |
+| `hs kill <port|path> [--json]` | 关闭指定服务 |
 | `hs kill-all [--json]` | 关闭所有服务 |
+| `hs search <keyword> [--json]` | 按端口或路径关键词搜索服务 |
+| `hs history [--json]` | 查看历史记录 |
+| `hs dashboard [-p PORT] [-o] [--json]` | Web 仪表盘（默认端口 8180） |
+| `hs dashboard stop|status|restart|help` | dashboard 管理子命令 |
+| `hs mcp [--transport stdio|sse] [--port PORT]` | MCP Server（AI Agent 集成） |
+| `hs mcp stop|status|restart|help` | MCP 管理子命令 |
 | `hs config [--json]` | 显示配置 |
-| `hs set port|domain <value> [--json]` | 修改配置 |
+| `hs set port|domain <value>` | 修改配置 |
+| `hs version [--json]` | 版本号 |
+| `hs help` | 帮助 |
 
 ### 小贴士
 
