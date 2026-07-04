@@ -127,6 +127,21 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._handle_log(int(port_str))
             else:
                 self._error('invalid port', 400)
+        elif path == '/hs-icon.svg':
+            self._serve_static('hs-icon.svg', 'image/svg+xml')
+        else:
+            self._error('not found')
+
+    def _serve_static(self, filename: str, mime: str) -> None:
+        """提供静态文件"""
+        path = os.path.join(SCRIPT_DIR, filename)
+        if os.path.exists(path):
+            self.send_response(200)
+            self.send_header('Content-Type', mime)
+            self.send_header('Cache-Control', 'max-age=3600')
+            self.end_headers()
+            with open(path, 'rb') as f:
+                self.wfile.write(f.read())
         else:
             self._error('not found')
 
