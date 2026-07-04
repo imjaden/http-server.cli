@@ -268,7 +268,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         start = time.time()
         try:
             req = urllib.request.Request(url, method='HEAD')
-            resp = urllib.request.urlopen(req, timeout=2)
+            resp = urllib.request.urlopen(req, timeout=0.5)
             elapsed = int((time.time() - start) * 1000)
             self._json({'success': True, 'port': port, 'alive': True,
                         'status_code': resp.getcode(), 'response_time_ms': elapsed})
