@@ -64,9 +64,15 @@ fi
 
 # --versions 优先处理
 if [[ $SHOW_VERSIONS -eq 1 ]]; then
-    CURRENT_VER=$(grep "__version__" "$VERSION_FILE" | sed -E "s/.*__version__ *= *['\"]([^'\"]+)['\"].*/\1/")
+    CURRENT_VER=$(grep "__version__" "$VERSION_FILE" | sed -E "s/.*__version__ *= *['\"]([^'\"]+)['\"].*/\\1/")
+    # 检测 editable 模式
+    if pip show http-server-cli 2>/dev/null | grep -q "Editable project location"; then
+        EDITABLE_STATUS="editable"
+    else
+        EDITABLE_STATUS="no-editable"
+    fi
     echo "📋 版本信息"
-    echo "  当前版本: $CURRENT_VER"
+    echo "  当前版本: $CURRENT_VER ($EDITABLE_STATUS)"
     PYPI_VER=$(pip index versions http-server-cli -i https://pypi.org/simple/ 2>/dev/null | head -1 | sed -E 's/.*\(([0-9.]+)\).*/\1/' || echo "未发布")
     echo "  生产环境版本: $PYPI_VER"
     TEST_VER=$(pip index versions http-server-cli -i https://test.pypi.org/simple/ 2>/dev/null | head -1 | sed -E 's/.*\(([0-9.]+)\).*/\1/' || echo "未发布")
