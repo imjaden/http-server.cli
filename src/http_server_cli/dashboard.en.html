@@ -317,6 +317,9 @@
         if (isAlive) totalMemory += memoryNum;
         var lastAccess = s.last_access_at ? s.last_access_at.slice(0, 19).replace('T', ' ') : '-';
         var urlDisplay = s.url || ('http://localhost:' + s.port);
+        if (s.index_page && s.index_page !== 'index.html') {
+          urlDisplay += '/' + s.index_page;
+        }
 
         html += '<tr>' +
           '<td class="url-cell"><a href="' + urlDisplay + '" target="_blank" title="Open in new tab">' + urlDisplay + ' <span class="external-link-icon">\u2197</span></a>' +
