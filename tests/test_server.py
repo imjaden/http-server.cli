@@ -550,6 +550,19 @@ class TestListJson:
         assert 'url' in server
         assert 'path' in server
 
+    def test_reopen_shows_index_page_in_url(self, monkeypatch, temp_project, capsys):
+        """已运行服务 reopen 时 URL 应包含自定义 index_page"""
+        mgr = ServerManager()
+        mgr.start(path=temp_project, index_page='app.html')
+        capsys.readouterr()  # 清掉首次输出
+        monkeypatch.setattr('http_server_cli.server.is_port_in_use', lambda p: True)
+        monkeypatch.setattr('http_server_cli.registry.is_port_in_use', lambda p: True)
+        # 不带 index_page 参数 reopen
+        mgr.start(path=temp_project, open_browser=False)
+        captured = capsys.readouterr()
+        assert 'app.html' in captured.out
+        assert 'http' in captured.out
+
 
 class TestStatusJson:
     """status --json 输出格式"""

@@ -3,6 +3,13 @@
 ## 1.0.8 (2026-07-01)
 
 ### Added
+- `--index` wildcard (glob) support: auto-select most recently modified file
+- `hs /path/to/*.html` path glob support: same most-recent-file resolution
+- `hs kill /path/to/file.html`: automatically resolves to parent directory
+- Dashboard URL column includes `index_page` path when non-default
+- Re-open (`hs . -o`) reuses registry `index_page` in URL
+- `scripts/release-local.sh` and `release-pypi.sh`: `--versions` shows editable status
+- Test suite: 227 tests (added reopen with index_page, dashboard URL with index)
 - `hs list` now only shows running/alive servers (filtered by `_alive` flag)
 - `hs search` now only searches running/alive servers
 - `hs history` filters out system temp directory entries (`/tmp/`, `/private/var/folders/`)

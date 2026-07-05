@@ -35,7 +35,9 @@
 10. **仅运行中** — `hs list` / `hs search` 仅显示运行中的实例
 11. **智能历史** — `hs history` 自动过滤系统临时目录
 12. **英文 CLI 输出** — 统一英文消息，规范格式化
-13. **Web Dashboard** — 图形化管理面板
+13. **通配符 index 解析** — `--index` 或 path 含 `*` 时自动取最近修改的文件
+14. **HTML 文件路径友好** — `hs /path/file.html` 自动提取目录，`hs kill file.html` 自动解析父目录
+15. **Web Dashboard** — 图形化管理面板
     - 中英文语言切换（🇨🇳 `/?lang=zh` ↔ 🇺🇸 `/en`），右上角悬浮 pill
     - 工具栏：60s 倒计时自动刷新、刷新按钮、Kill All 一键关闭
     - 服务器表格：URL(Port) | Health | Status | CPU | Memory | Last Access | Action
@@ -44,6 +46,7 @@
     - 健康检查探活：🟢/🟡/🔴 圆点标识 HTTP 响应状态
     - 搜索过滤框：实例 >10 时自动显示，实时按端口/路径关键字过滤
     - 一键复制 URL：📋 按钮点击复制到剪贴板
+    - URL 列拼接 `index_page`：非默认首页时显示完整路径
     - 底部版本号 + 可折叠命令参考
     - API：list / status / kill / kill-all / ping / log / info
 

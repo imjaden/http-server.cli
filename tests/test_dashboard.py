@@ -263,6 +263,16 @@ class TestDaemonMode:
         assert 'PID:' in output
 
 
+class TestDashboardUrlWithIndex:
+    def test_dashboard_html_appends_index_page_in_js(self):
+        """Dashboard HTML 的 JS 应包含 index_page 拼接逻辑"""
+        from http_server_cli.dashboard import _get_html
+        for lang in ('zh', 'en'):
+            html = _get_html(lang)
+            assert "s.index_page && s.index_page !== 'index.html'" in html
+            assert "urlDisplay += '/'" in html or "urlDisplay += '/'" in html
+
+
 class TestApiEndpoints:
     def test_api_ping_missing_port(self):
         """/api/ping 不存在的端口返回 alive=False"""
