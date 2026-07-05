@@ -107,9 +107,12 @@ class ServerManager:
                         'duration': duration,
                     })
                 else:
+                    entry_index = entry.get('index_page', '')
                     url = f'http://{domain}:{port}'
                     if index_page:
                         url += f'/{index_page}'
+                    elif entry_index and entry_index != 'index.html':
+                        url += f'/{entry_index}'
                     print(f'✅  {url}')
                     print(f'    📁  {format_path(abs_path)}')
                     print(f'    🔧  PID: {entry.get("pid")}  |  Started: {started_at}')
@@ -120,6 +123,8 @@ class ServerManager:
                     url = f'http://{domain}:{port}'
                     if index_page:
                         url += f'/{index_page}'
+                    elif entry.get('index_page') and entry.get('index_page') != 'index.html':
+                        url += f'/{entry["index_page"]}'
                     webbrowser.open(url)
                 return
 
