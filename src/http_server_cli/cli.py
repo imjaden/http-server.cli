@@ -143,19 +143,33 @@ def _cmd_start(manager, args):
     parser.add_argument('-o', '--open', action='store_true')
     parser.add_argument('-d', '--daemon', action='store_true')
     parser.add_argument('-f', '--foreground', action='store_true')
-    parser.add_argument('-i', '--index', default=None, help='首页文件名（默认 index.html）')
+    parser.add_argument('-i', '--index', nargs='*', default=None, help='首页文件名（默认 index.html）')
     parser.add_argument('--json', action='store_true')
     try:
         parsed, _ = parser.parse_known_args(args)
     except SystemExit:
         return
+    # 处理 --index 通配符展开（Shell 展开为多个文件时取最近修改的）
+    index_page = parsed.index
+    if isinstance(index_page, list):
+        if len(index_page) == 1:
+            index_page = index_page[0]
+        else:
+            import os
+            existing = [f for f in index_page if os.path.exists(f)]
+            if existing:
+                index_page = max(existing, key=os.path.getmtime)
+            else:
+                index_page = index_page[0]
+    if index_page:
+        index_page = index_page.lstrip('./')
     manager.start(
         path=parsed.path,
         open_browser=parsed.open,
         daemon=parsed.daemon,
         foreground=parsed.foreground,
         json=parsed.json,
-        index_page=parsed.index,
+        index_page=index_page,
     )
 
 @_register
