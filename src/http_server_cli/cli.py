@@ -138,6 +138,7 @@ def _register(func):
 
 @_register
 def _cmd_start(manager, args):
+    import os
     parser = argparse.ArgumentParser(prog='hs start', add_help=False)
     parser.add_argument('path', nargs='?', default='.')
     parser.add_argument('-o', '--open', action='store_true')
@@ -146,7 +147,7 @@ def _cmd_start(manager, args):
     parser.add_argument('-i', '--index', nargs='*', default=None, help='首页文件名（默认 index.html）')
     parser.add_argument('--json', action='store_true')
     try:
-        parsed, _ = parser.parse_known_args(args)
+        parsed, unknown = parser.parse_known_args(args)
     except SystemExit:
         return
     # 处理 --index 通配符展开（Shell 展开为多个文件时取最近修改的）
@@ -155,7 +156,6 @@ def _cmd_start(manager, args):
         if len(index_page) == 1:
             index_page = index_page[0]
         else:
-            import os
             existing = [f for f in index_page if os.path.exists(f)]
             if existing:
                 index_page = max(existing, key=os.path.getmtime)
@@ -163,8 +163,17 @@ def _cmd_start(manager, args):
                 index_page = index_page[0]
     if index_page:
         index_page = index_page.lstrip('./')
+
+    # 处理 path 通配符展开：Shell 展开后收集所有 html 文件，取最近者
+    path = parsed.path
+    if path and os.path.isfile(path) and path.lower().endswith(('.html', '.htm')):
+        all_html = [path] + [a for a in unknown if a.lower().endswith(('.html', '.htm'))]
+        if len(all_html) > 1:
+            existing = [f for f in all_html if os.path.exists(f)]
+            if existing:
+                path = max(existing, key=os.path.getmtime)
     manager.start(
-        path=parsed.path,
+        path=path,
         open_browser=parsed.open,
         daemon=parsed.daemon,
         foreground=parsed.foreground,
