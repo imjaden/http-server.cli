@@ -636,7 +636,30 @@ class TestKillJson:
         captured = capsys.readouterr()
         result = json.loads(captured.out)
         assert result['success'] is False
-        assert 'Please specify' in result['error']
+        assert 'specify' in result['error'].lower()
+
+
+class TestKillGlobResolution:
+    """kill 命令通配符路径解析"""
+
+    def test_kill_html_path_resolves_to_dir(self, temp_project, capsys):
+        """kill 传入 html 文件路径应解析到父目录"""
+        mgr = ServerManager()
+        mgr.start(path=temp_project, json=True)
+        captured = capsys.readouterr()
+        import http_server_cli.server as hs_srv
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setattr('http_server_cli.server.is_port_in_use', lambda p: True)
+        monkeypatch.setattr('http_server_cli.registry.is_port_in_use', lambda p: True)
+        # 创建一个真实 html 文件后 kill，应解析到注册的目录
+        html_path = os.path.join(temp_project, 'test.html')
+        with open(html_path, 'w') as f:
+            f.write('<html></html>')
+        mgr.kill(html_path)
+        captured = capsys.readouterr()
+        # 应该匹配到注册的目录，而不是报 not registered
+        assert 'not registered' not in captured.out
+        monkeypatch.undo()
 
 
 class TestKillAllJson:

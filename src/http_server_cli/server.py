@@ -447,6 +447,9 @@ class ServerManager:
                 return
         else:
             abs_path = resolve_path(arg)
+            # html 文件路径 → 取其所在目录（registry 存的是目录路径）
+            if os.path.isfile(abs_path) and abs_path.lower().endswith(('.html', '.htm')):
+                abs_path = os.path.dirname(abs_path)
             entry = self.registry.find(path=abs_path)
             if not entry:
                 if json:

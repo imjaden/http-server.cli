@@ -323,13 +323,21 @@ def _cmd_kill(manager, args):
     parser.add_argument('arg', nargs='?', default=None)
     parser.add_argument('--json', action='store_true')
     try:
-        parsed, _ = parser.parse_known_args(args)
+        parsed, unknown = parser.parse_known_args(args)
     except SystemExit:
         return
-    if parsed.arg is None:
+    arg = parsed.arg
+    # 通配符展开处理：收集 Shell 展开的 html 文件，取最近者
+    if arg and arg.lower().endswith(('.html', '.htm')):
+        all_html = [arg] + [a for a in unknown if a.lower().endswith(('.html', '.htm'))]
+        if len(all_html) > 1:
+            existing = [f for f in all_html if os.path.exists(f)]
+            if existing:
+                arg = max(existing, key=os.path.getmtime)
+    if arg is None:
         manager.kill('', json=parsed.json)
     else:
-        manager.kill(parsed.arg, json=parsed.json)
+        manager.kill(arg, json=parsed.json)
 
 @_register
 def _cmd_kill_all(manager, args):
