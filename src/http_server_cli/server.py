@@ -64,6 +64,15 @@ class ServerManager:
             abs_path = os.path.dirname(abs_path)
             path = abs_path
 
+        # 通配符解析：--index 含 * 时取最近修改的文件
+        if index_page and '*' in index_page:
+            import glob
+            pattern = os.path.join(abs_path, index_page)
+            matches = glob.glob(pattern)
+            if matches:
+                latest = max(matches, key=os.path.getmtime)
+                index_page = os.path.relpath(latest, abs_path)
+
         domain = self.config.domain
         default_port = self.config.port
 
@@ -85,22 +94,23 @@ class ServerManager:
                 log_path = os.path.join(LOG_DIR, f'{port}.log')
                 
                 if json:
+                    url = f'http://{domain}:{port}'
+                    if index_page:
+                        url += f'/{index_page}'
                     json_output(True, 'start', data={
-                        'url': f'http://{domain}:{port}',
-                        'port': port,
+                        'url': url,
                         'path': abs_path,
                         'pid': entry.get('pid'),
-                        'domain': domain,
-                        'mode': 'daemon' if entry.get('daemon') else ('foreground' if entry.get('foreground') else 'normal'),
                         'started_at': started_at,
-                        'browser_opened': False,
-                        'already_running': True,
                         'index_page': entry.get('index_page', 'index.html'),
                         'stats': stats,
                         'duration': duration,
                     })
                 else:
-                    print(f'✅  http://{domain}:{port}')
+                    url = f'http://{domain}:{port}'
+                    if index_page:
+                        url += f'/{index_page}'
+                    print(f'✅  {url}')
                     print(f'    📁  {format_path(abs_path)}')
                     print(f'    🔧  PID: {entry.get("pid")}  |  Started: {started_at}')
                     print(f'    📊  CPU: {stats["cpu"]}  |  Memory: {stats["memory"]} ({stats["memory_percent"]}) | Duration: {duration}')
@@ -184,22 +194,23 @@ class ServerManager:
         log_path_display = format_path(log_path)
 
         if json:
+            url = f'http://{domain}:{port}'
+            if index:
+                url += f'/{index}'
             json_output(True, 'start', data={
-                'url': f'http://{domain}:{port}',
-                'port': port,
+                'url': url,
                 'path': abs_path,
                 'pid': proc.pid,
-                'domain': domain,
-                'mode': 'daemon' if daemon else ('foreground' if foreground else 'normal'),
                 'started_at': started_at,
-                'browser_opened': bool(open_browser),
-                'already_running': False,
                 'index_page': index,
                 'stats': stats,
                 'duration': duration,
             })
         else:
-            print(f'✅  http://{domain}:{port}')
+            url = f'http://{domain}:{port}'
+            if index:
+                url += f'/{index}'
+            print(f'✅  {url}')
             print(f'    📁  {format_path(abs_path)}')
             print(f'    🔧  PID: {proc.pid}  |  Started: {started_at}')
             print(f'    📊  CPU: {stats["cpu"]}  |  Memory: {stats["memory"]} ({stats["memory_percent"]}) | Duration: {duration}')

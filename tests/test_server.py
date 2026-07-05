@@ -444,10 +444,9 @@ class TestStartJson:
         assert result['command'] == 'start'
         assert result['error'] is None
         d = result['data']
-        assert d['port'] == 8080
         assert d['path'] == os.path.realpath(temp_project)
-        assert d['already_running'] is False
-        assert d['mode'] == 'normal'
+        assert 'url' in d
+        assert 'pid' in d
         assert 'stats' in d
         assert 'duration' in d
 
@@ -465,7 +464,6 @@ class TestStartJson:
         captured = capsys.readouterr()
         result = json.loads(captured.out)
         assert result['success'] is True
-        assert result['data']['already_running'] is True
         assert result['data']['index_page'] == 'index.html'
         monkeypatch.undo()
 
@@ -482,7 +480,6 @@ class TestStartJson:
         mgr.start(path=temp_project, json=True)
         captured = capsys.readouterr()
         result = json.loads(captured.out)
-        assert result['data']['already_running'] is True
         assert result['data']['index_page'] == 'dashboard.html'
         monkeypatch.undo()
 
