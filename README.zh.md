@@ -66,22 +66,60 @@ hs kill ~/project-alpha     # 按路径
 hs kill-all                 # 一键全关
 ```
 
-### 所有命令
+### 启动
 
 | 命令 | 说明 |
-|:-----|:------|
-| `hs . [-o] [-d] [-f] [-i <file>]` | **快捷方式**，等价 `hs start .` |
-| `hs start [path] [-o] [-d] [-f] [-i <file>]` | 启动服务；`-i` 指定首页文件 |
-| `hs list [--port|--path|--short] [--json]` | 列出运行中服务（`--port` 仅端口，`--path` 仅路径，`--short` 端口:路径） |
-| `hs status <port|path> [--json]` | 查询服务状态 |
-| `hs kill <port|path> [--json]` | 关闭指定服务 |
-| `hs kill-all [--json]` | 关闭所有服务 |
-| `hs search <keyword> [--json]` | 按端口或路径关键词搜索服务 |
-| `hs history [--json]` | 查看历史记录 |
-| `hs dashboard [-p PORT] [-o] [--json]` | Web 仪表盘（默认端口 8180） |
-| `hs dashboard stop|status|restart|help` | dashboard 管理子命令 |
-| `hs mcp [--transport stdio|sse] [--port PORT]` | MCP Server（AI Agent 集成） |
-| `hs mcp stop|status|restart|help` | MCP 管理子命令 |
+|:--------|:------------|
+| `hs . [-o] [-d] [-f]` | 当前目录，自动找空闲端口 |
+| `hs /path [-o] [-d] [-f]` | 指定目录 |
+| `hs . -i app.html [-o]` | 指定首页文件 |
+| `hs . -i './snapshots/*.html' [-o]` | 通配符 → 取最近修改的文件 |
+| `hs /path/to/file.html [-o]` | HTML 文件 → 自动提取目录 + 设 index |
+| `hs /path/snapshots/*.html [-o]` | 路径通配符 → 取最近文件 |
+| `hs start [path] [-o] [-d] [-f] [-i <file>]` | `hs .` 的完整形式 |
+
+### 查看
+
+| 命令 | 说明 |
+|:--------|:------------|
+| `hs list` | 列出运行中的服务（仅存活实例） |
+| `hs list --port` | 仅端口号 |
+| `hs list --path` | 仅路径 |
+| `hs list --short` | `端口:路径` 格式 |
+| `hs list --json` | JSON 输出 |
+| `hs search <keyword> [--json]` | 按端口或路径搜索 |
+| `hs status <port|path> [--json]` | 单个服务状态（CPU/内存/日志） |
+
+### 关闭
+
+| 命令 | 说明 |
+|:--------|:------------|
+| `hs kill 8080` | 按端口 |
+| `hs kill ~/project` | 按路径 |
+| `hs kill /path/to/file.html` | HTML 文件 → 自动解析到父目录 |
+| `hs kill /path/*.html` | 通配符 → 取最近文件 |
+| `hs kill-all` | 关闭所有用户服务 |
+| `hs kill-all --json` | JSON 输出 |
+
+### Dashboard
+
+| 命令 | 说明 |
+|:--------|:------------|
+| `hs dashboard [-p PORT] [-o] [--json]` | Web 仪表盘（默认 8180） |
+| `hs dashboard stop|status|restart|help` | 子命令 |
+
+### MCP（AI Agent 集成）
+
+| 命令 | 说明 |
+|:--------|:------------|
+| `hs mcp [--transport stdio|sse] [--port PORT]` | MCP Server |
+| `hs mcp stop|status|restart|help` | 子命令 |
+
+### 历史与配置
+
+| 命令 | 说明 |
+|:--------|:------------|
+| `hs history [--json]` | 查看历史记录（排除临时目录） |
 | `hs config [--json]` | 显示配置 |
 | `hs set port|domain <value>` | 修改配置 |
 | `hs version [--json]` | 版本号 |

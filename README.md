@@ -66,24 +66,62 @@ hs kill ~/project-alpha     # By path
 hs kill-all                 # Kill all
 ```
 
-### All Commands
+### Start
 
 | Command | Description |
-|:-----|:------|
-| `hs . [-o] [-d] [-f] [-i <file>]` | **Shortcut**, equivalent to `hs start .` |
-| `hs start [path] [-o] [-d] [-f] [-i <file>]` | Start server (`-o` open browser; `-d` daemon; `-f` foreground; `-i` custom index) |
-| `hs list [--port|--path|--short] [--json]` | List running servers (filter: `--port` only ports, `--path` only paths, `--short` port:path) |
-| `hs status <port|path> [--json]` | Query single server status |
-| `hs kill <port|path> [--json]` | Kill specified server |
-| `hs kill-all [--json]` | Kill all servers |
-| `hs search <keyword> [--json]` | Search servers by port or path keyword |
-| `hs history [--json]` | Show server start/stop history |
-| `hs dashboard [-p PORT] [-o] [--json]` | Web dashboard (default port 8180) |
-| `hs dashboard stop|status|restart|help` | Dashboard management subcommands |
-| `hs mcp [--transport stdio|sse] [--port PORT]` | MCP Server for AI Agent integration |
-| `hs mcp stop|status|restart|help` | MCP management subcommands |
+|:--------|:------------|
+| `hs . [-o] [-d] [-f]` | Current directory, auto-find free port |
+| `hs /path [-o] [-d] [-f]` | Specify directory |
+| `hs . -i app.html [-o]` | Custom index file |
+| `hs . -i './snapshots/*.html' [-o]` | Glob → most recently modified file |
+| `hs /path/to/file.html [-o]` | HTML file path → auto-extract directory + set index |
+| `hs /path/snapshots/*.html [-o]` | Path glob → most recent file |
+| `hs start [path] [-o] [-d] [-f] [-i <file>]` | Full form of `hs .` |
+
+### View
+
+| Command | Description |
+|:--------|:------------|
+| `hs list` | List running servers (alive only) |
+| `hs list --port` | Ports only |
+| `hs list --path` | Paths only |
+| `hs list --short` | `port:path` format |
+| `hs list --json` | JSON output |
+| `hs search <keyword> [--json]` | Search by port or path |
+| `hs status <port\|path> [--json]` | Single server status (CPU/memory/log) |
+
+### Kill
+
+| Command | Description |
+|:--------|:------------|
+| `hs kill 8080` | By port |
+| `hs kill ~/project` | By path |
+| `hs kill /path/to/file.html` | HTML file → auto-resolve to parent dir |
+| `hs kill /path/*.html` | Glob → most recent file |
+| `hs kill-all` | Kill all user services |
+| `hs kill-all --json` | JSON output |
+
+### Dashboard
+
+| Command | Description |
+|:--------|:------------|
+| `hs dashboard [-p PORT] [-o] [--json]` | Web dashboard (default 8180) |
+| `hs dashboard stop\|status\|restart\|help` | Subcommands |
+
+### MCP (AI Agent)
+
+| Command | Description |
+|:--------|:------------|
+| `hs mcp [--transport stdio\|sse] [--port PORT]` | MCP Server for AI Agent |
+| `hs mcp stop\|status\|restart\|help` | Subcommands |
+
+### History & Config
+
+| Command | Description |
+|:--------|:------------|
+| `hs history [--json]` | Server start/stop history (excludes temp dirs) |
 | `hs config [--json]` | Show configuration |
-| `hs set port|domain <value>` | Set configuration |
+| `hs set port\|domain <value>` | Change configuration |
 | `hs version [--json]` | Show version |
 | `hs help` | Show help |
 
