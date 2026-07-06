@@ -164,6 +164,61 @@ class TestUnknownCommand:
         assert 'unknown-command' not in _COMMANDS
         assert 'foobar' not in _COMMANDS
 
+    def test_relative_path_without_prefix_routes_to_start(self, monkeypatch, tmp_path):
+        """hs relative/path.html（无 ./ 前缀）应路由到 start"""
+        test_file = tmp_path / 'my-project-v1.html'
+        test_file.write_text('<html></html>')
+
+        captured = {'args': None}
+        def fake_start(mgr, args):
+            captured['args'] = args
+
+        cmds = dict(_COMMANDS)
+        cmds['start'] = fake_start
+        monkeypatch.setattr('http_server_cli.cli._COMMANDS', cmds)
+        monkeypatch.setattr('http_server_cli.cli.ServerManager', lambda: None)
+        monkeypatch.setattr('http_server_cli.cli.ensure_storage', lambda: None)
+
+        import sys, os
+        old_argv, old_cwd = sys.argv, os.getcwd()
+        sys.argv = ['hs', str(test_file), '--json']
+        os.chdir(str(tmp_path))
+        try:
+            from http_server_cli.cli import main
+            main()
+        except SystemExit:
+            pass
+        sys.argv = old_argv
+        os.chdir(old_cwd)
+
+        assert captured['args'] is not None
+        assert 'my-project-v1' in captured['args'][0]  # 原始连字符保留
+        assert '--json' in captured['args']
+
+    def test_nonexistent_path_still_unknown(self, monkeypatch):
+        """不存在的路径应保持 Unknown command"""
+        captured = {'called_start': False}
+        def fake_start(mgr, args):
+            captured['called_start'] = True
+
+        cmds = dict(_COMMANDS)
+        cmds['start'] = fake_start
+        monkeypatch.setattr('http_server_cli.cli._COMMANDS', cmds)
+        monkeypatch.setattr('http_server_cli.cli.ServerManager', lambda: None)
+        monkeypatch.setattr('http_server_cli.cli.ensure_storage', lambda: None)
+
+        import sys
+        old_argv = sys.argv
+        sys.argv = ['hs', 'this-file-does-not-exist.foobar']
+        try:
+            from http_server_cli.cli import main
+            main()
+        except SystemExit:
+            pass
+        sys.argv = old_argv
+
+        assert not captured['called_start']
+
 
 class TestListOptions:
     """hs list --port/--path/--short 选项测试"""

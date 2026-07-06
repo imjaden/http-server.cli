@@ -12,6 +12,7 @@ from http_server_cli import __version__
 from http_server_cli.config import Config
 from http_server_cli.server import ServerManager
 from http_server_cli.utils import eprint, ensure_storage
+import glob
 
 # ── 帮助文本 ──────────────────────────────────────────
 
@@ -675,8 +676,8 @@ def main():
     parsed, unknown = parser.parse_known_args()
 
     cmd = parsed.command
-    # 命令名规范化：连字符转下划线
-    if cmd:
+    # 命令名规范化：连字符转下划线（仅对已知命令生效，不影响路径参数）
+    if cmd and cmd.replace('-', '_') in _COMMANDS:
         cmd = cmd.replace('-', '_')
     if cmd in ('_h', '__help') or '-h' in unknown or '--help' in unknown:
         cmd = 'help'
@@ -685,8 +686,10 @@ def main():
     elif cmd is None:
         cmd = 'start'
     elif cmd not in _COMMANDS:
-        # 快捷方式：路径（如 .、~/site、/path/to/file.html）隐式作为 start 的 path 参数
-        if cmd.startswith(('.', '/', '~')) or cmd == '..':
+        # 快捷方式：路径隐式作为 start 的 path 参数
+        # 覆盖：./ ../ / ~ 显式路径，以及 Shell 展开后无前缀的相对路径/通配符
+        if (cmd.startswith(('.', '/', '~')) or cmd == '..'
+                or os.path.exists(cmd) or glob.glob(cmd)):
             parsed.args = [parsed.command] + parsed.args
             cmd = 'start'
         else:
