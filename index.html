@@ -279,7 +279,7 @@
     <div class="container">
       <p>
         A zero-dependency CLI for <strong>local HTTP preview</strong> that remembers what you're serving.
-        Run <code>hs . -o</code> — no port juggling, no &quot;which project was on 8080?&quot;, no &quot;how do I kill it?&quot;.
+        Run <code>hs -o</code> — no port juggling, no &quot;which project was on 8080?&quot;, no &quot;how do I kill it?&quot;.
       </p>
       <p>
         Starts at <strong>8080</strong>, auto-increments on conflict. Tracks every server you launch.
@@ -294,11 +294,9 @@
 
       <div class="group">
         <div class="group-title">▶  Start</div>
-        <div class="line prompt">$ hs . -o</div>
+        <div class="line prompt">$ hs -o</div>
         <div class="line out">   ✅  http://jaden.local:8081           →  ~/project-alpha</div>
-        <div class="line prompt">$ hs ./dist -i app.html -o</div>
-        <div class="line out">   ✅  http://jaden.local:8082/app.html  →  ~/project/dist</div>
-        <div class="line prompt">$ hs . --index 'snapshots/*.html' -o</div>
+        <div class="line prompt">$ hs snapshots/*.html -o</div>
         <div class="line out">   ✅  http://jaden.local:8083/snapshots/latest.html</div>
       </div>
 

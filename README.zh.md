@@ -9,10 +9,10 @@
 
 > 忘记端口，只管预览 — Forget ports. Just preview.
 >
-> 基于 `python3 -m http.server`，零外部依赖。项目目录下 `hs . -o` 一键预览。
+> 基于 `python3 -m http.server`，零外部依赖。项目目录下 `hs -o` 一键预览。
 
 - [x] **零外部依赖** — 仅需 Python 3.7+，macOS/Linux/Windows（`pip install http-server-cli`）
-- [x] **自动端口 + 智能首页** — 默认 8080，冲突自动递增；无 index.html 时自动打开最近修改的 html；支持 `-i` 指定（`hs . -o`）
+- [x] **自动端口 + 智能首页** — 默认 8080，冲突自动递增；无 index.html 时自动打开最近修改的 html；支持 `-i` 指定（`hs -o`）
 - [x] **项目管理** — 追踪路径↔端口映射、监控 CPU/内存、JSON 输出（`hs list`）
 - [x] **多种启动模式** — daemon 后台或 foreground 前台（`-d`/`-f`）
 - [x] **Web 仪表盘** — `hs dashboard -o` 图形化管理（中英文切换 / 60s 倒计时 / Kill All / 异常捕捉）
@@ -28,7 +28,7 @@
 
 | 场景 | 以前 | 用 `hs` |
 |:---------|:-----|:--------|
-| 启动服务 | `python3 -m http.server 8080` + 手动开浏览器 | `hs . -o` — 自动找空闲端口，打开浏览器 |
+| 启动服务 | `python3 -m http.server 8080` + 手动开浏览器 | `hs -o` — 自动找空闲端口，打开浏览器 |
 | 查看服务 | `lsof -i :8080`，再 `ps` 看路径 | `hs list` |
 | 切换项目 | 先关旧的，再开新的（或冲突） | `hs ../project-b` |
 | 关掉服务 | `lsof` 查 PID → `kill` | `hs kill 8080` |
@@ -43,7 +43,7 @@ pip install http-server-cli
 验证：
 ```
 hs version     # → http-server-cli v1.0.x
-hs . -o        # 当前目录启动 + 打开浏览器
+hs -o        # 当前目录启动 + 打开浏览器
 ```
 
 ## 用法
@@ -53,7 +53,7 @@ hs . -o        # 当前目录启动 + 打开浏览器
 ```bash
 # 1. 到项目下无脑预览
 cd ~/project-alpha
-hs . -o                     # 自动找端口 + 打开浏览器
+hs -o                     # 自动找端口 + 打开浏览器
 
 # 2. 看看都起了哪些
 hs list

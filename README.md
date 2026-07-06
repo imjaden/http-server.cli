@@ -9,10 +9,10 @@
 
 > Forget ports. Just preview.
 >
-> Based on `python3 -m http.server`, zero external dependencies. Just `hs . -o` to preview your project.
+> Based on `python3 -m http.server`, zero external dependencies. Just `hs -o` to preview your project.
 
 - [x] **Zero External Dependencies** — Python 3.7+, macOS/Linux/Windows (`pip install http-server-cli`)
-- [x] **Auto Port + Smart Index** — Default 8080, auto-increment on conflict; auto-open most-recent HTML when no index.html; specify with `-i` (`hs . -o`)
+- [x] **Auto Port + Smart Index** — Default 8080, auto-increment on conflict; auto-open most-recent HTML when no index.html; specify with `-i` (`hs -o`)
 - [x] **Project Management** — Track port↔path mapping, monitor CPU/memory, JSON output (`hs list`)
 - [x] **Multiple Launch Modes** — Daemon or foreground (`-d`/`-f`)
 - [x] **Web Dashboard** — `hs dashboard -o` GUI (CN/EN toggle, 60s countdown, Kill All, error handler)
@@ -28,7 +28,7 @@ Multiple frontend projects → constant context switching: "Which port is A on?"
 
 | Scenario | Before | With `hs` |
 |:---------|:-----|:--------|
-| Start server | `python3 -m http.server 8080` + open browser manually | `hs . -o` — auto-find free port, open browser |
+| Start server | `python3 -m http.server 8080` + open browser manually | `hs -o` — auto-find free port, open browser |
 | View servers | `lsof -i :8080`, then `ps` | `hs list` |
 | Switch projects | Kill old, start new (or conflict) | `hs ../project-b` |
 | Kill server | `lsof` → `kill <pid>` | `hs kill 8080` |
@@ -43,7 +43,7 @@ pip install http-server-cli
 Verify:
 ```
 hs version     # → http-server-cli v1.0.x
-hs . -o        # Start in current directory + open browser
+hs -o        # Start in current directory + open browser
 ```
 
 ## Usage
@@ -53,7 +53,7 @@ hs . -o        # Start in current directory + open browser
 ```bash
 # 1. Preview your project
 cd ~/project-alpha
-hs . -o                     # Auto port + open browser
+hs -o                     # Auto port + open browser
 
 # 2. Check running servers
 hs list

@@ -22,7 +22,7 @@ _HELP = """http-server-cli v{version} — 忘记端口，只管预览
 
 ━━━ 日常预览 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  hs . -o                  当前目录启动 + 打开浏览器
+  hs -o                    当前目录启动 + 打开浏览器
   hs ~/my-site -o          指定目录启动 + 打开浏览器
   hs . -i app.html         指定首页文件
   hs . -d                  后台运行（不占用终端）
@@ -681,9 +681,12 @@ def main():
         cmd = cmd.replace('-', '_')
     if cmd in ('_h', '__help') or '-h' in unknown or '--help' in unknown:
         cmd = 'help'
-    elif cmd in ('_v', '__version') or unknown:
+    elif cmd in ('_v', '__version') or '-v' in unknown or '--version' in unknown:
         cmd = 'version'
     elif cmd is None:
+        # 未输入命令名但有关键字（如 hs -o），视作 start 的参数
+        if unknown:
+            parsed.args = unknown[:]
         cmd = 'start'
     elif cmd not in _COMMANDS:
         # 快捷方式：路径隐式作为 start 的 path 参数

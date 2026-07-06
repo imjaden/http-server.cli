@@ -279,7 +279,7 @@
     <div class="container">
       <p>
         零依赖的 <strong>本地 HTTP 预览</strong> CLI 工具，自动记住你启动过的服务。
-        只需 <code>hs . -o</code> —— 不用再记端口号、不用纠结"哪个项目占用了 8080"、不用翻进程管理器去 kill。
+        只需 <code>hs -o</code> —— 不用再记端口号、不用纠结"哪个项目占用了 8080"、不用翻进程管理器去 kill。
       </p>
       <p>
         从 <strong>8080</strong> 开始分配，端口冲突时自动递增。持久化追踪每次启动的服务。
@@ -294,11 +294,9 @@
 
       <div class="group">
         <div class="group-title">▶  启动</div>
-        <div class="line prompt">$ hs . -o</div>
+        <div class="line prompt">$ hs -o</div>
         <div class="line out">   ✅  http://jaden.local:8081           →  ~/project-alpha</div>
-        <div class="line prompt">$ hs ./dist -i app.html -o</div>
-        <div class="line out">   ✅  http://jaden.local:8082/app.html  →  ~/project/dist</div>
-        <div class="line prompt">$ hs . --index 'snapshots/*.html' -o</div>
+        <div class="line prompt">$ hs snapshots/*.html -o</div>
         <div class="line out">   ✅  http://jaden.local:8083/snapshots/latest.html</div>
       </div>
 
