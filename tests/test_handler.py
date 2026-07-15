@@ -165,3 +165,79 @@ class TestLogMessage:
             # 日志应包含时间戳格式 [YYYY-MM-DD HH:MM:SS]
             assert '[' in captured.err
             assert 'Test message' in captured.err
+
+
+class TestRangeRequest:
+    """Range 请求支持测试"""
+
+    def test_parse_range_with_end(self):
+        from http_server_cli.handler import _parse_range_header
+        result = _parse_range_header('bytes=0-499', 1000)
+        assert result == (0, 499)
+
+    def test_parse_range_without_end(self):
+        from http_server_cli.handler import _parse_range_header
+        result = _parse_range_header('bytes=500-', 1000)
+        assert result == (500, 999)
+
+    def test_parse_range_invalid(self):
+        from http_server_cli.handler import _parse_range_header
+        assert _parse_range_header('invalid', 1000) is None
+        assert _parse_range_header('bytes=-500', 1000) is None
+        assert _parse_range_header('', 1000) is None
+
+    def test_parse_range_start_past_end(self):
+        from http_server_cli.handler import _parse_range_header
+        assert _parse_range_header('bytes=2000-3000', 1000) is None
+
+    def test_send_head_normal_has_accept_ranges(self, tmp_path):
+        """普通请求应返回 Accept-Ranges: bytes"""
+        import threading, urllib.request, socket, time, http.server
+        (tmp_path / 'test.txt').write_text('hello world')
+        from http_server_cli.handler import create_handler
+        handler_cls = create_handler(str(tmp_path))
+
+        sock = socket.socket()
+        sock.bind(('127.0.0.1', 0))
+        port = sock.getsockname()[1]
+        sock.close()
+        httpd = http.server.HTTPServer(('127.0.0.1', port), handler_cls)
+        def serve():
+            httpd.handle_request()
+        t = threading.Thread(target=serve)
+        t.start()
+        time.sleep(0.1)
+        try:
+            req = urllib.request.Request(f'http://127.0.0.1:{port}/test.txt')
+            resp = urllib.request.urlopen(req, timeout=3)
+            assert resp.status == 200
+            assert resp.getheader('Accept-Ranges') == 'bytes'
+        finally:
+            httpd.server_close()
+
+    def test_send_head_range_returns_206(self, tmp_path):
+        """Range 请求应返回 206 和 Content-Range"""
+        import threading, urllib.request, socket, time, http.server
+        (tmp_path / 'test.txt').write_text('hello world')
+        from http_server_cli.handler import create_handler
+        handler_cls = create_handler(str(tmp_path))
+
+        sock = socket.socket()
+        sock.bind(('127.0.0.1', 0))
+        port = sock.getsockname()[1]
+        sock.close()
+        httpd = http.server.HTTPServer(('127.0.0.1', port), handler_cls)
+        def serve():
+            httpd.handle_request()
+        t = threading.Thread(target=serve)
+        t.start()
+        time.sleep(0.1)
+        try:
+            req = urllib.request.Request(f'http://127.0.0.1:{port}/test.txt')
+            req.add_header('Range', 'bytes=0-4')
+            resp = urllib.request.urlopen(req, timeout=3)
+            assert resp.status == 206
+            assert resp.getheader('Content-Range') == 'bytes 0-4/11'
+            assert len(resp.read()) == 5  # 'hello'
+        finally:
+            httpd.server_close()

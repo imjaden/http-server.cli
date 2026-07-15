@@ -64,6 +64,18 @@ _HELP = """http-server-cli v{version} — 忘记端口，只管预览
   hs set port 3000         修改默认端口
   hs set domain 0.0.0.0    修改绑定域名
 
+━━━ 书签 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  hs bookmark add <name> [path] [-i index]    注册书签（path 默认 CWD）
+  hs bookmark list                             列出所有书签
+  hs bookmark show <name>                      查看书签详情
+  hs bookmark remove <name>                    删除书签
+
+  注册后直接用名称启动:
+    hs <name> --url        获取 URL
+    hs <name> -o           启动 + 打开浏览器
+    hs kill <name>         停止服务
+
 ━━━ 其他 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   hs version               显示版本号
