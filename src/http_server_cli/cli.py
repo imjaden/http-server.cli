@@ -779,21 +779,17 @@ def _bookmark_add(args):
         print(f'❌ Path does not exist or is not a directory: {format_path(abs_path)}', file=sys.stderr)
         return
 
-    # 通配符展开：index 含 * 时取最近修改的文件（与 _cmd_start 逻辑一致）
+    # index_page 处理：含 * 的通配符保留原样（运行时解析），字面量立即校验
     index_page = parsed.index
-    if index_page and '*' in index_page:
-        pattern = os.path.join(abs_path, index_page)
-        matches = glob.glob(pattern)
-        if matches:
-            latest = max(matches, key=os.path.getmtime)
-            index_page = os.path.relpath(latest, abs_path)
-
-    # index_page 校验（使用展开后的值）
     if index_page:
-        err = _validate_index_page(index_page)
-        if err:
-            print(f'❌ {err}', file=sys.stderr)
-            return
+        if '*' in index_page:
+            # 通配符模式：不展开、不校验，原样存储。运行时每次实时解析取最新文件。
+            pass
+        else:
+            err = _validate_index_page(index_page)
+            if err:
+                print(f'❌ {err}', file=sys.stderr)
+                return
 
     store = BookmarkStore()
     try:
@@ -884,17 +880,13 @@ def _bookmark_update(args):
             return
         path = abs_path
 
-    # 通配符展开 + 校验
+    # index_page 处理：含 * 的通配符保留原样，字面量立即校验
     index_page = parsed.index
     if index_page is not None:
-        abs_path_for_glob = path or existing['path']
         if '*' in index_page:
-            pattern = os.path.join(abs_path_for_glob, index_page)
-            matches = glob.glob(pattern)
-            if matches:
-                latest = max(matches, key=os.path.getmtime)
-                index_page = os.path.relpath(latest, abs_path_for_glob)
-        if index_page:  # 非空字符串才校验
+            # 通配符模式：不展开、不校验，原样存储
+            pass
+        elif index_page:
             err = _validate_index_page(index_page)
             if err:
                 print(f'❌ {err}', file=sys.stderr)
@@ -941,7 +933,18 @@ def main():
         if bm:
             implicit = [bm['path']]
             if bm.get('index_page'):
-                implicit += ['-i', bm['index_page']]
+                idx = bm['index_page']
+                if '*' in idx:
+                    # 通配符模式：运行时实时解析取最近修改的文件
+                    pattern = os.path.join(bm['path'], idx)
+                    matches = glob.glob(pattern)
+                    if matches:
+                        latest = max(matches, key=os.path.getmtime)
+                        idx = os.path.relpath(latest, bm['path'])
+                    else:
+                        idx = None  # 无匹配文件 → 不传 -i，用默认 index.html
+                if idx:
+                    implicit += ['-i', idx]
             parsed.args = implicit + parsed.args
             cmd = 'start'
         # ➋ 回退到路径快捷方式

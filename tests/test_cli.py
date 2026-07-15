@@ -479,24 +479,24 @@ class TestBookmarkCLI:
         assert '✅' in captured.out
 
     def test_bookmark_add_glob_index(self, tmp_path, capsys):
-        """-i 'snapshots/*.html' 通配符应展开为最近修改的文件"""
-        import os, time
+        """-i 'snapshots/*.html' 通配符应原样存储，不展开"""
+        import os
         snapshots = tmp_path / 'snapshots'
         snapshots.mkdir()
-        # 创建两个文件，间隔确保 mtime 不同
-        old = snapshots / 'snapshot-20260704.html'
-        new = snapshots / 'snapshot-20260715.html'
-        old.write_text('<old>')
-        new.write_text('<new>')
-        time.sleep(0.01)  # 确保 mtime 有差别
-        new.write_text('<newer>')
+        (snapshots / 'snapshot-20260704.html').write_text('<old>')
 
         from http_server_cli.cli import _bookmark_add
         _bookmark_add(['myapp', str(tmp_path), '-i', 'snapshots/snapshot-*.html'])
         captured = capsys.readouterr()
         assert '✅' in captured.out
-        # 应选取最近修改的文件（snapshot-20260715.html）
-        assert 'snapshot-20260715.html' in captured.out
+        # 应存储原始通配符模式，而非展开后的文件名
+        assert 'snapshots/snapshot-*.html' in captured.out
+        assert '20260704' not in captured.out  # 不应出现具体文件名
+
+        # 验证书签存储的是通配符模式
+        from http_server_cli.bookmark import BookmarkStore
+        bm = BookmarkStore().get('myapp')
+        assert bm['index_page'] == 'snapshots/snapshot-*.html'
 
     def test_bookmark_add_duplicate_name(self, tmp_path, capsys):
         """同名书签 → 报错"""
@@ -584,6 +584,42 @@ class TestBookmarkCLI:
         # argparse 后面的值会覆盖前面的
         args_str = ' '.join(captured['args'])
         assert 'other.html' in args_str
+
+    def test_bookmark_implicit_start_glob_resolve(self, tmp_path, capsys, monkeypatch):
+        """bookmark 含通配符 * 时，运行时解析为最近修改的文件"""
+        import os, time
+        snapshots = tmp_path / 'snapshots'
+        snapshots.mkdir()
+        (snapshots / 'snap-20260704.html').write_text('<old>')
+        time.sleep(0.01)
+        (snapshots / 'snap-20260715.html').write_text('<new>')
+
+        from http_server_cli.cli import _bookmark_add
+        _bookmark_add(['myapp', str(tmp_path), '-i', 'snapshots/snap-*.html'])
+        capsys.readouterr()
+
+        captured = {}
+        def fake_start(mgr, args):
+            captured['args'] = args
+
+        monkeypatch.setattr('http_server_cli.cli._COMMANDS',
+                            {'start': fake_start, 'bookmark': lambda m, a: None})
+        monkeypatch.setattr('http_server_cli.cli.ensure_storage', lambda: None)
+
+        import sys
+        old_argv = sys.argv
+        sys.argv = ['hs', 'myapp']
+        try:
+            from http_server_cli.cli import main
+            main()
+        except SystemExit:
+            pass
+        sys.argv = old_argv
+
+        # 应解析为最近修改的文件
+        args_str = ' '.join(captured['args'])
+        assert 'snap-20260715.html' in args_str
+        assert 'snap-20260704.html' not in args_str
 
     def test_bookmark_kill_by_name(self, tmp_path, capsys):
         """hs kill myapp 按书签名转换为路径"""
