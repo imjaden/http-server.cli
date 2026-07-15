@@ -697,3 +697,91 @@ class TestKillAllJson:
         assert result['data']['total'] == 1
         assert result['data']['killed'] == 1
         assert result['data']['entries'][0]['port'] == 8080
+
+
+class TestStartUrlOnly:
+    """start --url 输出格式"""
+
+    def test_url_only_new_start(self, temp_project, capsys):
+        """新启动成功，stdout 仅 URL 字符串（无 JSON 结构）"""
+        from http_server_cli.server import ServerManager
+        mgr = ServerManager()
+        mgr.start(path=temp_project, url_only=True)
+        captured = capsys.readouterr()
+        assert captured.out.startswith('http://')
+        assert not captured.out.strip().startswith('{')
+        assert '✅' not in captured.out
+        assert '"success"' not in captured.out
+
+    def test_url_only_already_running(self, monkeypatch, temp_project, capsys):
+        """已运行服务，返回已有服务的 URL"""
+        from http_server_cli.server import ServerManager
+        mgr = ServerManager()
+        mgr.start(path=temp_project)
+        capsys.readouterr()
+
+        monkeypatch.setattr('http_server_cli.server.is_port_in_use', lambda p: True)
+        monkeypatch.setattr('http_server_cli.registry.is_port_in_use', lambda p: True)
+        mgr.start(path=temp_project, url_only=True)
+        captured = capsys.readouterr()
+        assert captured.out.startswith('http://')
+
+    def test_url_only_already_running_custom_index(self, monkeypatch, temp_project, capsys):
+        """已运行 + 自定义 index，URL 含自定义 index"""
+        from http_server_cli.server import ServerManager
+        mgr = ServerManager()
+        mgr.start(path=temp_project, index_page='app.html')
+        capsys.readouterr()
+
+        monkeypatch.setattr('http_server_cli.server.is_port_in_use', lambda p: True)
+        monkeypatch.setattr('http_server_cli.registry.is_port_in_use', lambda p: True)
+        mgr.start(path=temp_project, url_only=True)
+        captured = capsys.readouterr()
+        assert '/app.html' in captured.out
+
+    def test_url_only_invalid_path(self, capsys):
+        """无效路径，stdout 空，stderr 有错误文本"""
+        from http_server_cli.server import ServerManager
+        mgr = ServerManager()
+        mgr.start(path='/nonexistent/path', url_only=True)
+        captured = capsys.readouterr()
+        assert captured.out == ''
+        assert 'Path does not exist' in captured.err
+
+    def test_url_only_no_port_available(self, monkeypatch, temp_project, capsys):
+        """端口全满，stdout 空，stderr 有错误文本"""
+        from http_server_cli.server import ServerManager
+        monkeypatch.setattr('http_server_cli.server.find_available_port', lambda sp: None)
+        mgr = ServerManager()
+        mgr.start(path=temp_project, url_only=True)
+        captured = capsys.readouterr()
+        assert captured.out == ''
+        assert 'all in use, cannot start' in captured.err
+
+    def test_url_only_with_custom_index(self, temp_project, capsys):
+        """index_page='app.html' 验证 URL 含 /app.html"""
+        from http_server_cli.server import ServerManager
+        mgr = ServerManager()
+        mgr.start(path=temp_project, url_only=True, index_page='app.html')
+        captured = capsys.readouterr()
+        assert captured.out.startswith('http://')
+        assert '/app.html' in captured.out
+
+    def test_url_only_default_index_omitted(self, temp_project, capsys):
+        """index_page='index.html' 验证 URL 不含 /index.html"""
+        from http_server_cli.server import ServerManager
+        mgr = ServerManager()
+        mgr.start(path=temp_project, url_only=True, index_page='index.html')
+        captured = capsys.readouterr()
+        url = captured.out.strip()
+        assert url.startswith('http://')
+        assert '/index.html' not in url
+
+    def test_url_only_invalid_index_page(self, temp_project, capsys):
+        """index_page='../etc/passwd' 应被校验拒绝，stdout 空"""
+        from http_server_cli.server import ServerManager
+        mgr = ServerManager()
+        mgr.start(path=temp_project, url_only=True, index_page='../etc/passwd')
+        captured = capsys.readouterr()
+        assert captured.out == ''
+        assert 'invalid' in captured.err

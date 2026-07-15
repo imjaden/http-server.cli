@@ -402,3 +402,44 @@ class TestSearchCommand:
         result = json.loads(captured.out)
         assert result['success'] is True
         assert result['data']['count'] >= 1
+
+
+class TestUrlFlag:
+    """hs start --url 标志测试"""
+
+    def test_url_json_mutual_exclusion(self, capsys):
+        """--url --json 同时给出应 exit 2，错误信息走 stderr"""
+        import sys
+        from unittest.mock import MagicMock
+
+        mgr = MagicMock()
+        mgr.config.port = 8080
+        mgr.config.domain = 'localhost'
+
+        with pytest.raises(SystemExit) as exc_info:
+            _COMMANDS['start'](mgr, ['.', '--url', '--json'])
+        assert exc_info.value.code == 2
+
+    def test_url_flag_passed_to_manager(self, monkeypatch):
+        """验证 url_only=True 正确传入 manager.start()"""
+        captured = {}
+
+        def fake_start(self, **kwargs):
+            captured['url_only'] = kwargs.get('url_only', False)
+            captured['json'] = kwargs.get('json', False)
+
+        monkeypatch.setattr('http_server_cli.server.ServerManager.start', fake_start)
+        monkeypatch.setattr('http_server_cli.cli.ensure_storage', lambda: None)
+
+        import sys
+        old_argv = sys.argv
+        sys.argv = ['hs', '.', '--url']
+        try:
+            from http_server_cli.cli import main
+            main()
+        except SystemExit:
+            pass
+        sys.argv = old_argv
+
+        assert captured.get('url_only') is True
+        assert captured.get('json') is False

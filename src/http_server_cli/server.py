@@ -4,11 +4,13 @@
 """
 
 import os
+import re
 import signal
 import subprocess
 import sys
 import time
 import webbrowser
+from urllib.parse import quote
 
 from http_server_cli.config import Config
 from http_server_cli.history import HistoryStore
@@ -32,6 +34,35 @@ from http_server_cli.utils import (
 
 from typing import Optional
 
+# ── index_page 校验 ──────────────────────────────────
+
+# raw string 中 \u4e00 原样传给 re 引擎，re 支持 \uXXXX Unicode 转义
+_INDEX_RE = re.compile(r'^[a-zA-Z0-9\u4e00-\u9fff][a-zA-Z0-9\u4e00-\u9fff._-]*$')
+
+
+def _validate_index_page(name: str) -> Optional[str]:
+    """校验 index_page 文件名。返回错误消息或 None。
+
+    允许: ASCII 字母数字 + 中文 + . _ -
+    拒绝: 空字符串、含 / 或 \\、含 ..
+    """
+    if not name:
+        return 'index_page cannot be empty'
+    if '..' in name or '/' in name or '\\' in name:
+        return f'index_page contains invalid path characters: {name}'
+    if not _INDEX_RE.match(name):
+        return f'index_page contains invalid characters: {name}'
+    return None
+
+
+def _build_url(domain: str, port: int, index_page: Optional[str] = None) -> str:
+    """构建完整 URL。默认 index.html 不追加后缀，其他 index_page 经 URL 编码后追加。"""
+    url = f'http://{domain}:{port}'
+    if index_page and index_page != 'index.html':
+        url += f'/{quote(index_page, safe="")}'
+    return url
+
+
 class ServerManager:
     """HTTP 服务全生命周期管理。"""
 
@@ -43,7 +74,7 @@ class ServerManager:
 
     def start(self, path: Optional[str] = None, open_browser: bool = False,
               daemon: bool = False, foreground: bool = False, json: bool = False,
-              index_page: Optional[str] = None) -> None:
+              url_only: bool = False, index_page: Optional[str] = None) -> Optional[bool]:
         """
         启动 HTTP 服务。
 
@@ -73,11 +104,27 @@ class ServerManager:
                 latest = max(matches, key=os.path.getmtime)
                 index_page = os.path.relpath(latest, abs_path)
 
+        # ── 校验 index_page（L0） ──
+        if index_page:
+            err = _validate_index_page(index_page)
+            if err:
+                if url_only:
+                    print(f'❌ {err}', file=sys.stderr)
+                    return False
+                elif json:
+                    json_output(False, 'start', error=err)
+                else:
+                    eprint(err, '❌')
+                return
+
         domain = self.config.domain
         default_port = self.config.port
 
         if not os.path.isdir(abs_path):
-            if json:
+            if url_only:
+                print(f'❌ Path does not exist or is not a directory: {format_path(abs_path)}', file=sys.stderr)
+                return False
+            elif json:
                 json_output(False, 'start', error=f'Path does not exist or is not a directory: {format_path(abs_path)}')
             else:
                 eprint(f'Path does not exist or is not a directory: {format_path(abs_path)}', '❌')
@@ -93,7 +140,13 @@ class ServerManager:
                 stats = get_process_stats(entry.get('pid'))
                 log_path = os.path.join(LOG_DIR, f'{port}.log')
                 
-                if json:
+                if url_only:
+                    url = _build_url(domain, port, index_page or entry.get('index_page'))
+                    print(url)
+                    if open_browser:
+                        webbrowser.open(url)
+                    return True
+                elif json:
                     url = f'http://{domain}:{port}'
                     if index_page:
                         url += f'/{index_page}'
@@ -129,18 +182,24 @@ class ServerManager:
                 return
 
             else:
-                eprint('Found stale registry entry, cleaning up before restart', '🔄')
+                if url_only:
+                    print('🔄 Found stale registry entry, cleaning up before restart', file=sys.stderr)
+                else:
+                    eprint('Found stale registry entry, cleaning up before restart', '🔄')
                 self.registry.remove(path=abs_path)
 
         # ── 查找可用端口 ──
         port = find_available_port(default_port)
         if port is None:
-            if json:
+            if url_only:
+                print(f'❌ Ports {default_port}-{MAX_PORT} all in use, cannot start', file=sys.stderr)
+                return False
+            elif json:
                 json_output(False, 'start', error=f'Ports {default_port}-{MAX_PORT} all in use, cannot start')
             else:
                 eprint(f'Ports {default_port}-{MAX_PORT} all in use, cannot start', '❌')
             return
-        if not json and port != default_port:
+        if not json and not url_only and port != default_port:
             eprint(f'Port {default_port} in use, auto-assigned port {port}', '🔀')
 
         # ── 启动后台进程 ──
@@ -157,25 +216,37 @@ class ServerManager:
                     preexec_fn=os.setsid if hasattr(os, 'setsid') else None,
                 )
         except PermissionError as e:
-            if json:
+            if url_only:
+                print(f'❌ Permission denied writing log or starting process: {e}', file=sys.stderr)
+                return False
+            elif json:
                 json_output(False, 'start', error=f'Permission denied writing log or starting process: {e}')
             else:
                 eprint(f'Permission denied writing log or starting process: {e}', '❌')
             return
         except FileNotFoundError as e:
-            if json:
+            if url_only:
+                print(f'❌ Python interpreter not found: {e}', file=sys.stderr)
+                return False
+            elif json:
                 json_output(False, 'start', error=f'Python interpreter not found: {e}')
             else:
                 eprint(f'Python interpreter not found: {e}', '❌')
             return
         except OSError as e:
-            if json:
+            if url_only:
+                print(f'❌ System error (port/resource unavailable): {e}', file=sys.stderr)
+                return False
+            elif json:
                 json_output(False, 'start', error=f'System error (port/resource unavailable): {e}')
             else:
                 eprint(f'System error (port/resource unavailable): {e}', '❌')
             return
         except Exception as e:
-            if json:
+            if url_only:
+                print(f'❌ Start failed: {e}', file=sys.stderr)
+                return False
+            elif json:
                 json_output(False, 'start', error=f'Start failed: {e}')
             else:
                 eprint(f'Start failed: {e}', '❌')
@@ -198,7 +269,14 @@ class ServerManager:
         duration = format_duration(started_at)
         log_path_display = format_path(log_path)
 
-        if json:
+        if url_only:
+            url = _build_url(domain, port, index if index != 'index.html' else None)
+            print(url)
+            if open_browser:
+                time.sleep(0.5)
+                webbrowser.open(url)
+            return True
+        elif json:
             url = f'http://{domain}:{port}'
             if index:
                 url += f'/{index}'
@@ -232,6 +310,9 @@ class ServerManager:
 
         if json:
             return  # JSON mode skips interactive behavior
+
+        if url_only:
+            return True  # URL mode skips interactive behavior
 
         if daemon:
             eprint(f'Press Ctrl+C to stop log tail, service still running in background', '🔄')

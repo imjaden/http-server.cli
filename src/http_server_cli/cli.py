@@ -26,6 +26,7 @@ _HELP = """http-server-cli v{version} — 忘记端口，只管预览
   hs ~/my-site -o          指定目录启动 + 打开浏览器
   hs . -i app.html         指定首页文件
   hs . -d                  后台运行（不占用终端）
+  hs . --url               仅返回服务 URL（与 --json 互斥）
   hs                       默认等于 hs .（当前目录启动）
 
   快捷方式: hs start [path]  启动服务;  -o 打开浏览器  -d 后台  -i <file> 首页
@@ -45,6 +46,7 @@ _HELP = """http-server-cli v{version} — 忘记端口，只管预览
   hs search <keyword>      搜索实例（按端口或路径模糊匹配，忽略大小写）
 
   --json                   所有命令后追加此参数可获取结构化 JSON 输出
+  --url                    启动后仅输出完整 URL 字符串（仅 start，与 --json 互斥）
 
 ━━━ 图形与集成 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -147,10 +149,16 @@ def _cmd_start(manager, args):
     parser.add_argument('-f', '--foreground', action='store_true')
     parser.add_argument('-i', '--index', nargs='*', default=None, help='首页文件名（默认 index.html）')
     parser.add_argument('--json', action='store_true')
+    parser.add_argument('--url', action='store_true')
     try:
         parsed, unknown = parser.parse_known_args(args)
     except SystemExit:
         return
+    # ── --url 与 --json 互斥 ──
+    # 注: CLI 层互斥错误也走 stderr，保证 "$(hs . --url 2>/dev/null)" 不受污染
+    if parsed.url and parsed.json:
+        print('⚠️ --url and --json are mutually exclusive', file=sys.stderr)
+        sys.exit(2)
     # 处理 --index 通配符展开（Shell 展开为多个文件时取最近修改的）
     index_page = parsed.index
     if isinstance(index_page, list):
@@ -173,14 +181,18 @@ def _cmd_start(manager, args):
             existing = [f for f in all_html if os.path.exists(f)]
             if existing:
                 path = max(existing, key=os.path.getmtime)
-    manager.start(
+    result = manager.start(
         path=path,
         open_browser=parsed.open,
         daemon=parsed.daemon,
         foreground=parsed.foreground,
-        json=parsed.json,
+        json=parsed.json if not parsed.url else False,
+        url_only=parsed.url,
         index_page=index_page,
     )
+    # --url 模式根据返回值设置退出码
+    if parsed.url:
+        sys.exit(0 if result else 1)
 
 @_register
 def _cmd_list(manager, args):
