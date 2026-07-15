@@ -23,7 +23,8 @@ class HistoryStore:
         return self._data.get('records', [])
 
     def add(self, port: int, path: str, started_at: str, domain: str = 'localhost',
-            daemon: bool = False, foreground: bool = False) -> None:
+            daemon: bool = False, foreground: bool = False,
+            bookmark: Optional[str] = None) -> None:
         """添加一条历史记录（服务关闭时更新 ended_at 和 memory）"""
         from http_server_cli.utils import get_process_stats
         # 先查一下是否已有同 port+path 的未结束记录
@@ -47,6 +48,7 @@ class HistoryStore:
                 'ended_at': None,
                 'memory_mb': 0,
                 'domain': domain,
+                'bookmark': bookmark,
             })
         self.save()
 

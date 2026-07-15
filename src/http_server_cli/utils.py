@@ -19,6 +19,7 @@ DATA_DIR = os.path.join(HOME, '.http-server-cli')
 CONFIG_PATH = os.path.join(DATA_DIR, 'config.json')
 REGISTRY_PATH = os.path.join(DATA_DIR, 'registry.json')
 HISTORY_PATH = os.path.join(DATA_DIR, 'history.json')
+BOOKMARKS_PATH = os.path.join(DATA_DIR, 'bookmarks.json')
 LOG_DIR = os.path.join(DATA_DIR, 'logs')
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 MAX_PORT = 10000
@@ -50,6 +51,8 @@ def ensure_storage() -> None:
         write_json(REGISTRY_PATH, {'servers': []})
     if not os.path.exists(HISTORY_PATH):
         write_json(HISTORY_PATH, {'records': []})
+    if not os.path.exists(BOOKMARKS_PATH):
+        write_json(BOOKMARKS_PATH, {'bookmarks': []})
 
 def read_json(filepath: str) -> dict:
     """安全读 JSON，失败返回空 dict"""

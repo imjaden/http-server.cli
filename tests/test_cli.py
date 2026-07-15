@@ -443,3 +443,144 @@ class TestUrlFlag:
 
         assert captured.get('url_only') is True
         assert captured.get('json') is False
+
+
+class TestBookmarkCLI:
+    """hs bookmark 集成测试"""
+
+    def test_bookmark_add_default_cwd(self, tmp_path, capsys):
+        """hs bookmark add myapp 默认取 CWD"""
+        from http_server_cli.cli import _bookmark_add
+        _bookmark_add(['myapp', str(tmp_path)])
+        captured = capsys.readouterr()
+        assert '✅' in captured.out
+        assert 'myapp' in captured.out
+
+    def test_bookmark_add_with_index(self, tmp_path, capsys):
+        """hs bookmark add myapp path -i app.html"""
+        from http_server_cli.cli import _bookmark_add
+        _bookmark_add(['myapp', str(tmp_path), '-i', 'app.html'])
+        captured = capsys.readouterr()
+        assert '✅' in captured.out
+        assert 'app.html' in captured.out
+
+    def test_bookmark_add_invalid_index(self, tmp_path, capsys):
+        """-i '../../etc/passwd' 应被拒绝"""
+        from http_server_cli.cli import _bookmark_add
+        _bookmark_add(['myapp', str(tmp_path), '-i', '../../etc/passwd'])
+        captured = capsys.readouterr()
+        assert '❌' in captured.err or 'invalid' in captured.err
+
+    def test_bookmark_add_duplicate_name(self, tmp_path, capsys):
+        """同名书签 → 报错"""
+        from http_server_cli.cli import _bookmark_add
+        _bookmark_add(['myapp', str(tmp_path)])
+        capsys.readouterr()
+        _bookmark_add(['myapp', str(tmp_path)])
+        captured = capsys.readouterr()
+        assert 'already exists' in captured.err
+
+    def test_bookmark_show(self, tmp_path, capsys):
+        """hs bookmark show 显示详情"""
+        from http_server_cli.cli import _bookmark_add, _bookmark_show
+        _bookmark_add(['myapp', str(tmp_path)])
+        capsys.readouterr()
+        _bookmark_show(['myapp'])
+        captured = capsys.readouterr()
+        assert 'myapp' in captured.out
+
+    def test_bookmark_show_not_found(self, capsys):
+        """查询不存在的书签 → 错误"""
+        from http_server_cli.cli import _bookmark_show
+        _bookmark_show(['nope'])
+        captured = capsys.readouterr()
+        assert 'not found' in captured.err
+
+    def test_bookmark_implicit_start(self, tmp_path, capsys, monkeypatch):
+        """hs myapp 隐式启动 → _cmd_start 被调用并收到正确 path"""
+        from http_server_cli.cli import _bookmark_add
+        _bookmark_add(['myapp', str(tmp_path), '-i', 'app.html'])
+        capsys.readouterr()
+
+        captured = {}
+        def fake_start(mgr, args):
+            captured['args'] = args
+
+        monkeypatch.setattr('http_server_cli.cli._COMMANDS',
+                            {'start': fake_start, 'bookmark': lambda m, a: None})
+        monkeypatch.setattr('http_server_cli.cli.ensure_storage', lambda: None)
+
+        import sys
+        old_argv = sys.argv
+        sys.argv = ['hs', 'myapp', '-o']
+        try:
+            from http_server_cli.cli import main
+            main()
+        except SystemExit:
+            pass
+        sys.argv = old_argv
+
+        assert 'args' in captured
+        # bookmark path 应作为第一个 arg 传入
+        assert str(tmp_path) in captured['args']
+        # bookmark 的 index_page 应通过 -i 传入
+        assert '-i' in captured['args']
+        assert 'app.html' in captured['args']
+        # 用户显式 flag 保留
+        assert '-o' in captured['args']
+
+    def test_bookmark_implicit_start_override(self, tmp_path, capsys, monkeypatch):
+        """hs myapp -i other.html 运行时覆盖 bookmark 默认 index"""
+        from http_server_cli.cli import _bookmark_add
+        _bookmark_add(['myapp', str(tmp_path), '-i', 'app.html'])
+        capsys.readouterr()
+
+        captured = {}
+        def fake_start(mgr, args):
+            captured['args'] = args
+
+        monkeypatch.setattr('http_server_cli.cli._COMMANDS',
+                            {'start': fake_start, 'bookmark': lambda m, a: None})
+        monkeypatch.setattr('http_server_cli.cli.ensure_storage', lambda: None)
+
+        import sys
+        old_argv = sys.argv
+        sys.argv = ['hs', 'myapp', '-i', 'other.html']
+        try:
+            from http_server_cli.cli import main
+            main()
+        except SystemExit:
+            pass
+        sys.argv = old_argv
+
+        # 用户覆盖的 -i other.html 应该在 bookmark 的 -i app.html 之后
+        # argparse 后面的值会覆盖前面的
+        args_str = ' '.join(captured['args'])
+        assert 'other.html' in args_str
+
+    def test_bookmark_kill_by_name(self, tmp_path, capsys):
+        """hs kill myapp 按书签名转换为路径"""
+        from http_server_cli.cli import _bookmark_add, _cmd_kill
+        from unittest.mock import MagicMock
+        _bookmark_add(['myapp', str(tmp_path)])
+        capsys.readouterr()
+
+        mgr = MagicMock()
+        _cmd_kill(mgr, ['myapp'])
+        # 验证 manager.kill 被调用时 arg 已转换为路径
+        mgr.kill.assert_called_once()
+        call_arg = mgr.kill.call_args[0][0]
+        assert call_arg == str(tmp_path)
+
+    def test_bookmark_status_by_name(self, tmp_path, capsys):
+        """hs status myapp 按书签名转换为路径"""
+        from http_server_cli.cli import _bookmark_add, _cmd_status
+        from unittest.mock import MagicMock
+        _bookmark_add(['myapp', str(tmp_path)])
+        capsys.readouterr()
+
+        mgr = MagicMock()
+        _cmd_status(mgr, ['myapp'])
+        mgr.status.assert_called_once()
+        call_arg = mgr.status.call_args[1]['arg']
+        assert call_arg == str(tmp_path)

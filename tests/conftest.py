@@ -47,6 +47,10 @@ def _isolate_data_dir(monkeypatch):
     # server 模块（from utils import LOG_DIR）
     monkeypatch.setattr('http_server_cli.server.LOG_DIR', log_dir)
 
+    # bookmark 模块（from utils import BOOKMARKS_PATH）
+    monkeypatch.setattr('http_server_cli.bookmark.BOOKMARKS_PATH',
+                        os.path.join(tmp, 'bookmarks.json'))
+
     os.makedirs(log_dir, exist_ok=True)
     yield
     shutil.rmtree(tmp, ignore_errors=True)

@@ -226,6 +226,9 @@ def _list_servers(manager, json: bool = False, port_only: bool = False,
     mreg = ManagedRegistry()
     managed_servers = mreg.active_servers()
 
+    from http_server_cli.bookmark import BookmarkStore as BStore
+    bm_store = BStore()
+
     if json:
         user_data = []
         for entry in user_servers:
@@ -239,6 +242,7 @@ def _list_servers(manager, json: bool = False, port_only: bool = False,
                 'started_at': entry.get('started_at'),
                 'stats': stats,
                 'duration': format_duration(entry.get('started_at', '')),
+                'bookmark': bm_store.get_for_path(entry['path']),
             })
         managed_data = []
         for entry in managed_servers:
@@ -288,13 +292,15 @@ def _list_servers(manager, json: bool = False, port_only: bool = False,
         pid = entry.get('pid', '-')
         started = entry.get('started_at', '-')
         is_current = entry['path'] == os.getcwd()
+        bm_name = bm_store.get_for_path(entry['path'])
+        bm_label = f'  [{bm_name}]' if bm_name else ''
         if is_current:
-            print(f'📍  http://{domain}:{port} （current）')
+            print(f'📍  http://{domain}:{port}{bm_label} （current）')
         else:
             status_icon = '✅' if alive else '❌'
             status_text = '' if alive else ' (stopped)'
             mode_tag = ' 🖥' if entry.get('daemon') else (' ⌨' if entry.get('foreground') else '')
-            print(f'{status_icon}  http://{domain}:{port}{status_text}{mode_tag}')
+            print(f'{status_icon}  http://{domain}:{port}{status_text}{mode_tag}{bm_label}')
         print(f'    📁  {path}')
         stats = get_process_stats(entry.get('pid'))
         duration = format_duration(started)
@@ -328,7 +334,14 @@ def _cmd_status(manager, args):
         parsed, _ = parser.parse_known_args(args)
     except SystemExit:
         return
-    manager.status(arg=parsed.arg, json=parsed.json)
+    arg = parsed.arg
+    # bookmark 名称解析：非 digit → 查 bookmark
+    if arg and not arg.isdigit():
+        from http_server_cli.bookmark import BookmarkStore
+        bm = BookmarkStore().get(arg)
+        if bm:
+            arg = bm['path']
+    manager.status(arg=arg, json=parsed.json)
 
 @_register
 def _cmd_kill(manager, args):
@@ -350,6 +363,12 @@ def _cmd_kill(manager, args):
     if arg is None:
         manager.kill('', json=parsed.json)
     else:
+        # bookmark 名称解析：非 digit 且非 html 文件 → 查 bookmark
+        if arg and not arg.isdigit() and not arg.lower().endswith(('.html', '.htm')):
+            from http_server_cli.bookmark import BookmarkStore
+            bm = BookmarkStore().get(arg)
+            if bm:
+                arg = bm['path']
         manager.kill(arg, json=parsed.json)
 
 @_register
@@ -679,6 +698,137 @@ def _manage_mcp(subcmd: str) -> None:
         from http_server_cli.mcp import serve_sse
         serve_sse(port=8181, daemon=True)
 
+# ── bookmark 子命令 ────────────────────────────────────
+
+@_register
+def _cmd_bookmark(manager, args):
+    """hs bookmark — 书签管理"""
+    sub = args[0] if args else None
+    if sub == 'add':
+        _bookmark_add(args[1:])
+    elif sub == 'list':
+        _bookmark_list(args[1:])
+    elif sub == 'show':
+        _bookmark_show(args[1:])
+    elif sub == 'remove':
+        _bookmark_remove(args[1:])
+    elif sub in ('help', '-h', '--help'):
+        _bookmark_help()
+    else:
+        print('❌ Usage: hs bookmark <add|list|show|remove> [args]', file=sys.stderr)
+        _bookmark_help()
+
+
+def _bookmark_help():
+    print('━━━ hs bookmark ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    print('  hs bookmark add <name> [path] [-i index]     Add bookmark')
+    print('  hs bookmark list                              List all')
+    print('  hs bookmark show <name>                       Show details')
+    print('  hs bookmark remove <name>                     Remove')
+    print()
+    print('  After adding, use the name directly:')
+    print('    hs <name> --url        Get URL')
+    print('    hs <name> -o           Start + open browser')
+    print('    hs kill <name>         Stop service')
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+
+
+def _bookmark_add(args):
+    parser = argparse.ArgumentParser(prog='hs bookmark add', add_help=False)
+    parser.add_argument('name')
+    parser.add_argument('path', nargs='?', default=None)
+    parser.add_argument('-i', '--index', default=None)
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
+        return
+
+    from http_server_cli.bookmark import BookmarkStore
+    from http_server_cli.server import _validate_index_page
+
+    # 名称校验
+    name_err = BookmarkStore.validate_name(parsed.name)
+    if name_err:
+        print(f'❌ {name_err}', file=sys.stderr)
+        return
+    if parsed.name in _COMMANDS:
+        print(f"❌ '{parsed.name}' conflicts with built-in command", file=sys.stderr)
+        return
+
+    # index_page 校验
+    if parsed.index:
+        err = _validate_index_page(parsed.index)
+        if err:
+            print(f'❌ {err}', file=sys.stderr)
+            return
+
+    # 路径处理
+    from http_server_cli.utils import resolve_path, format_path
+    path = parsed.path or os.getcwd()
+    abs_path = resolve_path(path)
+    if not os.path.isdir(abs_path):
+        print(f'❌ Path does not exist or is not a directory: {format_path(abs_path)}', file=sys.stderr)
+        return
+
+    store = BookmarkStore()
+    try:
+        store.add(parsed.name, abs_path, parsed.index)
+        print(f"✅ Bookmark '{parsed.name}' → {format_path(abs_path)}")
+        if parsed.index:
+            print(f"   📄 Default index: {parsed.index}")
+    except ValueError as e:
+        print(f'❌ {e}', file=sys.stderr)
+
+
+def _bookmark_list(args):
+    from http_server_cli.bookmark import BookmarkStore
+    from http_server_cli.utils import format_path
+    store = BookmarkStore()
+    bookmarks = store.list_all()
+    if not bookmarks:
+        print('No bookmarks registered')
+        return
+    print(f'📊 {len(bookmarks)} bookmark(s):')
+    print()
+    for bm in bookmarks:
+        print(f"  📌 {bm['name']}")
+        print(f"     📁 {format_path(bm['path'])}")
+        if bm.get('index_page'):
+            print(f"     📄 Default index: {bm['index_page']}")
+        print()
+
+
+def _bookmark_show(args):
+    if not args:
+        print('❌ Usage: hs bookmark show <name>', file=sys.stderr)
+        return
+    from http_server_cli.bookmark import BookmarkStore
+    from http_server_cli.utils import format_path
+    name = args[0]
+    store = BookmarkStore()
+    bm = store.get(name)
+    if not bm:
+        print(f"❌ bookmark '{name}' not found", file=sys.stderr)
+        return
+    print(f"📌 {bm['name']}")
+    print(f"   📁 {format_path(bm['path'])}")
+    if bm.get('index_page'):
+        print(f"   📄 Default index: {bm['index_page']}")
+    print(f"   🕐 Created: {bm.get('created_at', '-')}")
+
+
+def _bookmark_remove(args):
+    if not args:
+        print('❌ Usage: hs bookmark remove <name>', file=sys.stderr)
+        return
+    from http_server_cli.bookmark import BookmarkStore
+    name = args[0]
+    store = BookmarkStore()
+    if store.remove(name):
+        print(f"✅ Bookmark '{name}' removed")
+    else:
+        print(f"❌ bookmark '{name}' not found", file=sys.stderr)
+
 # ── main ───────────────────────────────────────────────
 
 def main():
@@ -701,9 +851,18 @@ def main():
             parsed.args = unknown[:]
         cmd = 'start'
     elif cmd not in _COMMANDS:
-        # 快捷方式：路径隐式作为 start 的 path 参数
-        # 覆盖：./ ../ / ~ 显式路径，以及 Shell 展开后无前缀的相对路径/通配符
-        if (cmd.startswith(('.', '/', '~')) or cmd == '..'
+        # ➊ 先查 bookmark
+        from http_server_cli.bookmark import BookmarkStore
+        bm_store = BookmarkStore()
+        bm = bm_store.get(cmd)
+        if bm:
+            implicit = [bm['path']]
+            if bm.get('index_page'):
+                implicit += ['-i', bm['index_page']]
+            parsed.args = implicit + parsed.args
+            cmd = 'start'
+        # ➋ 回退到路径快捷方式
+        elif (cmd.startswith(('.', '/', '~')) or cmd == '..'
                 or os.path.exists(cmd) or glob.glob(cmd)):
             parsed.args = [parsed.command] + parsed.args
             cmd = 'start'
