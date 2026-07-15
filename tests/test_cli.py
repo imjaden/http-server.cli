@@ -471,6 +471,13 @@ class TestBookmarkCLI:
         captured = capsys.readouterr()
         assert '❌' in captured.err or 'invalid' in captured.err
 
+    def test_bookmark_add_subdirectory_index(self, tmp_path, capsys):
+        """-i 'subdir/page.html' 子目录路径应合法"""
+        from http_server_cli.cli import _bookmark_add
+        _bookmark_add(['myapp', str(tmp_path), '-i', 'subdir/page.html'])
+        captured = capsys.readouterr()
+        assert '✅' in captured.out
+
     def test_bookmark_add_duplicate_name(self, tmp_path, capsys):
         """同名书签 → 报错"""
         from http_server_cli.cli import _bookmark_add

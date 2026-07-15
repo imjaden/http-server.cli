@@ -785,3 +785,20 @@ class TestStartUrlOnly:
         captured = capsys.readouterr()
         assert captured.out == ''
         assert 'invalid' in captured.err
+
+    def test_url_only_subdirectory_index(self, temp_project, capsys):
+        """index_page='subdir/page.html' 子目录路径应合法，URL 保留 /"""
+        from http_server_cli.server import ServerManager
+        mgr = ServerManager()
+        mgr.start(path=temp_project, url_only=True, index_page='subdir/page.html')
+        captured = capsys.readouterr()
+        assert 'subdir/page.html' in captured.out
+
+    def test_url_only_absolute_index_rejected(self, temp_project, capsys):
+        """index_page='/etc/passwd' 绝对路径应被拒绝"""
+        from http_server_cli.server import ServerManager
+        mgr = ServerManager()
+        mgr.start(path=temp_project, url_only=True, index_page='/etc/passwd')
+        captured = capsys.readouterr()
+        assert captured.out == ''
+        assert 'absolute' in captured.err
