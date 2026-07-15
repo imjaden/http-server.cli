@@ -611,3 +611,25 @@ class TestBookmarkCLI:
         mgr.status.assert_called_once()
         call_arg = mgr.status.call_args[1]['arg']
         assert call_arg == str(tmp_path)
+
+    def test_bookmark_update_index(self, tmp_path, capsys):
+        """hs bookmark update myapp -i new.html"""
+        from http_server_cli.cli import _bookmark_add, _bookmark_update, _bookmark_show
+        _bookmark_add(['myapp', str(tmp_path), '-i', 'old.html'])
+        capsys.readouterr()
+
+        _bookmark_update(['myapp', '-i', 'new.html'])
+        captured = capsys.readouterr()
+        assert '✅' in captured.out
+        assert 'new.html' in captured.out
+
+    def test_bookmark_update_path(self, tmp_path, capsys):
+        """hs bookmark update myapp /new/path"""
+        from http_server_cli.cli import _bookmark_add, _bookmark_update, _bookmark_show
+        _bookmark_add(['myapp', str(tmp_path)])
+        capsys.readouterr()
+
+        # update to same path (tmp_path is still valid)
+        _bookmark_update(['myapp', str(tmp_path)])
+        captured = capsys.readouterr()
+        assert '✅' in captured.out

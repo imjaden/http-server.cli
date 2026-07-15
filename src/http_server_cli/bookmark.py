@@ -105,6 +105,33 @@ class BookmarkStore:
         self._write_all(new_list)
         return True
 
+    def update(self, name: str, path: Optional[str] = None,
+               index_page: Optional[str] = None) -> bool:
+        """更新书签的 path 或 index_page。返回 True 表示成功，False 表示未找到。
+
+        - path=None: 保持原值
+        - index_page=None: 保持原值。传空字符串 '' 清除 index_page。
+        """
+        bookmarks = self._read_all()
+        for b in bookmarks:
+            if b['name'] == name:
+                if path is not None:
+                    # 路径唯一约束：新 path 不与其它书签冲突
+                    if path != b['path']:
+                        if any(b2['path'] == path and b2['name'] != name
+                               for b2 in bookmarks):
+                            existing = next(
+                                b2['name'] for b2 in bookmarks
+                                if b2['path'] == path and b2['name'] != name)
+                            raise ValueError(
+                                f"path already bookmarked as '{existing}'")
+                    b['path'] = path
+                if index_page is not None:
+                    b['index_page'] = index_page if index_page else None
+                self._write_all(bookmarks)
+                return True
+        return False
+
     def get(self, name: str) -> Optional[dict]:
         """根据名称获取书签，未找到返回 None。"""
         for b in self._read_all():

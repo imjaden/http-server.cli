@@ -67,6 +67,7 @@ _HELP = """http-server-cli v{version} — 忘记端口，只管预览
 ━━━ 书签 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   hs bookmark add <name> [path] [-i index]    注册书签（path 默认 CWD）
+  hs bookmark update <name> [path] [-i index]  更新书签路径或首页
   hs bookmark list                             列出所有书签
   hs bookmark show <name>                      查看书签详情
   hs bookmark remove <name>                    删除书签
@@ -718,6 +719,8 @@ def _cmd_bookmark(manager, args):
     sub = args[0] if args else None
     if sub == 'add':
         _bookmark_add(args[1:])
+    elif sub == 'update':
+        _bookmark_update(args[1:])
     elif sub == 'list':
         _bookmark_list(args[1:])
     elif sub == 'show':
@@ -727,13 +730,14 @@ def _cmd_bookmark(manager, args):
     elif sub in ('help', '-h', '--help'):
         _bookmark_help()
     else:
-        print('❌ Usage: hs bookmark <add|list|show|remove> [args]', file=sys.stderr)
+        print('❌ Usage: hs bookmark <add|update|list|show|remove> [args]', file=sys.stderr)
         _bookmark_help()
 
 
 def _bookmark_help():
     print('━━━ hs bookmark ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
     print('  hs bookmark add <name> [path] [-i index]     Add bookmark')
+    print('  hs bookmark update <name> [path] [-i index]   Update path and/or index')
     print('  hs bookmark list                              List all')
     print('  hs bookmark show <name>                       Show details')
     print('  hs bookmark remove <name>                     Remove')
@@ -849,6 +853,64 @@ def _bookmark_remove(args):
         print(f"✅ Bookmark '{name}' removed")
     else:
         print(f"❌ bookmark '{name}' not found", file=sys.stderr)
+
+
+def _bookmark_update(args):
+    parser = argparse.ArgumentParser(prog='hs bookmark update', add_help=False)
+    parser.add_argument('name')
+    parser.add_argument('path', nargs='?', default=None)
+    parser.add_argument('-i', '--index', default=None)
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
+        return
+
+    from http_server_cli.bookmark import BookmarkStore
+    from http_server_cli.server import _validate_index_page
+    from http_server_cli.utils import resolve_path, format_path
+
+    store = BookmarkStore()
+    existing = store.get(parsed.name)
+    if not existing:
+        print(f"❌ bookmark '{parsed.name}' not found", file=sys.stderr)
+        return
+
+    # 路径处理
+    path = None
+    if parsed.path is not None:
+        abs_path = resolve_path(parsed.path)
+        if not os.path.isdir(abs_path):
+            print(f'❌ Path does not exist: {format_path(abs_path)}', file=sys.stderr)
+            return
+        path = abs_path
+
+    # 通配符展开 + 校验
+    index_page = parsed.index
+    if index_page is not None:
+        abs_path_for_glob = path or existing['path']
+        if '*' in index_page:
+            pattern = os.path.join(abs_path_for_glob, index_page)
+            matches = glob.glob(pattern)
+            if matches:
+                latest = max(matches, key=os.path.getmtime)
+                index_page = os.path.relpath(latest, abs_path_for_glob)
+        if index_page:  # 非空字符串才校验
+            err = _validate_index_page(index_page)
+            if err:
+                print(f'❌ {err}', file=sys.stderr)
+                return
+        else:
+            index_page = ''  # 空字符串 → 清除
+
+    try:
+        store.update(parsed.name, path=path, index_page=index_page)
+        updated = store.get(parsed.name)
+        print(f"✅ Bookmark '{parsed.name}' updated")
+        print(f"   📁 {format_path(updated['path'])}")
+        if updated.get('index_page'):
+            print(f"   📄 Default index: {updated['index_page']}")
+    except ValueError as e:
+        print(f'❌ {e}', file=sys.stderr)
 
 # ── main ───────────────────────────────────────────────
 

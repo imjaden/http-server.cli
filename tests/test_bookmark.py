@@ -205,3 +205,56 @@ class TestBookmarkPersistence:
         store.remove('myapp')
         store2 = BookmarkStore()
         assert store2.get('myapp') is None
+
+
+class TestBookmarkUpdate:
+    """BookmarkStore.update 操作"""
+
+    def test_update_path(self):
+        store = BookmarkStore()
+        store.add('myapp', '/tmp/old-path')
+        assert store.update('myapp', path='/tmp/new-path') is True
+        bm = store.get('myapp')
+        assert bm['path'] == '/tmp/new-path'
+
+    def test_update_index(self):
+        store = BookmarkStore()
+        store.add('myapp', '/tmp/project', index_page='old.html')
+        assert store.update('myapp', index_page='new.html') is True
+        bm = store.get('myapp')
+        assert bm['index_page'] == 'new.html'
+
+    def test_update_clear_index(self):
+        """传空字符串清除 index_page"""
+        store = BookmarkStore()
+        store.add('myapp', '/tmp/project', index_page='app.html')
+        store.update('myapp', index_page='')
+        bm = store.get('myapp')
+        assert bm['index_page'] is None
+
+    def test_update_nonexistent(self):
+        store = BookmarkStore()
+        assert store.update('nope', path='/tmp/x') is False
+
+    def test_update_path_conflict(self):
+        """更新 path 时与其他书签冲突 → ValueError"""
+        store = BookmarkStore()
+        store.add('a', '/tmp/project-a')
+        store.add('b', '/tmp/project-b')
+        with pytest.raises(ValueError, match='already bookmarked'):
+            store.update('a', path='/tmp/project-b')
+
+    def test_update_same_path_ok(self):
+        """更新为同一 path 应成功（不触发唯一约束）"""
+        store = BookmarkStore()
+        store.add('myapp', '/tmp/project')
+        assert store.update('myapp', path='/tmp/project') is True
+
+    def test_update_partial(self):
+        """仅传 path 时 index_page 保持不变"""
+        store = BookmarkStore()
+        store.add('myapp', '/tmp/old', index_page='keep.html')
+        store.update('myapp', path='/tmp/new')
+        bm = store.get('myapp')
+        assert bm['path'] == '/tmp/new'
+        assert bm['index_page'] == 'keep.html'
