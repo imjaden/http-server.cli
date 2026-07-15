@@ -478,6 +478,26 @@ class TestBookmarkCLI:
         captured = capsys.readouterr()
         assert '✅' in captured.out
 
+    def test_bookmark_add_glob_index(self, tmp_path, capsys):
+        """-i 'snapshots/*.html' 通配符应展开为最近修改的文件"""
+        import os, time
+        snapshots = tmp_path / 'snapshots'
+        snapshots.mkdir()
+        # 创建两个文件，间隔确保 mtime 不同
+        old = snapshots / 'snapshot-20260704.html'
+        new = snapshots / 'snapshot-20260715.html'
+        old.write_text('<old>')
+        new.write_text('<new>')
+        time.sleep(0.01)  # 确保 mtime 有差别
+        new.write_text('<newer>')
+
+        from http_server_cli.cli import _bookmark_add
+        _bookmark_add(['myapp', str(tmp_path), '-i', 'snapshots/snapshot-*.html'])
+        captured = capsys.readouterr()
+        assert '✅' in captured.out
+        # 应选取最近修改的文件（snapshot-20260715.html）
+        assert 'snapshot-20260715.html' in captured.out
+
     def test_bookmark_add_duplicate_name(self, tmp_path, capsys):
         """同名书签 → 报错"""
         from http_server_cli.cli import _bookmark_add

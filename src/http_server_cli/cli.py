@@ -767,14 +767,7 @@ def _bookmark_add(args):
         print(f"❌ '{parsed.name}' conflicts with built-in command", file=sys.stderr)
         return
 
-    # index_page 校验
-    if parsed.index:
-        err = _validate_index_page(parsed.index)
-        if err:
-            print(f'❌ {err}', file=sys.stderr)
-            return
-
-    # 路径处理
+    # 路径处理（提前，因为通配符展开需要 abs_path）
     from http_server_cli.utils import resolve_path, format_path
     path = parsed.path or os.getcwd()
     abs_path = resolve_path(path)
@@ -782,12 +775,28 @@ def _bookmark_add(args):
         print(f'❌ Path does not exist or is not a directory: {format_path(abs_path)}', file=sys.stderr)
         return
 
+    # 通配符展开：index 含 * 时取最近修改的文件（与 _cmd_start 逻辑一致）
+    index_page = parsed.index
+    if index_page and '*' in index_page:
+        pattern = os.path.join(abs_path, index_page)
+        matches = glob.glob(pattern)
+        if matches:
+            latest = max(matches, key=os.path.getmtime)
+            index_page = os.path.relpath(latest, abs_path)
+
+    # index_page 校验（使用展开后的值）
+    if index_page:
+        err = _validate_index_page(index_page)
+        if err:
+            print(f'❌ {err}', file=sys.stderr)
+            return
+
     store = BookmarkStore()
     try:
-        store.add(parsed.name, abs_path, parsed.index)
+        store.add(parsed.name, abs_path, index_page)
         print(f"✅ Bookmark '{parsed.name}' → {format_path(abs_path)}")
-        if parsed.index:
-            print(f"   📄 Default index: {parsed.index}")
+        if index_page:
+            print(f"   📄 Default index: {index_page}")
     except ValueError as e:
         print(f'❌ {e}', file=sys.stderr)
 
