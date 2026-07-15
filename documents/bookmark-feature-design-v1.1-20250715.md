@@ -300,7 +300,7 @@ def _bookmark_add(args):
         print(f"❌ '{parsed.name}' conflicts with built-in command", file=sys.stderr)
         return
 
-    # index_page 校验（复用 server.py 的 _validate_index_page）
+    # index_page 校验（复用 server.py 的 _validate_index_page，支持子目录路径如 a/b.html）
     if parsed.index:
         from http_server_cli.server import _validate_index_page
         idx_err = _validate_index_page(parsed.index)

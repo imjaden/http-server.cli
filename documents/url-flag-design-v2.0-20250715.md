@@ -133,14 +133,21 @@ def start(self, path=None, open_browser=False,
 
 ```python
 import re
-# raw string 中将 \u4e00 原样传给 re 引擎，re 支持 \uXXXX Unicode 转义
-_INDEX_RE = re.compile(r'^[a-zA-Z0-9\u4e00-\u9fff][a-zA-Z0-9\u4e00-\u9fff._-]*$')
+# raw string 中 \u4e00 原样传给 re 引擎，re 支持 \uXXXX Unicode 转义
+# 允许 / 用于子目录路径（如 skills-ref/hermes-skills.html）
+_INDEX_RE = re.compile(r'^[a-zA-Z0-9\u4e00-\u9fff][a-zA-Z0-9\u4e00-\u9fff._/-]*$')
 
 def _validate_index_page(name: str) -> Optional[str]:
-    """校验 index_page 文件名。返回错误消息或 None。"""
+    """校验 index_page 路径。返回错误消息或 None。
+
+    允许: ASCII 字母数字 + 中文 + . _ - /（子目录）
+    拒绝: 空字符串、绝对路径（以 / 开头）、含 .. 或 \\
+    """
     if not name:
         return 'index_page cannot be empty'
-    if '..' in name or '/' in name or '\\' in name:
+    if name.startswith('/'):
+        return f'index_page cannot be an absolute path: {name}'
+    if '..' in name or '\\' in name:
         return f'index_page contains invalid path characters: {name}'
     if not _INDEX_RE.match(name):
         return f'index_page contains invalid characters: {name}'
@@ -153,10 +160,10 @@ def _validate_index_page(name: str) -> Optional[str]:
 from urllib.parse import quote
 
 def _build_url(domain: str, port: int, index_page: str = None) -> str:
-    """构建完整 URL。默认 index.html 不追加后缀。"""
+    """构建完整 URL。默认 index.html 不追加后缀，子目录路径保留 /。"""
     url = f'http://{domain}:{port}'
     if index_page and index_page != 'index.html':
-        url += f'/{quote(index_page, safe="")}'
+        url += f'/{quote(index_page, safe="/")}'
     return url
 ```
 
