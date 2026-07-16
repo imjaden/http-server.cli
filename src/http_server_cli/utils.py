@@ -79,14 +79,19 @@ def write_json(filepath: str, data: dict) -> None:
 # ── 端口检测 ────────────────────────────────────────────
 
 def is_port_in_use(port: int) -> bool:
-    """检测端口是否被占用（跨平台，socket 直连检测）"""
+    """检测端口是否被占用（bind 检测，覆盖所有接口）。
+
+    相比 connect_ex 方式，bind 能检测到绑定在 0.0.0.0、:: 或
+    特定网络接口上的服务，不会因接口不匹配而漏检。
+    """
     import socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(0.5)
         try:
-            return s.connect_ex(('127.0.0.1', port)) == 0
-        except (socket.gaierror, OSError):
+            s.bind(('', port))
             return False
+        except OSError:
+            return True
 
 def get_all_occupied_ports() -> set:
     """一次性获取所有 LISTEN 状态的端口号
