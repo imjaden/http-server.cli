@@ -79,19 +79,20 @@ def write_json(filepath: str, data: dict) -> None:
 # ── 端口检测 ────────────────────────────────────────────
 
 def is_port_in_use(port: int) -> bool:
-    """检测端口是否被占用（bind 检测，覆盖所有接口）。
+    """检测端口是否被占用（bind 检测，同时覆盖 IPv4 和 IPv6）。
 
-    相比 connect_ex 方式，bind 能检测到绑定在 0.0.0.0、:: 或
-    特定网络接口上的服务，不会因接口不匹配而漏检。
+    分别尝试 AF_INET 和 AF_INET6 绑定，任一失败即表示端口被占。
+    覆盖场景：IPv4-only、IPv6-only、双栈监听。
     """
     import socket
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.settimeout(0.5)
+    for family in (socket.AF_INET, socket.AF_INET6):
         try:
-            s.bind(('', port))
-            return False
+            with socket.socket(family, socket.SOCK_STREAM) as s:
+                s.settimeout(0.5)
+                s.bind(('', port))
         except OSError:
             return True
+    return False
 
 def get_all_occupied_ports() -> set:
     """一次性获取所有 LISTEN 状态的端口号
