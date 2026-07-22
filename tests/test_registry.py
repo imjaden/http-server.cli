@@ -145,3 +145,145 @@ class TestActiveServers:
         active = pre_filled_registry.active_servers()
         for a in active:
             assert a['_alive'] is True
+
+
+class TestTouchMemory:
+    """P0: _touch_memory + _flush_access_cache 内存级访问时间标记"""
+
+    def _reset_cache(self):
+        """重置模块级缓存状态"""
+        import time
+        import http_server_cli.registry as reg_mod
+        reg_mod._last_access_cache.clear()
+        reg_mod._last_flush_time = time.time()  # 当前时间，防止立即触发 flush
+
+    def test_touch_memory_stores_timestamp(self):
+        """_touch_memory 应在内存中记录端口时间戳"""
+        import http_server_cli.registry as reg_mod
+        self._reset_cache()
+        reg_mod._touch_memory(8080)
+        assert 8080 in reg_mod._last_access_cache
+        assert isinstance(reg_mod._last_access_cache[8080], float)
+
+    def test_touch_memory_multiple_ports(self):
+        """_touch_memory 应支持多端口独立记录"""
+        import http_server_cli.registry as reg_mod
+        self._reset_cache()
+        reg_mod._touch_memory(8080)
+        reg_mod._touch_memory(8081)
+        assert 8080 in reg_mod._last_access_cache
+        assert 8081 in reg_mod._last_access_cache
+
+    def test_flush_access_cache_writes_to_registry(self, fresh_registry):
+        """_flush_access_cache 应将缓存的访问时间写入 registry"""
+        import http_server_cli.registry as reg_mod
+        self._reset_cache()
+        fresh_registry.add(port=8080, path='/tmp/foo', pid=12345)
+        # 模拟缓存中有访问记录
+        import time
+        reg_mod._last_access_cache[8080] = time.time()
+        reg_mod._flush_access_cache()
+        # 验证 registry 中的 last_access_at 已更新
+        entry = fresh_registry.find(port=8080)
+        assert entry is not None
+        assert entry.get('last_access_at') is not None
+
+    def test_flush_access_cache_clears_after_flush(self):
+        """_flush_access_cache 刷盘后应清空缓存"""
+        import http_server_cli.registry as reg_mod
+        self._reset_cache()
+        reg_mod._last_access_cache[8080] = 1234567890.0
+        reg_mod._flush_access_cache()
+        assert len(reg_mod._last_access_cache) == 0
+
+    def test_flush_access_cache_empty_noop(self):
+        """空缓存时 _flush_access_cache 应为 no-op"""
+        import http_server_cli.registry as reg_mod
+        self._reset_cache()
+        # 不应抛出异常
+        reg_mod._flush_access_cache()
+
+    def test_flush_access_cache_skips_missing_entry(self):
+        """缓存中的端口在 registry 中不存在时应跳过不崩溃"""
+        import http_server_cli.registry as reg_mod
+        self._reset_cache()
+        # 缓存中有记录但 registry 中无对应条目
+        reg_mod._last_access_cache[9999] = 1234567890.0
+        reg_mod._flush_access_cache()  # 不抛异常
+        assert len(reg_mod._last_access_cache) == 0
+
+    def test_touch_memory_respects_flush_interval(self, monkeypatch):
+        """_touch_memory 仅在超过 _FLUSH_INTERVAL 后才触发刷盘"""
+        import http_server_cli.registry as reg_mod
+        self._reset_cache()  # _last_flush_time = time.time()
+        # 将间隔设大，防止自动刷盘
+        monkeypatch.setattr(reg_mod, '_FLUSH_INTERVAL', 9999.0)
+        # _reset_cache 已将 _last_flush_time 设为当前时间，不覆盖
+        reg_mod._touch_memory(8080)
+        # 不应触发刷盘（间隔未到）
+        assert 8080 in reg_mod._last_access_cache
+
+    def test_touch_memory_flushes_when_interval_exceeded(self, monkeypatch, fresh_registry):
+        """超过 _FLUSH_INTERVAL 时 _touch_memory 应触发刷盘"""
+        import http_server_cli.registry as reg_mod
+        self._reset_cache()
+        fresh_registry.add(port=8080, path='/tmp/foo', pid=12345)
+        # 将间隔设 0，强制触发
+        monkeypatch.setattr(reg_mod, '_FLUSH_INTERVAL', 0.0)
+        import time
+        reg_mod._last_flush_time = time.time() - 1.0  # 确保已过期
+        reg_mod._touch_memory(8080)
+        # 应触发刷盘，缓存清空
+        assert len(reg_mod._last_access_cache) == 0
+
+
+class TestRegistryCache:
+    """P2: Registry 懒初始化 — mtime 缓存"""
+
+    def _reset_cache(self):
+        """重置模块级缓存"""
+        import http_server_cli.registry as reg_mod
+        reg_mod._registry_cache = None
+        reg_mod._registry_cache_mtime = 0.0
+
+    def test_second_init_reuses_cache(self, fresh_registry):
+        """同一 mtime 时第二次 Registry() 应复用缓存数据"""
+        self._reset_cache()
+        # 第一次构造：读取文件（_registry_cache 应被设置）
+        reg1 = Registry()
+        reg1.add(port=8080, path='/tmp/foo', pid=12345)
+
+        # 第二次构造：mtime 未变，应复用缓存
+        reg2 = Registry()
+        assert reg2.count() == 1
+        assert reg2.find(port=8080)['path'] == '/tmp/foo'
+
+    def test_cache_invalidates_on_save(self, fresh_registry):
+        """save() 后缓存应更新为最新数据"""
+        self._reset_cache()
+        reg1 = Registry()
+        reg1.add(port=8080, path='/tmp/foo', pid=12345)
+
+        # save 后缓存应已刷新
+        reg2 = Registry()
+        assert reg2.count() == 1
+
+        # 添加新条目
+        reg2.add(port=8081, path='/tmp/bar', pid=12346)
+        reg3 = Registry()
+        assert reg3.count() == 2
+
+    def test_cache_invalidates_on_mtime_change(self, fresh_registry):
+        """文件 mtime 变化时缓存应失效并重新加载"""
+        self._reset_cache()
+        reg1 = Registry()
+        reg1.add(port=8080, path='/tmp/foo', pid=12345)
+        assert reg1.count() == 1
+
+        # 手动修改 mtime 缓存为过期值，模拟外部修改
+        import http_server_cli.registry as reg_mod
+        reg_mod._registry_cache_mtime = 0.0  # 强制失效
+
+        # 重新构造应重新读取
+        reg2 = Registry()
+        assert reg2.count() == 1  # 从文件重新加载

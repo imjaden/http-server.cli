@@ -26,6 +26,10 @@ from urllib.parse import urlparse
 # Range 头解析: bytes=START-END 或 bytes=START-
 _RANGE_RE = re.compile(r'^bytes=(\d+)-(\d*)$')
 
+# ── P1: log 降频 flush（每 100 条） ─────────────────────
+_log_count: int = 0
+_FLUSH_EVERY: int = 100
+
 
 def _parse_range_header(range_header: str, file_size: int) -> Optional[Tuple[int, int]]:
     """解析 Range 请求头，返回 (start, end) 或 None。
@@ -136,13 +140,12 @@ class SmartHTTPRequestHandler(SimpleHTTPRequestHandler):
             raise
 
     def do_GET(self):
-        """处理 GET 请求，首页智能跳转，记录访问时间"""
-        
-        # 记录最新访问时间
+        """处理 GET 请求，首页智能跳转，内存标记访问时间"""
+
+        # P0: 内存标记访问时间（不写盘，60s 刷一次）
         try:
-            from http_server_cli.registry import Registry
-            reg = Registry()
-            reg.touch(self.server.server_port)
+            from http_server_cli.registry import _touch_memory
+            _touch_memory(self.server.server_port)
         except Exception:
             pass
         
@@ -185,13 +188,16 @@ class SmartHTTPRequestHandler(SimpleHTTPRequestHandler):
         return os.path.basename(latest_file)
 
     def log_message(self, format, *args):
-        """自定义日志格式，输出到 stderr"""
+        """自定义日志格式，输出到 stderr。每 100 条 flush 一次。"""
         import sys
+        global _log_count
         from datetime import datetime
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         message = format % args if args else format
         sys.stderr.write(f'[{timestamp}] {message}\n')
-        sys.stderr.flush()
+        _log_count += 1
+        if _log_count % _FLUSH_EVERY == 0:
+            sys.stderr.flush()
 
 
 def create_handler(directory: str, index_page: str = 'index.html'):

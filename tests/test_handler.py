@@ -241,3 +241,95 @@ class TestRangeRequest:
             assert len(resp.read()) == 5  # 'hello'
         finally:
             httpd.server_close()
+
+
+class TestDoGetTouchMemory:
+    """P0: do_GET 使用 _touch_memory 替代 Registry().touch()"""
+
+    def test_touch_memory_does_not_call_registry_touch(self, monkeypatch):
+        """_touch_memory 不应调用 Registry().touch()（验证不会触发原子写）"""
+        import time
+        import http_server_cli.registry as reg_mod
+        reg_mod._last_access_cache.clear()
+        reg_mod._last_flush_time = time.time()  # 当前时间，防止立即触发 flush
+        monkeypatch.setattr(reg_mod, '_FLUSH_INTERVAL', 9999.0)
+
+        # 监视 Registry.touch 是否被调用
+        touch_called = []
+
+        def fake_touch(self, port):
+            touch_called.append(port)
+
+        monkeypatch.setattr(reg_mod.Registry, 'touch', fake_touch)
+
+        # _touch_memory 不应调用 Registry().touch()
+        reg_mod._touch_memory(8080)
+        assert len(touch_called) == 0
+        assert 8080 in reg_mod._last_access_cache
+
+    def test_touch_memory_importable_in_handler(self):
+        """handler 模块应能导入 _touch_memory"""
+        import time
+        import http_server_cli.registry as reg_mod
+        reg_mod._last_access_cache.clear()
+        reg_mod._last_flush_time = time.time()  # 当前时间
+        # 模拟 handler 中的 import 路径
+        from http_server_cli.registry import _touch_memory
+        _touch_memory(8080)
+        assert 8080 in reg_mod._last_access_cache
+
+
+class TestLogMessageThrottle:
+    """P1: log_message 每 100 条 flush 一次"""
+
+    def test_log_message_flush_every_100(self, monkeypatch):
+        """每 100 条日志应触发一次 flush"""
+        import http_server_cli.handler as handler_mod
+        # 重置计数器
+        handler_mod._log_count = 0
+
+        flush_count = 0
+
+        def fake_flush():
+            nonlocal flush_count
+            flush_count += 1
+
+        import sys
+        monkeypatch.setattr(sys.stderr, 'flush', fake_flush)
+
+        try:
+            from unittest.mock import MagicMock
+            handler = MagicMock()
+            for i in range(100):
+                handler_mod.SmartHTTPRequestHandler.log_message(
+                    handler, 'Test %d', i)
+
+            # 第 100 条应触发一次 flush
+            assert flush_count == 1
+        finally:
+            handler_mod._log_count = 0
+
+    def test_log_message_no_flush_before_100(self, monkeypatch):
+        """少于 100 条时不应 flush"""
+        import http_server_cli.handler as handler_mod
+        handler_mod._log_count = 0
+
+        flush_count = 0
+
+        def fake_flush():
+            nonlocal flush_count
+            flush_count += 1
+
+        import sys
+        monkeypatch.setattr(sys.stderr, 'flush', fake_flush)
+
+        try:
+            from unittest.mock import MagicMock
+            handler = MagicMock()
+            for i in range(99):
+                handler_mod.SmartHTTPRequestHandler.log_message(
+                    handler, 'Test %d', i)
+
+            assert flush_count == 0  # 99 条不触发
+        finally:
+            handler_mod._log_count = 0
