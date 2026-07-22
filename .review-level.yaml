@@ -1,0 +1,14 @@
+level: L1
+owner: Jaden Li
+classification: internal
+compliance: [none]
+review_history:
+  - date: 2026-07-22
+    reviewer: Security Reviewer (review profile)
+    review_level: L1
+    verdict: PASS
+    score: 100
+    findings_total: 0
+    findings_open: 0
+    tracking: none
+    scope: "Design doc review: perf-hot-path-optimization-design-v1.1-20260722.md (commit 69101fd)"
