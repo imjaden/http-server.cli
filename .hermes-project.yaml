@@ -1,0 +1,9 @@
+project: http-server-cli
+profiles:
+- name: dev
+- name: review
+sessions:
+- profile: dev
+  title: http-server-cli-dev
+- profile: review
+  title: http-server-cli-review
