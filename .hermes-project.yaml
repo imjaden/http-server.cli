@@ -3,6 +3,9 @@ profiles:
 - name: dev
 - name: review
 sessions:
+- role: ops
+  profile: ops
+  title: http-server-cli-ops
 - role: dev
   profile: dev
   title: http-server-cli-dev
