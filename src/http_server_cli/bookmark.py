@@ -76,18 +76,35 @@ class BookmarkStore:
 
     # ── CRUD ──
 
-    def add(self, name: str, path: str, index_page: Optional[str] = None) -> None:
+    def add(self, name: str, path: str, index_page: Optional[str] = None,
+            force: bool = False) -> None:
         """添加书签。
 
+        唯一键为 (path, index_page) 组合，同 path 不同 index_page 可共存。
+        force=True 时覆盖组合键冲突的旧条目（不覆盖 name 冲突）。
+
         Raises:
-            ValueError: name 已存在或 path 已被其他书签绑定。
+            ValueError: name 已存在；或 (path, index_page) 已被其他书签绑定且未 force。
         """
         bookmarks = self._read_all()
         if any(b['name'] == name for b in bookmarks):
             raise ValueError(f"bookmark '{name}' already exists")
-        if any(b['path'] == path for b in bookmarks):
-            existing = next(b['name'] for b in bookmarks if b['path'] == path)
-            raise ValueError(f"path already bookmarked as '{existing}'")
+        # 归一化: '' 与 None 语义等价（均表示默认 index.html），统一组合键
+        index_page = index_page or None
+        # 组合唯一键: (path, index_page)。index_page None 表示默认 index.html
+        conflict = next(
+            (b for b in bookmarks
+             if b['path'] == path and (b.get('index_page') or None) == index_page),
+            None)
+        if conflict:
+            if not force:
+                existing = conflict['name']
+                raise ValueError(
+                    f"path+index already bookmarked as '{existing}'")
+            # force: 删除旧条目，替换为新条目
+            bookmarks = [b for b in bookmarks
+                         if not (b['path'] == path
+                                 and (b.get('index_page') or None) == index_page)]
         bookmarks.append({
             'name': name,
             'path': path,
@@ -111,23 +128,30 @@ class BookmarkStore:
 
         - path=None: 保持原值
         - index_page=None: 保持原值。传空字符串 '' 清除 index_page。
+
+        冲突校验基于 (path, index_page) 组合键，不提供 --force（defer，
+        先 remove + add 代替）。
         """
         bookmarks = self._read_all()
         for b in bookmarks:
             if b['name'] == name:
-                if path is not None:
-                    # 路径唯一约束：新 path 不与其它书签冲突
-                    if path != b['path']:
-                        if any(b2['path'] == path and b2['name'] != name
-                               for b2 in bookmarks):
-                            existing = next(
-                                b2['name'] for b2 in bookmarks
-                                if b2['path'] == path and b2['name'] != name)
-                            raise ValueError(
-                                f"path already bookmarked as '{existing}'")
-                    b['path'] = path
-                if index_page is not None:
-                    b['index_page'] = index_page if index_page else None
+                new_path = path if path is not None else b['path']
+                new_index = index_page if index_page is not None else b.get('index_page')
+                new_index = new_index or None
+                # 组合键冲突校验：目标组合是否已被其它 name 占用
+                if any(b2['name'] != name
+                       and b2['path'] == new_path
+                       and (b2.get('index_page') or None) == new_index
+                       for b2 in bookmarks):
+                    existing = next(
+                        b2['name'] for b2 in bookmarks
+                        if b2['name'] != name
+                        and b2['path'] == new_path
+                        and (b2.get('index_page') or None) == new_index)
+                    raise ValueError(
+                        f"path+index already bookmarked as '{existing}'")
+                b['path'] = new_path
+                b['index_page'] = new_index
                 self._write_all(bookmarks)
                 return True
         return False
@@ -144,12 +168,10 @@ class BookmarkStore:
         return sorted(self._read_all(),
                       key=lambda x: x.get('created_at', '9999-12-31T23:59:59'))
 
-    def get_for_path(self, path: str) -> Optional[str]:
-        """根据路径查找书签名。路径唯一约束保证最多一个匹配。"""
-        for b in self._read_all():
-            if b['path'] == path:
-                return b['name']
-        return None
+    def get_for_path(self, path: str) -> list[str]:
+        """根据路径查找书签名。同 path 可有多条，返回全部名称列表（sorted）。"""
+        return sorted(
+            b['name'] for b in self._read_all() if b['path'] == path)
 
     def names(self) -> set[str]:
         """返回所有书签名的集合。"""

@@ -32,11 +32,49 @@ class TestBookmarkCRUD:
         with pytest.raises(ValueError, match="already exists"):
             store.add('myapp', '/Users/test/project-b')
 
-    def test_add_duplicate_path(self):
-        """路径唯一约束：同一路径只能一个书签"""
+    def test_add_duplicate_composite_key(self):
+        """组合键唯一约束：同 path 同 index_page 冲突"""
         store = BookmarkStore()
         store.add('myapp', '/Users/test/project')
-        with pytest.raises(ValueError, match="path already bookmarked"):
+        with pytest.raises(ValueError, match="path\\+index already bookmarked"):
+            store.add('other', '/Users/test/project')
+
+    def test_add_same_path_different_index(self):
+        """同 path 不同 index_page 可共存（TC-01）"""
+        store = BookmarkStore()
+        store.add('a', '/Users/test/project', index_page='a.html')
+        store.add('b', '/Users/test/project', index_page='b.html')
+        assert store.get('a') is not None
+        assert store.get('b') is not None
+        assert len(store.list_all()) == 2
+
+    def test_add_force_overrides_composite_key(self):
+        """force=True 覆盖组合键冲突（TC-03）"""
+        store = BookmarkStore()
+        store.add('old', '/Users/test/project', index_page='a.html')
+        store.add('new', '/Users/test/project', index_page='a.html', force=True)
+        assert store.get('old') is None
+        bm = store.get('new')
+        assert bm is not None
+        assert bm['index_page'] == 'a.html'
+
+    def test_add_force_does_not_override_name_conflict(self):
+        """force 不覆盖 name 冲突（--force 边界）"""
+        store = BookmarkStore()
+        store.add('myapp', '/Users/test/project-a')
+        with pytest.raises(ValueError, match="already exists"):
+            store.add('myapp', '/Users/test/project-b', force=True)
+
+    def test_add_legacy_no_index_uses_null_key(self):
+        """存量无 index_page 条目组合键按 (path, null)（TC-08）"""
+        store = BookmarkStore()
+        store.add('legacy', '/Users/test/project')
+        # 新增带 index 的同 path 条目应共存
+        store.add('new', '/Users/test/project', index_page='a.html')
+        assert store.get('legacy') is not None
+        assert store.get('new') is not None
+        # 新增不带 index 的同 path 条目应冲突
+        with pytest.raises(ValueError, match="path\\+index already bookmarked"):
             store.add('other', '/Users/test/project')
 
     def test_add_with_index(self):
@@ -90,11 +128,18 @@ class TestBookmarkCRUD:
     def test_get_for_path(self):
         store = BookmarkStore()
         store.add('myapp', '/Users/test/project')
-        assert store.get_for_path('/Users/test/project') == 'myapp'
+        assert store.get_for_path('/Users/test/project') == ['myapp']
 
     def test_get_for_path_none(self):
         store = BookmarkStore()
-        assert store.get_for_path('/no/match') is None
+        assert store.get_for_path('/no/match') == []
+
+    def test_get_for_path_multiple(self):
+        """同 path 多条目返回 sorted 名称列表（TC-04）"""
+        store = BookmarkStore()
+        store.add('b', '/Users/test/project', index_page='b.html')
+        store.add('a', '/Users/test/project', index_page='a.html')
+        assert store.get_for_path('/Users/test/project') == ['a', 'b']
 
     def test_names(self):
         store = BookmarkStore()
@@ -258,3 +303,20 @@ class TestBookmarkUpdate:
         bm = store.get('myapp')
         assert bm['path'] == '/tmp/new'
         assert bm['index_page'] == 'keep.html'
+
+    def test_update_index_composite_key_conflict(self):
+        """update 改 index_page 到已占用组合 → ValueError（TC-10）"""
+        store = BookmarkStore()
+        store.add('a', '/tmp/project', index_page='a.html')
+        store.add('b', '/tmp/project', index_page='b.html')
+        with pytest.raises(ValueError, match='already bookmarked'):
+            store.update('a', index_page='b.html')
+
+    def test_update_same_path_different_index_ok(self):
+        """update 同 path 不同 index_page 不冲突（组合键语义）"""
+        store = BookmarkStore()
+        store.add('a', '/tmp/project', index_page='a.html')
+        store.add('b', '/tmp/project', index_page='b.html')
+        # a 改 path 到同 path 但 index 保持 a.html → 不冲突
+        assert store.update('a', path='/tmp/project') is True
+        assert store.get('a')['index_page'] == 'a.html'
