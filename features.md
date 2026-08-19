@@ -24,15 +24,15 @@
 
 ## 书签系统
 
-1. `hs bookmark add <name> [path] [-i index]` — 注册书签 ✅
-2. `hs bookmark update <name> [path] [-i index]` — 更新书签 ✅
+1. `hs bookmark add <name> [path] [-i index] [--force] [--json]` — 注册书签 ✅
+2. `hs bookmark update <name> [path] [-i index] [--json]` — 更新书签 ✅
 3. `hs bookmark list [--json]` — 列出所有书签 ✅
 4. `hs bookmark show <name> [--json]` — 查看书签详情 ✅
-5. `hs bookmark remove <name>` — 删除书签 ✅
-6. 路径唯一约束 — 不同 name 不可指向同一 path ✅
+5. `hs bookmark remove <name> [--json]` — 删除书签 ✅
+6. (path, index_page) 组合键唯一 — 同项目不同页面可注册多个书签；`--force` 覆盖组合键冲突（不覆盖 name 冲突）✅
 7. 通配符 index 解析 — `-i 'snapshots/*.html'` 存原始 pattern，运行时取 `max(mtime)` ✅
 8. 损坏检测 — 非空文件 JSON 解析失败抛出 `DataCorruptionError` ✅
-9. 关联文档: `documents/bookmark-feature-design-v1.1-20250715.md`
+9. 关联文档: `documents/bookmark-feature-design-v1.1-20250715.md` / `documents/bookmark-multi-page-design-v1.1-20260819.md`
 
 ## HTTP 服务
 
@@ -66,21 +66,22 @@
 ## Web Dashboard
 
 1. 图形化管理面板 — 端口 8180，`hs dashboard -o` 打开 ✅ — `documents/hs-dashboard-design-v2.0-20260629.md`
-2. 中英文语言切换 — 🇨🇳 `/?lang=zh` ↔ 🇺🇸 `/en`，右上角悬浮 pill ✅
-3. 工具栏 — 60s 倒计时自动刷新 / 刷新按钮 / Kill All 一键关闭 ✅
-4. 服务器表格 — URL(Port) | Health | Status | CPU | Memory | Last Access | Action ✅
-5. 健康检查探活 — 🟢/🟡/🔴 圆点标识 HTTP 响应状态 ✅
-6. 搜索过滤框 — 实例 >10 时自动显示，实时按端口/路径关键字过滤 ✅
-7. 状态弹框 — 端口/路径/PID/内存/启动时间/日志路径/最近访问 + 最近 50 行日志 ✅
-8. 一键复制 URL — 📋 按钮 ✅
-9. 全局异常捕捉 — `window.onerror` 覆盖层弹框显示完整 stack trace ✅
-10. REST API — list / status / kill / kill-all / ping / log / info ✅
+2. `hs dashboard [stop|status|restart] [--json]` — 管理仪表盘 ✅
+3. 中英文语言切换 — 🇨🇳 `/?lang=zh` ↔ 🇺🇸 `/en`，右上角悬浮 pill ✅
+4. 工具栏 — 60s 倒计时自动刷新 / 刷新按钮 / Kill All 一键关闭 ✅
+5. 服务器表格 — URL(Port) | Health | Status | CPU | Memory | Last Access | Action ✅
+6. 健康检查探活 — 🟢/🟡/🔴 圆点标识 HTTP 响应状态 ✅
+7. 搜索过滤框 — 实例 >10 时自动显示，实时按端口/路径关键字过滤 ✅
+8. 状态弹框 — 端口/路径/PID/内存/启动时间/日志路径/最近访问 + 最近 50 行日志 ✅
+9. 一键复制 URL — 📋 按钮 ✅
+10. 全局异常捕捉 — `window.onerror` 覆盖层弹框显示完整 stack trace ✅
+11. REST API — list / status / kill / kill-all / ping / log / info ✅
 
 ## MCP 集成
 
 1. `hs mcp` — 启动 MCP Server（后台 SSE），AI Agent 集成 ✅ — `documents/hs-mcp-design-v1.0-20260624.md`
-2. `hs mcp stop` — 停止 MCP 服务 ✅
-3. `hs mcp status` — 查看 MCP 状态 ✅
+2. `hs mcp stop [--json]` — 停止 MCP 服务 ✅
+3. `hs mcp status [--json]` — 查看 MCP 状态 ✅
 4. JSON-RPC 2.0 协议 — stdio/SSE 传输，6 个工具（hs_list/hs_status/hs_kill/hs_kill_all/hs_start/hs_search）✅
 5. 零外部依赖 — 纯标准库实现 MCP 协议 ✅
 
@@ -92,7 +93,7 @@
 
 ## 测试
 
-1. 11 个测试模块，308 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
+1. 11 个测试模块，338 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
 2. `conftest.py` — autouse 数据隔离 + monkeypatch 路径注入 ✅
 3. 集成测试模式 — mock `_COMMANDS` / `ensure_storage`，set `sys.argv`，catch `SystemExit` ✅
 

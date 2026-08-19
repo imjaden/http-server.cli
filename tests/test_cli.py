@@ -669,3 +669,370 @@ class TestBookmarkCLI:
         _bookmark_update(['myapp', str(tmp_path)])
         captured = capsys.readouterr()
         assert '✅' in captured.out
+
+
+class TestBookmarkMultiPageCLI:
+    """bookmark 同项目多页面（组合键）+ --force 集成测试"""
+
+    def test_bookmark_add_same_path_different_index(self, tmp_path, capsys):
+        """同 path 不同 index 两个书签均成功（TC-01）"""
+        from http_server_cli.cli import _bookmark_add
+        _bookmark_add(['a', str(tmp_path), '-i', 'a.html'])
+        capsys.readouterr()
+        _bookmark_add(['b', str(tmp_path), '-i', 'b.html'])
+        captured = capsys.readouterr()
+        assert '✅' in captured.out
+
+        from http_server_cli.bookmark import BookmarkStore
+        store = BookmarkStore()
+        assert store.get('a') is not None
+        assert store.get('b') is not None
+
+    def test_bookmark_add_conflict_without_force(self, tmp_path, capsys):
+        """同 path 同 index 无 --force → 报错（TC-02）"""
+        from http_server_cli.cli import _bookmark_add
+        _bookmark_add(['a', str(tmp_path), '-i', 'a.html'])
+        capsys.readouterr()
+        _bookmark_add(['b', str(tmp_path), '-i', 'a.html'])
+        captured = capsys.readouterr()
+        assert 'path+index already bookmarked' in captured.err
+
+    def test_bookmark_add_force_overrides(self, tmp_path, capsys):
+        """同 path 同 index + --force → 旧条目被替换（TC-03）"""
+        from http_server_cli.cli import _bookmark_add
+        _bookmark_add(['a', str(tmp_path), '-i', 'a.html'])
+        capsys.readouterr()
+        _bookmark_add(['b', str(tmp_path), '-i', 'a.html', '--force'])
+        captured = capsys.readouterr()
+        assert '✅' in captured.out
+
+        from http_server_cli.bookmark import BookmarkStore
+        store = BookmarkStore()
+        assert store.get('a') is None
+        assert store.get('b') is not None
+
+    def test_bookmark_add_force_name_conflict_still_fails(self, tmp_path, capsys):
+        """--force 不覆盖 name 冲突"""
+        from http_server_cli.cli import _bookmark_add
+        _bookmark_add(['myapp', str(tmp_path)])
+        capsys.readouterr()
+        _bookmark_add(['myapp', str(tmp_path), '--force'])
+        captured = capsys.readouterr()
+        assert 'already exists' in captured.err
+
+    def test_list_multi_label(self, tmp_path, capsys):
+        """hs list 文本模式多标签 [a,b]（TC-06）"""
+        from http_server_cli.cli import _bookmark_add, _list_servers
+        from unittest.mock import MagicMock
+        from http_server_cli.config import Config
+        _bookmark_add(['a', str(tmp_path), '-i', 'a.html'])
+        capsys.readouterr()
+        _bookmark_add(['b', str(tmp_path), '-i', 'b.html'])
+        capsys.readouterr()
+
+        mgr = MagicMock()
+        mgr.config = Config()
+        mgr.registry.active_servers.return_value = [
+            {'port': 8081, 'path': str(tmp_path), 'pid': 10001,
+             'domain': 'localhost', '_alive': True, 'daemon': False,
+             'foreground': False, 'started_at': '2026-06-20T00:00:00'},
+        ]
+        _list_servers(mgr)
+        captured = capsys.readouterr()
+        assert '[a,b]' in captured.out
+
+    def test_list_json_bookmark_is_list(self, tmp_path, capsys):
+        """hs list JSON bookmark 为名称列表（TC-06/07）"""
+        from http_server_cli.cli import _bookmark_add, _list_servers
+        from unittest.mock import MagicMock
+        from http_server_cli.config import Config
+        _bookmark_add(['a', str(tmp_path), '-i', 'a.html'])
+        capsys.readouterr()
+        _bookmark_add(['b', str(tmp_path), '-i', 'b.html'])
+        capsys.readouterr()
+
+        mgr = MagicMock()
+        mgr.config = Config()
+        mgr.registry.active_servers.return_value = [
+            {'port': 8081, 'path': str(tmp_path), 'pid': 10001,
+             'domain': 'localhost', '_alive': True, 'daemon': False,
+             'foreground': False, 'started_at': '2026-06-20T00:00:00'},
+            {'port': 8082, 'path': '/tmp/no-bookmark', 'pid': 10002,
+             'domain': 'localhost', '_alive': True, 'daemon': False,
+             'foreground': False, 'started_at': '2026-06-20T00:05:00'},
+        ]
+        _list_servers(mgr, json=True)
+        captured = capsys.readouterr()
+        import json
+        result = json.loads(captured.out)
+        servers = result['data']['servers']
+        by_path = {s['path']: s['bookmark'] for s in servers}
+        assert by_path[str(tmp_path)] == ['a', 'b']
+        assert by_path['/tmp/no-bookmark'] == []  # no-match 为 []（非 null）
+
+
+class TestBookmarkCLIJson:
+    """bookmark 子命令 --json 输出（功能二）"""
+
+    def _add(self, name, path, index=None):
+        from http_server_cli.cli import _bookmark_add
+        args = [name, str(path)]
+        if index:
+            args += ['-i', index]
+        _bookmark_add(args)
+
+    def test_bookmark_list_json(self, tmp_path, capsys):
+        """hs bookmark list --json 合法 JSON 含 count+bookmarks 无 emoji（TC-01）"""
+        self._add('myapp', tmp_path, 'app.html')
+        capsys.readouterr()
+        from http_server_cli.cli import _bookmark_list
+        _bookmark_list(['--json'])
+        captured = capsys.readouterr()
+        import json
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['command'] == 'bookmark-list'
+        assert result['data']['count'] == 1
+        assert result['data']['bookmarks'][0]['name'] == 'myapp'
+        # 无 emoji
+        assert '📌' not in captured.out
+        assert '📊' not in captured.out
+
+    def test_bookmark_show_json(self, tmp_path, capsys):
+        """hs bookmark show <name> --json 返回详情（TC-02）"""
+        self._add('myapp', tmp_path, 'app.html')
+        capsys.readouterr()
+        from http_server_cli.cli import _bookmark_show
+        _bookmark_show(['myapp', '--json'])
+        captured = capsys.readouterr()
+        import json
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['command'] == 'bookmark-show'
+        assert result['data']['name'] == 'myapp'
+        assert result['data']['index_page'] == 'app.html'
+
+    def test_bookmark_show_json_not_found(self, capsys):
+        """hs bookmark show <缺失> --json 错误走信封（TC-03）"""
+        from http_server_cli.cli import _bookmark_show
+        _bookmark_show(['nope', '--json'])
+        captured = capsys.readouterr()
+        import json
+        result = json.loads(captured.out)
+        assert result['success'] is False
+        assert result['error'] is not None
+        assert 'not found' in result['error']
+
+    def test_bookmark_add_json(self, tmp_path, capsys):
+        """hs bookmark add --json 返回 data 含 name/path/index_page（TC-04）"""
+        from http_server_cli.cli import _bookmark_add
+        _bookmark_add(['myapp', str(tmp_path), '-i', 'app.html', '--json'])
+        captured = capsys.readouterr()
+        import json
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['command'] == 'bookmark-add'
+        assert result['data']['name'] == 'myapp'
+        assert result['data']['index_page'] == 'app.html'
+        assert 'created_at' in result['data']
+
+    def test_bookmark_add_json_conflict(self, tmp_path, capsys):
+        """hs bookmark add --json 冲突错误走信封（TC-05）"""
+        from http_server_cli.cli import _bookmark_add
+        _bookmark_add(['a', str(tmp_path), '-i', 'a.html'])
+        capsys.readouterr()
+        _bookmark_add(['b', str(tmp_path), '-i', 'a.html', '--json'])
+        captured = capsys.readouterr()
+        import json
+        result = json.loads(captured.out)
+        assert result['success'] is False
+        assert 'path+index already bookmarked' in result['error']
+
+    def test_bookmark_remove_json(self, tmp_path, capsys):
+        """hs bookmark remove --json 成功走信封（TC-06）"""
+        self._add('myapp', tmp_path)
+        capsys.readouterr()
+        from http_server_cli.cli import _bookmark_remove
+        _bookmark_remove(['myapp', '--json'])
+        captured = capsys.readouterr()
+        import json
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['command'] == 'bookmark-remove'
+        assert result['data']['name'] == 'myapp'
+
+    def test_bookmark_remove_json_not_found(self, capsys):
+        """hs bookmark remove <缺失> --json 未找到走信封（TC-06）"""
+        from http_server_cli.cli import _bookmark_remove
+        _bookmark_remove(['nope', '--json'])
+        captured = capsys.readouterr()
+        import json
+        result = json.loads(captured.out)
+        assert result['success'] is False
+        assert 'not found' in result['error']
+
+    def test_bookmark_update_json(self, tmp_path, capsys):
+        """hs bookmark update --json 成功走信封（TC-07）"""
+        self._add('myapp', tmp_path, 'old.html')
+        capsys.readouterr()
+        from http_server_cli.cli import _bookmark_update
+        _bookmark_update(['myapp', '-i', 'new.html', '--json'])
+        captured = capsys.readouterr()
+        import json
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['command'] == 'bookmark-update'
+        assert result['data']['index_page'] == 'new.html'
+
+    def test_bookmark_update_json_not_found(self, capsys):
+        """hs bookmark update <缺失> --json 未找到走信封（TC-07）"""
+        from http_server_cli.cli import _bookmark_update
+        _bookmark_update(['nope', '--json'])
+        captured = capsys.readouterr()
+        import json
+        result = json.loads(captured.out)
+        assert result['success'] is False
+        assert 'not found' in result['error']
+
+    def test_bookmark_json_error_no_stdout_pollution(self, capsys):
+        """json 模式错误不污染 stdout（TC-12）"""
+        from http_server_cli.cli import _bookmark_show
+        _bookmark_show(['nope', '--json'])
+        captured = capsys.readouterr()
+        # stdout 必须是单行合法 JSON，无 emoji
+        import json
+        result = json.loads(captured.out.strip())
+        assert result['success'] is False
+        assert '📌' not in captured.out
+        assert '❌' not in captured.out
+
+    def test_bookmark_json_corrupted_file(self, tmp_path, capsys):
+        """bookmarks.json 损坏时各子命令走信封无 traceback（TC-13）"""
+        import http_server_cli.bookmark as bm_mod
+        bad_path = tmp_path / 'bookmarks.json'
+        bad_path.write_text('{this is not json')
+
+        original = bm_mod.BOOKMARKS_PATH
+        bm_mod.BOOKMARKS_PATH = str(bad_path)
+        try:
+            from http_server_cli.cli import _bookmark_list, _bookmark_show, _bookmark_remove
+            for fn, args in ((_bookmark_list, ['--json']),
+                             (_bookmark_show, ['myapp', '--json']),
+                             (_bookmark_remove, ['myapp', '--json'])):
+                fn(args)
+                captured = capsys.readouterr()
+                import json as _json
+                result = _json.loads(captured.out)
+                assert result['success'] is False
+                assert result['error'] == 'bookmarks file corrupted'
+                # 无 traceback 冒泡到 stderr
+                assert 'Traceback' not in captured.err
+        finally:
+            bm_mod.BOOKMARKS_PATH = original
+
+
+class TestManageJson:
+    """mcp / dashboard 管理子命令 --json 输出"""
+
+    def _make_mgr(self, monkeypatch, name, entry):
+        from unittest.mock import MagicMock
+        mreg = MagicMock()
+        mreg.find.return_value = entry
+        # _manage_mcp/_manage_dashboard 内部 `from registry_managed import ManagedRegistry`，
+        # 需 patch 源模块
+        monkeypatch.setattr(
+            'http_server_cli.registry_managed.ManagedRegistry', lambda: mreg)
+        return mreg
+
+    def _patch_alive(self, monkeypatch, alive):
+        # is_process_alive / is_port_in_use 是函数内局部导入，patch 源模块 utils
+        monkeypatch.setattr('http_server_cli.utils.is_process_alive',
+                            lambda pid: alive)
+        monkeypatch.setattr('http_server_cli.utils.is_port_in_use',
+                            lambda port: alive)
+
+    def test_mcp_status_json_not_running(self, monkeypatch, capsys):
+        """hs mcp status --json 未运行 → error 信封（TC-08）"""
+        self._make_mgr(monkeypatch, 'mcp', None)
+        from http_server_cli.cli import _manage_mcp
+        _manage_mcp('status', json_mode=True)
+        captured = capsys.readouterr()
+        import json
+        result = json.loads(captured.out)
+        assert result['success'] is False
+        assert result['command'] == 'mcp-status'
+        assert result['error'] == 'MCP not running'
+
+    def test_mcp_status_json_running(self, monkeypatch, capsys):
+        """hs mcp status --json 运行 → 成功信封（TC-08）"""
+        entry = {'name': 'mcp', 'port': 8181, 'pid': 12345,
+                 'started_at': '2026-06-20T00:00:00', 'transport': 'sse'}
+        self._make_mgr(monkeypatch, 'mcp', entry)
+        self._patch_alive(monkeypatch, True)
+        from http_server_cli.cli import _manage_mcp
+        _manage_mcp('status', json_mode=True)
+        captured = capsys.readouterr()
+        import json
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['command'] == 'mcp-status'
+        assert result['data']['name'] == 'mcp'
+        assert result['data']['alive'] is True
+
+    def test_mcp_stop_json(self, monkeypatch, capsys):
+        """hs mcp stop --json → 成功信封（TC-09）"""
+        entry = {'name': 'mcp', 'port': 8181, 'pid': 12345,
+                 'started_at': '2026-06-20T00:00:00', 'transport': 'sse'}
+        self._make_mgr(monkeypatch, 'mcp', entry)
+        self._patch_alive(monkeypatch, False)
+        from http_server_cli.cli import _manage_mcp
+        _manage_mcp('stop', json_mode=True)
+        captured = capsys.readouterr()
+        import json
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['command'] == 'mcp-stop'
+        assert result['data']['stopped'] is True
+
+    def test_dashboard_status_json_not_running(self, monkeypatch, capsys):
+        """hs dashboard status --json 未运行 → error 信封（TC-10）"""
+        self._make_mgr(monkeypatch, 'dashboard', None)
+        from http_server_cli.cli import _manage_dashboard
+        _manage_dashboard('status', json_mode=True)
+        captured = capsys.readouterr()
+        import json
+        result = json.loads(captured.out)
+        assert result['success'] is False
+        assert result['command'] == 'dashboard-status'
+        assert result['error'] == 'dashboard not running'
+
+    def test_dashboard_status_json_running(self, monkeypatch, capsys):
+        """hs dashboard status --json 运行 → 成功信封（TC-10）"""
+        entry = {'name': 'dashboard', 'port': 8180, 'pid': 12345,
+                 'started_at': '2026-06-20T00:00:00'}
+        self._make_mgr(monkeypatch, 'dashboard', entry)
+        self._patch_alive(monkeypatch, True)
+        from http_server_cli.cli import _manage_dashboard
+        _manage_dashboard('status', json_mode=True)
+        captured = capsys.readouterr()
+        import json
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['command'] == 'dashboard-status'
+        assert result['data']['name'] == 'dashboard'
+        assert result['data']['alive'] is True
+
+    def test_dashboard_stop_json(self, monkeypatch, capsys):
+        """hs dashboard stop --json → 成功信封（TC-11）"""
+        entry = {'name': 'dashboard', 'port': 8180, 'pid': 12345,
+                 'started_at': '2026-06-20T00:00:00'}
+        self._make_mgr(monkeypatch, 'dashboard', entry)
+        self._patch_alive(monkeypatch, False)
+        from http_server_cli.cli import _manage_dashboard
+        _manage_dashboard('stop', json_mode=True)
+        captured = capsys.readouterr()
+        import json
+        result = json.loads(captured.out)
+        assert result['success'] is True
+        assert result['command'] == 'dashboard-stop'
+        assert result['data']['stopped'] is True

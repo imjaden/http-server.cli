@@ -305,8 +305,8 @@ def _list_servers(manager, json: bool = False, port_only: bool = False,
         pid = entry.get('pid', '-')
         started = entry.get('started_at', '-')
         is_current = entry['path'] == os.getcwd()
-        bm_name = bm_store.get_for_path(entry['path'])
-        bm_label = f'  [{bm_name}]' if bm_name else ''
+        bm_names = bm_store.get_for_path(entry['path'])
+        bm_label = f'  [{",".join(bm_names)}]' if bm_names else ''
         if is_current:
             print(f'📍  http://{domain}:{port}{bm_label} （current）')
         else:
@@ -544,7 +544,7 @@ def _cmd_dashboard(manager, args):
     # 子命令优先
     sub = args[0] if args else None
     if sub in ('help', 'stop', 'status', 'restart'):
-        _manage_dashboard(sub)
+        _manage_dashboard(sub, json_mode=('--json' in args))
         return
 
     parser = argparse.ArgumentParser(prog='hs dashboard', add_help=False)
@@ -562,10 +562,10 @@ def _cmd_dashboard(manager, args):
           json_output_mode=parsed.json, daemon=auto_daemon)
 
 
-def _manage_dashboard(subcmd: str) -> None:
+def _manage_dashboard(subcmd: str, json_mode: bool = False) -> None:
     """管理 dashboard 服务：stop / status / restart / help"""
     from http_server_cli.registry_managed import ManagedRegistry
-    from http_server_cli.utils import eprint, format_duration, get_process_stats, is_process_alive, is_port_in_use
+    from http_server_cli.utils import eprint, format_duration, get_process_stats, is_process_alive, is_port_in_use, json_output
     import os, signal, time
 
     mreg = ManagedRegistry()
@@ -585,7 +585,11 @@ def _manage_dashboard(subcmd: str) -> None:
         return
 
     if subcmd in ('stop', 'status', 'restart') and not entry:
-        eprint('dashboard not running', 'ℹ️')
+        if json_mode:
+            json_output(False, f'dashboard-{subcmd}',
+                        error='dashboard not running')
+        else:
+            eprint('dashboard not running', 'ℹ️')
         return
 
     port = entry.get('port', '?')
@@ -595,9 +599,19 @@ def _manage_dashboard(subcmd: str) -> None:
         alive = pid and is_process_alive(pid) and is_port_in_use(port)
         duration = format_duration(entry.get('started_at', ''))
         stats = get_process_stats(pid)
-        icon = '🟢' if alive else '🔴'
         from http_server_cli.utils import LOG_DIR, format_path
         dashboard_log = format_path(os.path.join(LOG_DIR, 'dashboard.log'))
+        if json_mode:
+            json_output(True, 'dashboard-status', data={
+                'name': 'dashboard',
+                'port': port,
+                'pid': pid,
+                'alive': bool(alive),
+                'duration': duration,
+                'log': dashboard_log,
+            })
+            return
+        icon = '🟢' if alive else '🔴'
         print(f'{icon}  hs dashboard  →  http://127.0.0.1:{port}')
         print(f'    🔧  PID: {pid}  |  Duration: {duration}')
         print(f'    📊  CPU: {stats["cpu"]}  |  Memory: {stats["memory"]} ({stats["memory_percent"]})')
@@ -628,11 +642,21 @@ def _manage_dashboard(subcmd: str) -> None:
                     os.remove(lp)
                 except OSError:
                     pass
-        eprint(f'dashboard (port {port}) stopped', '🛑')
+        if subcmd == 'stop':
+            if json_mode:
+                json_output(True, 'dashboard-stop', data={
+                    'name': 'dashboard', 'port': port, 'stopped': True,
+                })
+            else:
+                eprint(f'dashboard (port {port}) stopped', '🛑')
 
     if subcmd == 'restart':
         from http_server_cli.dashboard import serve
         serve(port=8180, open_browser=False, daemon=True)
+        if json_mode:
+            json_output(True, 'dashboard-restart', data={
+                'name': 'dashboard', 'port': port, 'restarted': True,
+            })
 
 
 @_register
@@ -641,7 +665,7 @@ def _cmd_mcp(manager, args):
     # 子命令优先
     sub = args[0] if args else None
     if sub in ('help', 'stop', 'status', 'restart'):
-        _manage_mcp(sub)
+        _manage_mcp(sub, json_mode=('--json' in args))
         return
 
     parser = argparse.ArgumentParser(prog='hs mcp', add_help=False)
@@ -659,36 +683,50 @@ def _cmd_mcp(manager, args):
         serve_sse(port=parsed.port, daemon=True)
 
 
-def _manage_mcp(subcmd: str) -> None:
+def _manage_mcp(subcmd: str, json_mode: bool = False) -> None:
     """管理 MCP 服务：stop / status / restart / help"""
     from http_server_cli.registry_managed import ManagedRegistry
-    from http_server_cli.utils import eprint, format_duration, get_process_stats, is_process_alive, is_port_in_use
+    from http_server_cli.utils import eprint, format_duration, get_process_stats, is_process_alive, is_port_in_use, json_output
     import os, signal, time
 
     mreg = ManagedRegistry()
     entry = mreg.find(name='mcp')
 
     if subcmd == 'help':
-        print('━━━ hs mcp ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+        print('━━━ hs mcp ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
         print('  hs mcp                    Background SSE (default)')
         print('  hs mcp --transport stdio  Foreground stdio mode')
         print('  hs mcp --port PORT        Specify port')
         print('  hs mcp stop               Stop MCP service')
         print('  hs mcp status             View status')
         print('  hs mcp restart            Restart MCP service')
-        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
         return
 
     if subcmd in ('stop', 'status', 'restart') and not entry:
-        eprint('MCP not running', 'ℹ️')
+        if json_mode:
+            json_output(False, f'mcp-{subcmd}', error='MCP not running')
+        else:
+            eprint('MCP not running', 'ℹ️')
         return
 
     port = entry.get('port', '?')
     pid = entry.get('pid')
+    transport = entry.get('transport', '')
 
     if subcmd == 'status':
         alive = pid and is_process_alive(pid) and is_port_in_use(port)
         duration = format_duration(entry.get('started_at', ''))
+        if json_mode:
+            json_output(True, 'mcp-status', data={
+                'name': 'mcp',
+                'port': port,
+                'pid': pid,
+                'alive': bool(alive),
+                'transport': transport,
+                'duration': duration,
+            })
+            return
         icon = '🟢' if alive else '🔴'
         print(f'{icon}  hs mcp (SSE)  →  http://127.0.0.1:{port}/sse')
         print(f'    🔧  PID: {pid}  |  Duration: {duration}')
@@ -705,11 +743,21 @@ def _manage_mcp(subcmd: str) -> None:
             except (ProcessLookupError, PermissionError, OSError):
                 pass
         mreg.remove(name='mcp')
-        eprint(f'MCP (port {port}) stopped', '🛑')
+        if subcmd == 'stop':
+            if json_mode:
+                json_output(True, 'mcp-stop', data={
+                    'name': 'mcp', 'port': port, 'stopped': True,
+                })
+            else:
+                eprint(f'MCP (port {port}) stopped', '🛑')
 
     if subcmd == 'restart':
         from http_server_cli.mcp import serve_sse
         serve_sse(port=8181, daemon=True)
+        if json_mode:
+            json_output(True, 'mcp-restart', data={
+                'name': 'mcp', 'port': port, 'restarted': True,
+            })
 
 # ── bookmark 子命令 ────────────────────────────────────
 
@@ -754,29 +802,45 @@ def _bookmark_add(args):
     parser.add_argument('name')
     parser.add_argument('path', nargs='?', default=None)
     parser.add_argument('-i', '--index', default=None)
+    parser.add_argument('--force', action='store_true')
+    parser.add_argument('--json', action='store_true')
     try:
         parsed, _ = parser.parse_known_args(args)
     except SystemExit:
         return
 
-    from http_server_cli.bookmark import BookmarkStore
+    from http_server_cli.bookmark import BookmarkStore, DataCorruptionError
     from http_server_cli.server import _validate_index_page
+    from http_server_cli.utils import resolve_path, format_path, json_output
+
+    json_mode = parsed.json
+    cmd = 'bookmark-add'
 
     # 名称校验
     name_err = BookmarkStore.validate_name(parsed.name)
     if name_err:
-        print(f'❌ {name_err}', file=sys.stderr)
+        if json_mode:
+            json_output(False, cmd, error=name_err)
+        else:
+            print(f'❌ {name_err}', file=sys.stderr)
         return
     if parsed.name in _COMMANDS:
-        print(f"❌ '{parsed.name}' conflicts with built-in command", file=sys.stderr)
+        err = f"'{parsed.name}' conflicts with built-in command"
+        if json_mode:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
         return
 
     # 路径处理（提前，因为通配符展开需要 abs_path）
-    from http_server_cli.utils import resolve_path, format_path
     path = parsed.path or os.getcwd()
     abs_path = resolve_path(path)
     if not os.path.isdir(abs_path):
-        print(f'❌ Path does not exist or is not a directory: {format_path(abs_path)}', file=sys.stderr)
+        err = f'Path does not exist or is not a directory: {format_path(abs_path)}'
+        if json_mode:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
         return
 
     # index_page 处理：含 * 的通配符保留原样（运行时解析），字面量立即校验
@@ -788,24 +852,68 @@ def _bookmark_add(args):
         else:
             err = _validate_index_page(index_page)
             if err:
-                print(f'❌ {err}', file=sys.stderr)
+                if json_mode:
+                    json_output(False, cmd, error=err)
+                else:
+                    print(f'❌ {err}', file=sys.stderr)
                 return
 
     store = BookmarkStore()
     try:
-        store.add(parsed.name, abs_path, index_page)
-        print(f"✅ Bookmark '{parsed.name}' → {format_path(abs_path)}")
-        if index_page:
-            print(f"   📄 Default index: {index_page}")
+        store.add(parsed.name, abs_path, index_page, force=parsed.force)
+        bm = store.get(parsed.name)
+        if json_mode:
+            json_output(True, cmd, data={
+                'name': bm['name'],
+                'path': bm['path'],
+                'index_page': bm.get('index_page'),
+                'created_at': bm.get('created_at'),
+            })
+        else:
+            print(f"✅ Bookmark '{parsed.name}' → {format_path(abs_path)}")
+            if index_page:
+                print(f"   📄 Default index: {index_page}")
     except ValueError as e:
-        print(f'❌ {e}', file=sys.stderr)
+        if json_mode:
+            json_output(False, cmd, error=str(e))
+        else:
+            print(f'❌ {e}', file=sys.stderr)
+    except DataCorruptionError:
+        if json_mode:
+            json_output(False, cmd, error='bookmarks file corrupted')
+        else:
+            print('❌ bookmarks file corrupted', file=sys.stderr)
 
 
 def _bookmark_list(args):
-    from http_server_cli.bookmark import BookmarkStore
-    from http_server_cli.utils import format_path
+    parser = argparse.ArgumentParser(prog='hs bookmark list', add_help=False)
+    parser.add_argument('--json', action='store_true')
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
+        return
+
+    from http_server_cli.bookmark import BookmarkStore, DataCorruptionError
+    from http_server_cli.utils import format_path, json_output
+
+    cmd = 'bookmark-list'
     store = BookmarkStore()
-    bookmarks = store.list_all()
+    try:
+        bookmarks = store.list_all()
+    except DataCorruptionError:
+        if parsed.json:
+            json_output(False, cmd, error='bookmarks file corrupted')
+        else:
+            print('❌ bookmarks file corrupted', file=sys.stderr)
+        return
+
+    if parsed.json:
+        json_output(True, cmd, data={
+            'count': len(bookmarks),
+            'bookmarks': bookmarks,
+        })
+        return
+
     if not bookmarks:
         print('No bookmarks registered')
         return
@@ -820,17 +928,53 @@ def _bookmark_list(args):
 
 
 def _bookmark_show(args):
-    if not args:
-        print('❌ Usage: hs bookmark show <name>', file=sys.stderr)
+    parser = argparse.ArgumentParser(prog='hs bookmark show', add_help=False)
+    parser.add_argument('name', nargs='?', default=None)
+    parser.add_argument('--json', action='store_true')
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
         return
-    from http_server_cli.bookmark import BookmarkStore
-    from http_server_cli.utils import format_path
-    name = args[0]
+
+    from http_server_cli.bookmark import BookmarkStore, DataCorruptionError
+    from http_server_cli.utils import format_path, json_output
+
+    cmd = 'bookmark-show'
+    if not parsed.name:
+        err = 'Usage: hs bookmark show <name>'
+        if parsed.json:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
+        return
+
     store = BookmarkStore()
-    bm = store.get(name)
-    if not bm:
-        print(f"❌ bookmark '{name}' not found", file=sys.stderr)
+    try:
+        bm = store.get(parsed.name)
+    except DataCorruptionError:
+        if parsed.json:
+            json_output(False, cmd, error='bookmarks file corrupted')
+        else:
+            print('❌ bookmarks file corrupted', file=sys.stderr)
         return
+
+    if not bm:
+        err = f"bookmark '{parsed.name}' not found"
+        if parsed.json:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
+        return
+
+    if parsed.json:
+        json_output(True, cmd, data={
+            'name': bm['name'],
+            'path': bm['path'],
+            'index_page': bm.get('index_page'),
+            'created_at': bm.get('created_at'),
+        })
+        return
+
     print(f"📌 {bm['name']}")
     print(f"   📁 {format_path(bm['path'])}")
     if bm.get('index_page'):
@@ -839,16 +983,47 @@ def _bookmark_show(args):
 
 
 def _bookmark_remove(args):
-    if not args:
-        print('❌ Usage: hs bookmark remove <name>', file=sys.stderr)
+    parser = argparse.ArgumentParser(prog='hs bookmark remove', add_help=False)
+    parser.add_argument('name', nargs='?', default=None)
+    parser.add_argument('--json', action='store_true')
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
         return
-    from http_server_cli.bookmark import BookmarkStore
-    name = args[0]
+
+    from http_server_cli.bookmark import BookmarkStore, DataCorruptionError
+    from http_server_cli.utils import json_output
+
+    cmd = 'bookmark-remove'
+    if not parsed.name:
+        err = 'Usage: hs bookmark remove <name>'
+        if parsed.json:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
+        return
+
     store = BookmarkStore()
-    if store.remove(name):
-        print(f"✅ Bookmark '{name}' removed")
+    try:
+        removed = store.remove(parsed.name)
+    except DataCorruptionError:
+        if parsed.json:
+            json_output(False, cmd, error='bookmarks file corrupted')
+        else:
+            print('❌ bookmarks file corrupted', file=sys.stderr)
+        return
+
+    if parsed.json:
+        if removed:
+            json_output(True, cmd, data={'name': parsed.name})
+        else:
+            json_output(False, cmd, error=f"bookmark '{parsed.name}' not found")
+        return
+
+    if removed:
+        print(f"✅ Bookmark '{parsed.name}' removed")
     else:
-        print(f"❌ bookmark '{name}' not found", file=sys.stderr)
+        print(f"❌ bookmark '{parsed.name}' not found", file=sys.stderr)
 
 
 def _bookmark_update(args):
@@ -856,19 +1031,35 @@ def _bookmark_update(args):
     parser.add_argument('name')
     parser.add_argument('path', nargs='?', default=None)
     parser.add_argument('-i', '--index', default=None)
+    parser.add_argument('--json', action='store_true')
     try:
         parsed, _ = parser.parse_known_args(args)
     except SystemExit:
         return
 
-    from http_server_cli.bookmark import BookmarkStore
+    from http_server_cli.bookmark import BookmarkStore, DataCorruptionError
     from http_server_cli.server import _validate_index_page
-    from http_server_cli.utils import resolve_path, format_path
+    from http_server_cli.utils import resolve_path, format_path, json_output
+
+    json_mode = parsed.json
+    cmd = 'bookmark-update'
 
     store = BookmarkStore()
-    existing = store.get(parsed.name)
+    try:
+        existing = store.get(parsed.name)
+    except DataCorruptionError:
+        if json_mode:
+            json_output(False, cmd, error='bookmarks file corrupted')
+        else:
+            print('❌ bookmarks file corrupted', file=sys.stderr)
+        return
+
     if not existing:
-        print(f"❌ bookmark '{parsed.name}' not found", file=sys.stderr)
+        err = f"bookmark '{parsed.name}' not found"
+        if json_mode:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
         return
 
     # 路径处理
@@ -876,7 +1067,11 @@ def _bookmark_update(args):
     if parsed.path is not None:
         abs_path = resolve_path(parsed.path)
         if not os.path.isdir(abs_path):
-            print(f'❌ Path does not exist: {format_path(abs_path)}', file=sys.stderr)
+            err = f'Path does not exist: {format_path(abs_path)}'
+            if json_mode:
+                json_output(False, cmd, error=err)
+            else:
+                print(f'❌ {err}', file=sys.stderr)
             return
         path = abs_path
 
@@ -889,7 +1084,10 @@ def _bookmark_update(args):
         elif index_page:
             err = _validate_index_page(index_page)
             if err:
-                print(f'❌ {err}', file=sys.stderr)
+                if json_mode:
+                    json_output(False, cmd, error=err)
+                else:
+                    print(f'❌ {err}', file=sys.stderr)
                 return
         else:
             index_page = ''  # 空字符串 → 清除
@@ -897,12 +1095,27 @@ def _bookmark_update(args):
     try:
         store.update(parsed.name, path=path, index_page=index_page)
         updated = store.get(parsed.name)
-        print(f"✅ Bookmark '{parsed.name}' updated")
-        print(f"   📁 {format_path(updated['path'])}")
-        if updated.get('index_page'):
-            print(f"   📄 Default index: {updated['index_page']}")
+        if json_mode:
+            json_output(True, cmd, data={
+                'name': updated['name'],
+                'path': updated['path'],
+                'index_page': updated.get('index_page'),
+            })
+        else:
+            print(f"✅ Bookmark '{parsed.name}' updated")
+            print(f"   📁 {format_path(updated['path'])}")
+            if updated.get('index_page'):
+                print(f"   📄 Default index: {updated['index_page']}")
     except ValueError as e:
-        print(f'❌ {e}', file=sys.stderr)
+        if json_mode:
+            json_output(False, cmd, error=str(e))
+        else:
+            print(f'❌ {e}', file=sys.stderr)
+    except DataCorruptionError:
+        if json_mode:
+            json_output(False, cmd, error='bookmarks file corrupted')
+        else:
+            print('❌ bookmarks file corrupted', file=sys.stderr)
 
 # ── main ───────────────────────────────────────────────
 
