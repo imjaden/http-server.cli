@@ -16,7 +16,7 @@ import glob
 
 # ── 帮助文本 ──────────────────────────────────────────
 
-_HELP = """http-server-cli v{version} — 忘记端口，只管预览
+_HELP = """http-server.cli v{version} — 忘记端口，只管预览
 
 用法:  hs [command] [args]
 
@@ -82,7 +82,7 @@ _HELP = """http-server-cli v{version} — 忘记端口，只管预览
   hs version               显示版本号
   hs help                  显示此帮助
 
-数据目录: ~/.http-server-cli/（config.json / registry.json / logs/）
+数据目录: ~/.http-server.cli/（config.json / registry.json / logs/）
 """
 
 # ── Set 子命令 ─────────────────────────────────────────
@@ -529,13 +529,13 @@ def _cmd_version(manager, args):
         import sys
         data = {
             'version': __version__,
-            'name': 'http-server-cli',
+            'name': 'http-server.cli',
             'python': sys.version.split()[0],
             'platform': sys.platform,
         }
         json_output(True, 'version', data=data)
     else:
-        print(f'http-server-cli v{__version__}')
+        print(f'http-server.cli v{__version__}')
 
 
 @_register
