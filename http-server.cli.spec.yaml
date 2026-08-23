@@ -1,5 +1,5 @@
-name: http-server-cli
-version: 1.0.8
+name: http-server.cli
+version: 1.1.0
 description: 基于 python3 -m http.server 的本地 HTTP 服务管理器。自动分配端口、追踪项目映射、管理服务生命周期、智能首页跳转、进程资源监控。
 date: 2026-06-23
 author: IRIS
@@ -279,7 +279,7 @@ specs:
         scenarios:
           - name: version 命令
             when: 执行 hs version
-            then: 输出 http-server-cli v1.1.0
+            then: 输出 http-server.cli v1.1.0
 
           - name: --version 标志
             when: 执行 hs --version
@@ -405,7 +405,7 @@ specs:
         scenarios:
           - name: 创建日志文件
             given: 服务在端口 8080 启动
-            when: 检查 ~/.http-server-cli/logs/8080.log
+            when: 检查 ~/.http-server.cli/logs/8080.log
             then: 文件存在且可读取
 
       - id: log-02
@@ -416,7 +416,7 @@ specs:
           - name: 删除日志文件
             given: 服务在端口 8080 运行
             when: 执行 hs kill 8080
-            then: ~/.http-server-cli/logs/8080.log 文件被删除
+            then: ~/.http-server.cli/logs/8080.log 文件被删除
 
       - id: log-03
         name: 首页跳转日志

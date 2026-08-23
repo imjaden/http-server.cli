@@ -28,7 +28,7 @@ class DataCorruptionError(RuntimeError):
 class BookmarkStore:
     """书签持久化存储。
 
-    存储文件: ~/.http-server-cli/bookmarks.json
+    存储文件: ~/.http-server.cli/bookmarks.json
     路径唯一约束: 不同 name 不可指向同一 path。
     损坏检测: 非空文件 JSON 解析失败抛出 DataCorruptionError。
     """
