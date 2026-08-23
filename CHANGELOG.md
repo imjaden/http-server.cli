@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.0 (2026-08-19)
+## 1.1.0 (2026-08-23)
 
 ### Changed
 - Project renamed `http-server-cli` → `http-server.cli`; GitHub repo → `imjaden/http-server.cli`
