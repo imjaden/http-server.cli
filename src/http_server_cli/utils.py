@@ -6,6 +6,7 @@
 
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -15,7 +16,9 @@ from pathlib import Path
 from typing import Any, Optional
 
 HOME = os.path.expanduser('~')
-DATA_DIR = os.path.join(HOME, '.http-server-cli')
+# v1.1.0: 数据目录从 ~/.http-server-cli 迁移至 ~/.http-server.cli
+LEGACY_DATA_DIR = os.path.join(HOME, '.http-server-cli')
+DATA_DIR = os.path.join(HOME, '.http-server.cli')
 CONFIG_PATH = os.path.join(DATA_DIR, 'config.json')
 REGISTRY_PATH = os.path.join(DATA_DIR, 'registry.json')
 HISTORY_PATH = os.path.join(DATA_DIR, 'history.json')
@@ -41,8 +44,39 @@ def format_path(path: str) -> str:
 
 # ── 存储 ────────────────────────────────────────────────
 
+def _migrate_legacy_data() -> None:
+    """v1.1.0: 将旧数据目录 ~/.http-server-cli 迁移至 ~/.http-server.cli。
+
+    - 新目录已存在 → 不迁移（可能是新装或已迁移过）。
+    - 旧目录不存在 → 无事可做。
+    - move 失败（权限/跨设备等）→ 回退复制旧目录内容到新目录，
+      保留旧目录并在 stderr 提示；复制也失败 → 警告并继续（不中断）。
+    """
+    if not os.path.isdir(LEGACY_DATA_DIR):
+        return
+    if os.path.exists(DATA_DIR):
+        # 新目录已存在：旧目录可能是残留，交给用户处理
+        return
+    try:
+        os.makedirs(os.path.dirname(DATA_DIR), exist_ok=True)
+        os.rename(LEGACY_DATA_DIR, DATA_DIR)
+        eprint(f'Data directory migrated to {format_path(DATA_DIR)}', '🔀')
+    except OSError as e:
+        try:
+            shutil.copytree(LEGACY_DATA_DIR, DATA_DIR)
+            eprint(
+                f'Data directory copied to {format_path(DATA_DIR)} '
+                f'(move failed: {e}); legacy directory kept',
+                '⚠️')
+        except OSError as e2:
+            eprint(
+                f'Data directory migration failed ({e2}); '
+                f'continuing with new empty directory', '⚠️')
+
+
 def ensure_storage() -> None:
     """确保数据目录和初始文件存在"""
+    _migrate_legacy_data()
     os.makedirs(LOG_DIR, exist_ok=True)
     if not os.path.exists(CONFIG_PATH):
         from http_server_cli.config import DEFAULT_CONFIG

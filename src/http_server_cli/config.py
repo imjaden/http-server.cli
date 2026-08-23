@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 配置管理：默认端口、绑定域名。
-持久化至 ~/.http-server-cli/config.json。
+持久化至 ~/.http-server.cli/config.json。
 """
 
 import os
@@ -73,7 +73,7 @@ class Config:
             }
             json_output(success=True, command='config', data=data)
             return
-        print('📋 http-server-cli configuration')
+        print('📋 http-server.cli configuration')
         print(f'  port:   {self.port}')
         print(f'  domain: {self.domain}')
         print(f'  data dir: {CONFIG_PATH.replace(os.path.expanduser("~"), "~")}')
