@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "http-server-cli"
 dynamic = ["version"]
 description = "Local HTTP Server Manager"
-readme = "README.en.md"
+readme = "README.md"
 requires-python = ">=3.7"
 license = "MIT"
 authors = [
@@ -33,9 +33,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/imjaden/http-server-cli"
-Source = "https://github.com/imjaden/http-server-cli"
-BugTracker = "https://github.com/imjaden/http-server-cli/issues"
+Homepage = "https://github.com/imjaden/http-server.cli"
+Source = "https://github.com/imjaden/http-server.cli"
+BugTracker = "https://github.com/imjaden/http-server.cli/issues"
 
 [project.scripts]
 hs = "http_server_cli.cli:main"
