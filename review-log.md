@@ -175,3 +175,22 @@ Re-audit of the two fix commits closing all 6 🟡 findings (HS-SEC-011~016) plu
 | HS-SEC-011~016 | rename residuals (6 🟡) | 🟡 | P1/P2 | ✅ Closed (0dcbab2/fd07634) |
 | OBS-1 | CHANGELOG date drift | 🟢 | — | ✅ Closed (fd07634) |
 | OBS-2 | governance enum lacks feat@ | 🟢 | — | ⏸ 挂账（约定本轮不动） |
+
+---
+
+## 2026-08-23 — Commit audit: fix@spec YAML quoting (ac69262)
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2 (spec 文件 + 全量测试回归)
+- **Scope**: 1 个未 push commit — fix@spec: quote scenario values with colons to fix YAML syntax
+- **Commit(s)**: ac69262
+- **Verdict**: ✅ PASS
+- **Score**: 100 / 100 (Rating: A)
+
+### Summary
+
+3 处 `then:` 值内含 `: `（半角冒号+空格）导致 YAML plain scalar 解析报错，整值以单引号包裹修复（L389/L394/L429）。`yaml.safe_load` 实测通过（8 specs），全量扫描无其他未加引号冒号值，输出串语义逐字未变。commit 格式 `fix@spec: subject` 符合 type@scope 约定，单行描述自描述。无新增/重命名文件。343 测试全绿（Python 3.12 + PYTHONPATH=src 实测）。无新增发现。
+
+### Tracking
+
+无新增发现，无 tracking ID。
