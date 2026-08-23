@@ -5,6 +5,7 @@ Utils 模块测试 — OpenSpec: cfg-01(ensure_storage), res-03(format_duration)
 
 import json
 import os
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -129,6 +130,97 @@ class TestEnsureStorage:
 
         reg = read_json(_registry_path())
         assert reg == {'servers': []}
+
+
+class TestLegacyDataMigration:
+    """v1.1.0 数据目录迁移: ~/.http-server-cli → ~/.http-server.cli"""
+
+    def _make_legacy(self, path: str) -> None:
+        """构造旧目录含 config.json/registry.json/bookmarks.json"""
+        os.makedirs(os.path.join(path, 'logs'), exist_ok=True)
+        with open(os.path.join(path, 'config.json'), 'w') as f:
+            f.write('{"port": 8080, "domain": "localhost"}\n')
+        with open(os.path.join(path, 'registry.json'), 'w') as f:
+            f.write('{"servers": []}\n')
+
+    def test_migrates_when_legacy_exists(self, monkeypatch, tmp_path):
+        legacy = str(tmp_path / 'legacy')
+        newdir = str(tmp_path / 'new')
+        self._make_legacy(legacy)
+        monkeypatch.setattr(hs_utils, 'LEGACY_DATA_DIR', legacy)
+        monkeypatch.setattr(hs_utils, 'DATA_DIR', newdir)
+
+        hs_utils._migrate_legacy_data()
+
+        assert not os.path.exists(legacy)
+        assert os.path.isfile(os.path.join(newdir, 'config.json'))
+        assert os.path.isfile(os.path.join(newdir, 'registry.json'))
+        assert os.path.isdir(os.path.join(newdir, 'logs'))
+
+    def test_skips_when_new_dir_exists(self, monkeypatch, tmp_path):
+        legacy = str(tmp_path / 'legacy')
+        newdir = str(tmp_path / 'new')
+        self._make_legacy(legacy)
+        os.makedirs(newdir, exist_ok=True)
+        marker = os.path.join(newdir, 'keep.txt')
+        with open(marker, 'w') as f:
+            f.write('x')
+        monkeypatch.setattr(hs_utils, 'LEGACY_DATA_DIR', legacy)
+        monkeypatch.setattr(hs_utils, 'DATA_DIR', newdir)
+
+        hs_utils._migrate_legacy_data()
+
+        assert os.path.exists(legacy)      # 旧目录保留
+        assert os.path.exists(marker)      # 新目录未被覆盖
+
+    def test_skips_when_no_legacy(self, monkeypatch, tmp_path):
+        newdir = str(tmp_path / 'new')
+        monkeypatch.setattr(hs_utils, 'LEGACY_DATA_DIR',
+                            str(tmp_path / 'nonexistent'))
+        monkeypatch.setattr(hs_utils, 'DATA_DIR', newdir)
+
+        hs_utils._migrate_legacy_data()
+
+        assert not os.path.exists(newdir)  # 不应创建新目录
+
+    def test_copy_fallback_on_move_failure(self, monkeypatch, tmp_path):
+        """move 失败时回退 copytree,旧目录保留"""
+        legacy = str(tmp_path / 'legacy')
+        newdir = str(tmp_path / 'new')
+        self._make_legacy(legacy)
+        monkeypatch.setattr(hs_utils, 'LEGACY_DATA_DIR', legacy)
+        monkeypatch.setattr(hs_utils, 'DATA_DIR', newdir)
+
+        def _fail_rename(src, dst):
+            raise OSError('cross-device link')
+
+        monkeypatch.setattr(os, 'rename', _fail_rename)
+        hs_utils._migrate_legacy_data()
+
+        assert os.path.exists(legacy)      # 旧目录保留
+        assert os.path.isfile(os.path.join(newdir, 'config.json'))
+
+    def test_continues_on_full_failure(self, monkeypatch, tmp_path, capsys):
+        """move + copy 都失败 → 警告并继续,不抛异常"""
+        legacy = str(tmp_path / 'legacy')
+        newdir = str(tmp_path / 'new')
+        self._make_legacy(legacy)
+        monkeypatch.setattr(hs_utils, 'LEGACY_DATA_DIR', legacy)
+        monkeypatch.setattr(hs_utils, 'DATA_DIR', newdir)
+
+        def _fail_rename(src, dst):
+            raise OSError('perm denied')
+
+        def _fail_copy(src, dst):
+            raise OSError('disk full')
+
+        monkeypatch.setattr(os, 'rename', _fail_rename)
+        monkeypatch.setattr(shutil, 'copytree', _fail_copy)
+        hs_utils._migrate_legacy_data()
+
+        captured = capsys.readouterr()
+        assert 'migration failed' in captured.out
+        assert os.path.exists(legacy)      # 旧数据安全保留
 
 
 class TestFormatDuration:

@@ -40,7 +40,7 @@ class TestVersionCommand:
     def test_version_output(self, capsys):
         _COMMANDS['version'](None, [])
         captured = capsys.readouterr()
-        assert f'http-server-cli v{__version__}' in captured.out
+        assert f'http-server.cli v{__version__}' in captured.out
 
     def test_version_json_output(self, capsys):
         _COMMANDS['version'](None, ['--json'])
@@ -49,7 +49,7 @@ class TestVersionCommand:
         assert result['success'] is True
         assert result['command'] == 'version'
         assert result['data']['version'] == __version__
-        assert result['data']['name'] == 'http-server-cli'
+        assert result['data']['name'] == 'http-server.cli'
         assert result['error'] is None
 
 class TestHelpCommand:
