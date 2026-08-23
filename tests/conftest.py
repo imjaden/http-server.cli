@@ -34,6 +34,8 @@ def _isolate_data_dir(monkeypatch):
 
     # utils 模块（定义源）
     monkeypatch.setattr('http_server_cli.utils.DATA_DIR', tmp)
+    monkeypatch.setattr('http_server_cli.utils.LEGACY_DATA_DIR',
+                        os.path.join(tmp, 'legacy'))
     monkeypatch.setattr('http_server_cli.utils.CONFIG_PATH', cfg_path)
     monkeypatch.setattr('http_server_cli.utils.REGISTRY_PATH', reg_path)
     monkeypatch.setattr('http_server_cli.utils.LOG_DIR', log_dir)
