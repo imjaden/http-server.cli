@@ -42,3 +42,13 @@ review_history:
     tracking: HS-SEC-011 ~ HS-SEC-016 (closed)
     scope: "Commit re-audit: fix closure HS-SEC-011~016 + OBS-1 (commits 0dcbab2, fd07634); OBS-2 deferred"
     report: documents/review/http-server-cli-rename-fix-rereview-v1.1-20260823.md
+  - date: 2026-08-23
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: PASS
+    score: 100
+    findings_total: 0
+    findings_open: 0
+    tracking: none
+    scope: "Commit audit: fix@spec YAML quoting (ac69262) — 3 lines, spec parse OK + 343 tests green"
+    report: documents/review/http-server-cli-spec-yaml-fix-audit-v1.0-20260823.md
