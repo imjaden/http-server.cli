@@ -386,12 +386,12 @@ specs:
           - name: 分钟级时长
             given: 服务运行 5 分钟
             when: 执行 hs list
-            then: 输出"时长: 5 分钟"
+            then: '输出"时长: 5 分钟"'
 
           - name: 小时级时长
             given: 服务运行 2 小时
             when: 执行 hs list
-            then: 输出"时长: 2 小时"
+            then: '输出"时长: 2 小时"'
 
   # ── 日志管理 ───────────────────────────────────────
 
@@ -426,4 +426,4 @@ specs:
           - name: 重定向日志
             given: 目录无 index.html，有 test.html
             when: 访问 /
-            then: 日志输出"首页无 index.html，重定向到: test.html"
+            then: '日志输出"首页无 index.html，重定向到: test.html"'
