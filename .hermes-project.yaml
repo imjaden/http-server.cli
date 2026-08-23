@@ -12,3 +12,7 @@ sessions:
 - role: review
   profile: review
   title: http-server-cli-review
+handoff:
+  enabled: true
+  doc: documents/handoff/handoff-http-server.cli-review.md
+  updated_at: '2026-08-23'
