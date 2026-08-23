@@ -4,7 +4,7 @@
 
 <h1 align="center">
   <svg viewBox="0 0 16 16" width="28" height="28" style="vertical-align:middle;margin-right:6px;"><circle cx="8" cy="8" r="7.5" fill="#e0e0e0"/><text x="8" y="11.5" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-weight="900" font-size="9" fill="#333">hs</text></svg>
-  http-server-cli
+  http-server.cli
 </h1>
 
 > 忘记端口，只管预览 — Forget ports. Just preview.
@@ -42,7 +42,7 @@ pip install http-server-cli
 
 验证：
 ```
-hs version     # → http-server-cli v1.0.x
+hs version     # → http-server.cli v1.0.x
 hs -o        # 当前目录启动 + 打开浏览器
 ```
 
@@ -133,7 +133,7 @@ hs kill-all                 # 一键全关
 ## 数据目录
 
 ```
-~/.http-server-cli/
+~/.http-server.cli/
 ├── config.json            # 默认端口/域名配置
 ├── registry.json          # port → {path, pid, domain, started_at, index_page}
 ├── registry-managed.json  # 基础设施服务（dashboard、MCP SSE）
@@ -143,8 +143,8 @@ hs kill-all                 # 一键全关
 ## 本地开发
 
 ```bash
-git clone git@github.com:imjaden/http-server-cli.git
-cd http-server-cli
+git clone git@github.com:imjaden/http-server.cli.git
+cd http-server.cli
 pip install -e .
 python3 -m pytest tests/
 ```
@@ -160,4 +160,4 @@ python3 -m pytest tests/
 | `portless` (npm) | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
 | `kill-port-cli` (npm) | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ |
 | `lsof` / `netstat` | ❌ | ❌ | ❌ | 手动 | 手动 | ❌ |
-| **`http-server-cli`** | **✅** | **✅** | **✅** | **✅** | **✅** | **✅** |
+| **`http-server.cli`** | **✅** | **✅** | **✅** | **✅** | **✅** | **✅** |

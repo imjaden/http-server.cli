@@ -132,4 +132,4 @@ DataCorruptionError。各 bookmark 子命令需 try/except 包裹 store 操作,�
 
 - utils.py:272 json_output 信封定义
 - bookmark-multi-page-design-v1.1-20260819.md(bookmark add --force 联动)
-- http-server-cli.spec.yaml
+- http-server.cli.spec.yaml

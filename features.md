@@ -1,4 +1,4 @@
-# http-server-cli — Features
+# http-server.cli — Features
 
 > 零依赖 Python HTTP 服务 CLI。一键启动本地静态文件服务，忘记端口。
 >
@@ -61,7 +61,7 @@
 3. `config.json` — 默认配置（port/domain）✅
 4. `bookmarks.json` — 书签持久化 ✅
 5. `logs/` — 按端口分日志文件 ✅
-6. 数据目录: `~/.http-server-cli/`
+6. 数据目录: `~/.http-server.cli/`
 
 ## Web Dashboard
 
