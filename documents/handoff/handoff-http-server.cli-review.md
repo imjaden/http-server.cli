@@ -8,7 +8,7 @@ next: "*下一步建议**：dev 侧补 feat@ commit body；运行时确认测试
 risk: "*下一步建议**：dev 侧补 feat@ commit body；运行时确认测试数；可选修复 '--json' 检测与"
 ---
 
-# Handoff: http-server-cli-review
+# Handoff: http-server.cli-review
 
 📌 语义摘要
 
@@ -18,7 +18,7 @@ risk: "*下一步建议**：dev 侧补 feat@ commit body；运行时确认测试
 
 ## 目标
 评审方案的合理性、严格性及安全性: 
-/Users/jadenli/CodeSpace/http-server-cli/documents/url-flag-design-v1-20250715.md
+$HOME/CodeSpace/http-server.cli/documents/url-flag-design-v1-20250715.md
 
 ## 输入
 - profile: review
@@ -50,7 +50,7 @@ risk: "*下一步建议**：dev 侧补 feat@ commit body；运行时确认测试
 
 ## 下一步清单
 1. 继续: 评审方案的合理性、严格性及安全性: 
-/Users/jadenli/CodeSpace/http-s
+$HOME/CodeSpace/http-server.cli/documents/
 2. 未 push commit 中修改到该文件的:
 3. 本轮聚焦全部未 push commit（共 1 个）。
 4. 未 push commit:
