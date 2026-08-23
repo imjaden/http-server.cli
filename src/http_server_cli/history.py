@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 History 管理：记录所有 http-server 实例的启动/关闭历史。
-持久化至 ~/.http-server-cli/history.json。
+持久化至 ~/.http-server.cli/history.json。
 """
 
 import os

@@ -1,5 +1,5 @@
 #!/bin/bash
-# http-server-cli 发布脚本 — 发布到 TestPyPI/PyPI
+# http-server.cli 发布脚本 — 发布到 TestPyPI/PyPI
 # 用法: bash scripts/release-pypi.sh [options]
 
 set -e
@@ -119,7 +119,7 @@ REPOSITORY_NAME="$TARGET"
 REPOSITORY_LABEL="$([ "$TARGET" = "testpypi" ] && echo 'TestPyPI' || echo 'PyPI')"
 
 echo "========================================"
-echo "  http-server-cli ${REPOSITORY_LABEL} 发布"
+echo "  http-server.cli ${REPOSITORY_LABEL} 发布"
 echo "========================================"
 echo "  目标: ${REPOSITORY_LABEL}"
 echo "  模式: $([ $DRY_RUN -eq 1 ] && echo 'dry-run' || echo '正式发布')"

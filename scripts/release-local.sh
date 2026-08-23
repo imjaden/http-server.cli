@@ -1,5 +1,5 @@
 #!/bin/bash
-# http-server-cli 本地开发安装脚本
+# http-server.cli 本地开发安装脚本
 # 用法: bash scripts/release-local.sh [options]
 
 set -e
@@ -127,7 +127,7 @@ if [[ $EDITABLE -eq 0 ]]; then
 fi
 
 echo "========================================"
-echo "  http-server-cli 开发环境配置"
+echo "  http-server.cli 开发环境配置"
 echo "========================================"
 echo "  模式: $([ $VERBOSE -eq 1 ] && echo 'verbose' || echo 'quiet')"
 echo "  安装: ${EDITABLE_LABEL}"
