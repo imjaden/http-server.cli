@@ -128,12 +128,50 @@ doc old title + /Users absolute paths. Per governance: no push; back to ops for 
 
 | Issue | Title | Severity | Priority | Status |
 |:------|:------|:--------|:--------|:------|
-| HS-SEC-011 | bookmark.py docstring 旧数据目录 | 🟡 | P2 | Open |
-| HS-SEC-012 | history.py docstring 旧数据目录 | 🟡 | P2 | Open |
-| HS-SEC-013 | dashboard GitHub URL 旧名 | 🟡 | P2 | Open |
-| HS-SEC-014 | MANIFEST.in 悬空 include | 🟡 | P1 | Open |
-| HS-SEC-015 | spec.yaml 内容 drift | 🟡 | P1 | Open |
-| HS-SEC-016 | handoff 旧名标题 + /Users 路径 | 🟡 | P2 | Open |
+| HS-SEC-011 | bookmark.py docstring 旧数据目录 | 🟡 | P2 | ✅ Closed (0dcbab2) |
+| HS-SEC-012 | history.py docstring 旧数据目录 | 🟡 | P2 | ✅ Closed (0dcbab2) |
+| HS-SEC-013 | dashboard GitHub URL 旧名 | 🟡 | P2 | ✅ Closed (0dcbab2) |
+| HS-SEC-014 | MANIFEST.in 悬空 include | 🟡 | P1 | ✅ Closed (0dcbab2, sdist 实测) |
+| HS-SEC-015 | spec.yaml 内容 drift | 🟡 | P1 | ✅ Closed (0dcbab2) |
+| HS-SEC-016 | handoff 旧名标题 + /Users 路径 | 🟡 | P2 | ✅ Closed (fd07634) |
 
-OBS-1: CHANGELOG 1.1.0 date 2026-08-19 vs commit date 08-23 (🟢 record-only)
-OBS-2: scan-commits.py default enum lacks feat@; project convention uses feat@ (governance §5 enum gap, 🟢)
+OBS-1: CHANGELOG 1.1.0 date 2026-08-19 vs commit date 08-23 (🟢 record-only) → ✅ Closed (fd07634)
+OBS-2: scan-commits.py default enum lacks feat@; project convention uses feat@ (governance §5 enum gap, 🟢) → ⏸ 挂账（re-audit 约定本轮不动）
+
+> ✅ RESOLVED → v1.1 re-audit (2026-08-23): PASS 100/100，见下方 re-audit 条目。
+
+---
+
+## 2026-08-23 — Commit re-audit: rename batch fix closure (HS-SEC-011~016 + OBS-1)
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2 (code with file I/O — data dir migration)
+- **Scope**: fix commits 0dcbab2 + fd07634（纯文本替换，8 文件 14 行 + 2 文件 4 行）
+- **Commit(s)**: 0dcbab2, fd07634
+- **Verdict**: ✅ PASS
+- **Score**: 100 / 100 (Rating: A)
+
+### Summary
+
+Re-audit of the two fix commits closing all 6 🟡 findings (HS-SEC-011~016) plus OBS-1 from the 2026-08-23 rename batch audit (CONDITIONAL PASS 70/B). Every item verified against current file state + fix-commit diff: bookmark.py:31 / history.py:4 docstrings → `~/.http-server.cli/...`; dashboard.html:183 + dashboard.en.html:188 GitHub href → `imjaden/http-server.cli`; MANIFEST.in include → `http-server.cli.spec.yaml` with sdist build 实测（`uv build --sdist`，tarball 内含新 spec，无旧名）；spec.yaml name/version/输出串/日志路径全同步（http-server.cli / 1.1.0 / L282 / L408+L419）并连带同步 release-*.sh 显示串；handoff 标题 → `http-server.cli-review`、/Users 路径 → `$HOME`。343 测试全绿。全局旧名扫描仅剩合理保留（PyPI 包名 1A、LEGACY_DATA_DIR 迁移逻辑、历史文档、CHANGELOG 历史条目、迁移测试描述）。`hs version` 实测输出 `http-server.cli v1.1.0` 与 spec L282 一致。修复提交无新增问题。OBS-2 按约定挂账（🟢 记录项，不影响评分）。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| — | — | 无新增发现（上轮 6 🟡 + OBS-1 全部闭合） | — | — |
+
+### Positives
+
+- 修复提交最小化且外科式：14 + 4 行纯文本替换，无 scope creep
+- sdist 打包回归用真实构建 + tarball 检查验证（不止改 MANIFEST.in 文本）
+- release 脚本显示串同步超出 SEC-015 清单范围（bonus 一致性）
+- CLI 运行时输出与 spec 场景 L282 交叉验证（行为一致性）
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| HS-SEC-011~016 | rename residuals (6 🟡) | 🟡 | P1/P2 | ✅ Closed (0dcbab2/fd07634) |
+| OBS-1 | CHANGELOG date drift | 🟢 | — | ✅ Closed (fd07634) |
+| OBS-2 | governance enum lacks feat@ | 🟢 | — | ⏸ 挂账（约定本轮不动） |
