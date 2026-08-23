@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.1.0 (2026-08-19)
+
+### Changed
+- Project renamed `http-server-cli` → `http-server.cli`; GitHub repo → `imjaden/http-server.cli`
+- Data directory migrated `~/.http-server-cli/` → `~/.http-server.cli/` (auto-migrate on first run, move + copy fallback)
+- CLI display strings, `hs version` output, docstrings updated to `http-server.cli`
+- `pyproject.toml`: `readme` corrected `README.en.md` → `README.md` (file was already `README.md`)
+- Spec file renamed `http-server-cli.spec.yaml` → `http-server.cli.spec.yaml`
+
+### Added
+- bookmark: unique key is now `(path, index_page)` composite; same path with different index pages can coexist
+- `hs bookmark add --force`: overwrite existing bookmark with same `(path, index_page)` key
+- `hs bookmark list` / `show` / `add` / `update` / `remove` support `--json` envelope output
+- `hs mcp status|stop|restart` and `hs dashboard status|stop|restart` support `--json`
+- Data dir migration unit tests (5 cases: migrate, skip, no-legacy, copy fallback, full failure)
+
 ## 1.0.8 (2026-07-01)
 
 ### Added

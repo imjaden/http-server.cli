@@ -173,4 +173,4 @@ bm_label = f'  [{",".join(bm_names)}]' if bm_names else ''
 ## 参考
 
 - bookmark-feature-design-v1.1-20250715.md(基线设计,路径唯一约束来源)
-- http-server-cli.spec.yaml
+- http-server.cli.spec.yaml
