@@ -80,3 +80,60 @@ implementation. No security findings. Commit and naming conventions fully compli
 ### Tracking
 
 No security findings. No tracking IDs assigned.
+
+---
+
+## 2026-08-23 — Commit audit: rename batch http-server-cli → http-server.cli (7 commits)
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2 (code with file I/O — data dir migration)
+- **Scope**: rename batch, 7 unpushed commits (ahead 7)
+- **Commit(s)**: 040c08f, 3b58879, a696253, b0e7bab, ec4b31a, 4ba0c57, f6a6909
+- **Verdict**: ⏳ CONDITIONAL PASS
+- **Score**: 70 / 100 (Rating: B)
+
+### Summary
+
+Commit audit of the rename batch (project name http-server-cli → http-server.cli, GitHub repo
+renamed). Migration logic verified sound: `os.rename` atomic move (utils.py:62) with `copytree`
+fallback on OSError (utils.py:67) and warn-and-continue on double failure (utils.py:71-74);
+live probe confirmed old dir removed, config/registry/bookmarks/logs all migrated, idempotent
+second run, new-dir-exists skip. 343 tests pass (incl. 5 new migration tests). `hs version --json`
+outputs name=http-server.cli / version=1.1.0. Commit format 7/7 `type@scope: subject`, grouped by
+attribute. Feature commits 89ed981/da5cfcb (bookmark composite key, --json) confirmed already on
+origin/main. But "改名后无残留旧名" acceptance criterion FAILS: 6 active-file residuals
+(SEC-011~016) — bookmark/history docstrings, dashboard github URLs, MANIFEST.in dangling include
+(packaging regression), spec.yaml content drift (name/version/output-string/log paths), handoff
+doc old title + /Users absolute paths. Per governance: no push; back to ops for fixes.
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| HS-SEC-011 | 🟡 | bookmark.py docstring 残留旧数据目录 | src/http_server_cli/bookmark.py:31 | Open |
+| HS-SEC-012 | 🟡 | history.py docstring 残留旧数据目录 | src/http_server_cli/history.py:4 | Open |
+| HS-SEC-013 | 🟡 | dashboard 模板残留旧 GitHub URL | src/http_server_cli/dashboard.html:183, dashboard.en.html:188 | Open |
+| HS-SEC-014 | 🟡 | MANIFEST.in 悬空 include（sdist 打包回归） | MANIFEST.in:1 | Open |
+| HS-SEC-015 | 🟡 | spec.yaml 内容 drift（name/version/输出串/日志路径） | http-server.cli.spec.yaml:1-2,282,408,419 | Open |
+| HS-SEC-016 | 🟡 | handoff 文档旧名标题 + /Users 绝对路径 | documents/handoff/handoff-http-server.cli-review.md:11,21,53 | Open |
+
+### Positives
+
+- Migration logic correct and defensively layered (move → copytree → warn-continue), old data never destroyed
+- 5 targeted migration unit tests + live environment probe both green; 343/343 full suite
+- Commit grouping by attribute (docs/test/feat/chore) clean and atomic
+- Feature commits 89ed981/da5cfcb already pushed — no scope creep in this batch
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| HS-SEC-011 | bookmark.py docstring 旧数据目录 | 🟡 | P2 | Open |
+| HS-SEC-012 | history.py docstring 旧数据目录 | 🟡 | P2 | Open |
+| HS-SEC-013 | dashboard GitHub URL 旧名 | 🟡 | P2 | Open |
+| HS-SEC-014 | MANIFEST.in 悬空 include | 🟡 | P1 | Open |
+| HS-SEC-015 | spec.yaml 内容 drift | 🟡 | P1 | Open |
+| HS-SEC-016 | handoff 旧名标题 + /Users 路径 | 🟡 | P2 | Open |
+
+OBS-1: CHANGELOG 1.1.0 date 2026-08-19 vs commit date 08-23 (🟢 record-only)
+OBS-2: scan-commits.py default enum lacks feat@; project convention uses feat@ (governance §5 enum gap, 🟢)
