@@ -5,6 +5,8 @@
 > 文件命名: 固定为 `features.md`，小写，无版本号。
 >
 > 适用: 风格 B 文件（无版本号，持续更新），存放在项目根目录。
+>
+> 功能契约事实源: `http-server.cli.spec.yaml`（OpenSpec 格式，review 审计依据）。
 
 ## CLI 命令
 
@@ -82,7 +84,7 @@
 1. `hs mcp` — 启动 MCP Server（后台 SSE），AI Agent 集成 ✅ — `documents/hs-mcp-design-v1.0-20260624.md`
 2. `hs mcp stop [--json]` — 停止 MCP 服务 ✅
 3. `hs mcp status [--json]` — 查看 MCP 状态 ✅
-4. JSON-RPC 2.0 协议 — stdio/SSE 传输，6 个工具（hs_list/hs_status/hs_kill/hs_kill_all/hs_start/hs_search）✅
+4. JSON-RPC 2.0 协议 — stdio/SSE 传输，6 个工具（hs_list/hs_status/hs_start/hs_kill/hs_kill_all/hs_config）✅
 5. 零外部依赖 — 纯标准库实现 MCP 协议 ✅
 
 ## 配置管理
@@ -93,7 +95,7 @@
 
 ## 测试
 
-1. 11 个测试模块，338 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
+1. 11 个测试模块，343 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
 2. `conftest.py` — autouse 数据隔离 + monkeypatch 路径注入 ✅
 3. 集成测试模式 — mock `_COMMANDS` / `ensure_storage`，set `sys.argv`，catch `SystemExit` ✅
 
