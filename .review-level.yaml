@@ -52,3 +52,13 @@ review_history:
     tracking: none
     scope: "Commit audit: fix@spec YAML quoting (ac69262) — 3 lines, spec parse OK + 343 tests green"
     report: documents/review/http-server-cli-spec-yaml-fix-audit-v1.0-20260823.md
+  - date: 2026-08-24
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: PASS
+    score: 100
+    findings_total: 0
+    findings_open: 0
+    tracking: none
+    scope: "Commit audit: docs 同步批 4 commits (1fdc0e1, d9933cc, d661ac9, 801c573) — MANIFEST/features/index/README, 343 tests green, 10/10 data checks"
+    report: documents/review/http-server-cli-docs-sync-audit-v1.0-20260824.md
