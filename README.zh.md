@@ -101,12 +101,26 @@ hs kill-all                 # 一键全关
 | `hs kill-all` | 关闭所有用户服务 |
 | `hs kill-all --json` | JSON 输出 |
 
+### 书签
+
+| 命令 | 说明 |
+|:--------|:------------|
+| `hs bookmark add <name> [path] [-i index] [--force]` | 注册书签（path 默认当前目录） |
+| `hs bookmark update <name> [path] [-i index]` | 更新书签路径或首页 |
+| `hs bookmark list` | 列出所有书签 |
+| `hs bookmark show <name>` | 查看书签详情 |
+| `hs bookmark remove <name>` | 删除书签 |
+| `hs <name> [-o]` | 从书签启动服务 |
+| `hs kill <name>` | 按书签名关闭服务 |
+
 ### Dashboard
 
 | 命令 | 说明 |
 |:--------|:------------|
 | `hs dashboard [-p PORT] [-o] [--json]` | Web 仪表盘（默认 8180） |
-| `hs dashboard stop|status|restart|help` | 子命令 |
+| `hs dashboard stop\|status\|restart\|help` | 子命令 |
+
+> 托管服务（dashboard、MCP SSE）登记在 `registry-managed.json`；`hs kill-all` 不会关闭它们。
 
 ### MCP（AI Agent 集成）
 

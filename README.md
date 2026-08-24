@@ -101,12 +101,26 @@ hs kill-all                 # Kill all
 | `hs kill-all` | Kill all user services |
 | `hs kill-all --json` | JSON output |
 
+### Bookmark
+
+| Command | Description |
+|:--------|:------------|
+| `hs bookmark add <name> [path] [-i index] [--force]` | Register a bookmark (path defaults to current directory) |
+| `hs bookmark update <name> [path] [-i index]` | Update bookmark path or index page |
+| `hs bookmark list` | List all bookmarks |
+| `hs bookmark show <name>` | Show bookmark details |
+| `hs bookmark remove <name>` | Remove a bookmark |
+| `hs <name> [-o]` | Start server from a bookmark |
+| `hs kill <name>` | Kill service by bookmark name |
+
 ### Dashboard
 
 | Command | Description |
 |:--------|:------------|
 | `hs dashboard [-p PORT] [-o] [--json]` | Web dashboard (default 8180) |
 | `hs dashboard stop\|status\|restart\|help` | Subcommands |
+
+> Managed services (dashboard, MCP SSE) are tracked in `registry-managed.json`; `hs kill-all` does NOT stop them.
 
 ### MCP (AI Agent)
 
