@@ -194,3 +194,42 @@ Re-audit of the two fix commits closing all 6 🟡 findings (HS-SEC-011~016) plu
 ### Tracking
 
 无新增发现，无 tracking ID。
+
+---
+
+## 2026-08-24 — Commit audit: docs 同步批 (MANIFEST/features/index/README, 4 commits)
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2 (docs/chore 批 + 全量测试回归)
+- **Scope**: 4 个未 push commit — 纯文档/打包配置同步批（MANIFEST.in readme ref / features.md 同步 / index Bookmark 组 / README Bookmark + registry-managed）
+- **Commit(s)**: 1fdc0e1, d9933cc, d661ac9, 801c573
+- **Verdict**: ✅ PASS
+- **Score**: 100 / 100 (Rating: A)
+
+### Summary
+
+4 commit 全部为文档/打包配置改动，无源码逻辑变更。数据验证 10/10 通过：features.md 343 = `grep -c 'def test_'` 求和（38+68+11+30+20+6+29+11+31+65+34）且 pytest 实测 343 passed in 1.29s；MCP 工具名 6 个（hs_list/hs_status/hs_start/hs_kill/hs_kill_all/hs_config）与 mcp.py L47-91 `_TOOLS` 一致（hs_search → hs_config 修正正确）；MANIFEST.in include README.md + README.zh.md 均存在、README.en.md 不存在（1fdc0e1 修复正确，与 pyproject L9 readme=README.md / CHANGELOG 1.1.0 对齐）；index 双页 Bookmark 组与 cli.py:873 `✅ Bookmark 'alpha' → path`、cli.py:918-921 `📊 N bookmark(s):`+`📌 name`+`📁 path` 逐项吻合，端口 8080 与 README L60 示例一致；registry-managed 声明属实（server.py:622 kill_all 仅遍历用户 registry.json，托管服务独立 registry-managed.json，kill-all 不关）；中英双页对称（index +12/+12，README +14/+16，zh 多 2 行为管道符转义修复）。范围文件仅 6 个（MANIFEST.in/README.md/README.zh.md/features.md/index.html/index.zh.html），未触碰 spec.yaml/源码/测试。commit 格式 4/4 type@scope 合规（chore@package/docs@features/docs@index/docs@readme），type 均在项目历史类型集；无 /Users 字面路径；无凭证。无新增发现。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| — | — | 无新增发现 | — | — |
+
+### Positives
+
+- 数据同步全部以源码实证为据（grep 求和 + pytest 实测 + mcp.py/cli.py 输出串逐一比对），非凭描述
+- MANIFEST.in 修复与 pyproject readme 字段、CHANGELOG 1.1.0 记录三方对齐，无悬空引用
+- README.zh.md 顺带修复 dashboard 子命令表管道符未转义（EN 已转义，ZH 补齐对称）
+- Bookmark 组终端模拟格式与源码输出逐字一致（含 emoji 前缀），场景可复现
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| OBS-1 | 工作区 .hermes-project.yaml 改名（http-server.cli → http-server）未提交 | 🟢 | — | ⏸ 待 ops 确认（与本批无关） |
+| OBS-2 | governance enum 缺 feat@ | 🟢 | — | ⏸ 挂账（约定不动） |
+
+无新增发现，无 tracking ID。
+
+---
