@@ -62,3 +62,12 @@ review_history:
     tracking: none
     scope: "Commit audit: docs 同步批 4 commits (1fdc0e1, d9933cc, d661ac9, 801c573) — MANIFEST/features/index/README, 343 tests green, 10/10 data checks"
     report: documents/review/http-server-cli-docs-sync-audit-v1.0-20260824.md
+  - date: 2026-08-24
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: PASS
+    score: 100
+    findings_total: 0
+    findings_open: 0
+    tracking: OBS-2 (closed)
+    scope: "Skill-fix: design-review scan-commits.py DEFAULT_TYPES 补入 feat — OBS-2 挂账翻转 Closed; feat@ 扫描实测 ok (http-server.cli 7/7, hermes-manager 5/5), 其余类型回归不变, --type 覆盖语义不变"

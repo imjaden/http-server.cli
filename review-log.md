@@ -136,7 +136,7 @@ doc old title + /Users absolute paths. Per governance: no push; back to ops for 
 | HS-SEC-016 | handoff 旧名标题 + /Users 路径 | 🟡 | P2 | ✅ Closed (fd07634) |
 
 OBS-1: CHANGELOG 1.1.0 date 2026-08-19 vs commit date 08-23 (🟢 record-only) → ✅ Closed (fd07634)
-OBS-2: scan-commits.py default enum lacks feat@; project convention uses feat@ (governance §5 enum gap, 🟢) → ⏸ 挂账（re-audit 约定本轮不动）
+OBS-2: scan-commits.py default enum lacks feat@; project convention uses feat@ (governance §5 enum gap, 🟢) → ✅ Closed (2026-08-24, design-review skill v1.8.0: DEFAULT_TYPES 补入 feat; feat@ 扫描实测 ok，见下方 skill-fix 条目)
 
 > ✅ RESOLVED → v1.1 re-audit (2026-08-23): PASS 100/100，见下方 re-audit 条目。
 
@@ -228,8 +228,38 @@ Re-audit of the two fix commits closing all 6 🟡 findings (HS-SEC-011~016) plu
 | Issue | Title | Severity | Priority | Status |
 |:------|:------|:--------|:--------|:------|
 | OBS-1 | 工作区 .hermes-project.yaml 改名（http-server.cli → http-server）未提交 | 🟢 | — | ⏸ 待 ops 确认（与本批无关） |
-| OBS-2 | governance enum 缺 feat@ | 🟢 | — | ⏸ 挂账（约定不动） |
+| OBS-2 | governance enum 缺 feat@ | 🟢 | — | ✅ Closed (2026-08-24, skill v1.8.0) |
 
 无新增发现，无 tracking ID。
+
+---
+
+## 2026-08-24 — Skill-fix: design-review scan-commits.py DEFAULT_TYPES 补入 feat (OBS-2 翻转)
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Commit(s)**: 无（skill 修复位于 review profile 技能目录，非本项目代码）
+- **Verdict**: ✅ OBS-2 Closed
+
+### Summary
+
+治理规范处理 OBS-2：design-review skill 自带扫描脚本
+`~/.hermes/profiles/review/skills/software-development/design-review/scripts/scan-commits.py`
+`DEFAULT_TYPES`（原 L21）枚举缺 `feat`，导致扫描 `feat@` commit 时被标 BAD。
+本轮最小修复：
+
+- scan-commits.py `DEFAULT_TYPES` 补入 `feat`（其他类型不变，`--type` 显式覆盖语义不变）
+- SKILL.md 版本 1.7.0 → 1.8.0；batch-scan 说明 + §5 stale pitfall + 两个 reference
+  （push-gate-audit-pattern.md / governance-handbook-reference.md）同步枚举复述
+- 实测：http-server.cli HEAD~40..HEAD feat 7/7 ok、hermes-manager HEAD~60..HEAD feat 5/5 ok；
+  回归 add/docs/chore/test 等其余类型行为不变；`--type feat,audit` 覆盖生效、
+  `--type` 旧枚举（无 feat）时 feat@ 仍标 BAD（覆盖语义未变）
+- 治理手册 §5 类型清单本身（v1.3-20260823）仍未含 feat/audit/fix/perf —— 属手册侧缺口，
+  已在 governance-handbook-reference.md 加注记，按 GOV observation 处理（非本轮范围）
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| OBS-2 | scan-commits.py default enum lacks feat@ | 🟢 | — | ✅ Closed (2026-08-24) |
 
 ---
