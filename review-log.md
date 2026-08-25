@@ -340,3 +340,44 @@ Re-audit of the two fix commits closing all 6 🟡 findings (HS-SEC-011~016) plu
 
 ---
 
+## 2026-08-25 — Commit audit: CL-SEC19 index 落地页 page-index 对齐批 (92250f4, 95cf6f7, a039321, 5f7028e, 84f53d9)
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（提交审计 — index 双页 page-index 对齐 + data-copy 修正 + 全量测试回归）
+- **Scope**: 5 个未 push commit — CL-SEC19 闭环（T1 两列首屏 / T2 场景网格 3 列 / T3 对齐 html-gen page-index 结构 / T4 手工微调定案 + data-copy 修正）
+- **Commit(s)**: 92250f4, 95cf6f7, a039321, 5f7028e, 84f53d9
+- **Verdict**: ✅ PASS
+- **Score**: 100 / 100 (Rating: A)
+- **Report**: documents/review/http-server-cli-index-page-index-audit-v1.0-20260825.md
+
+### Summary
+
+5 commit index 对齐批核验通过，数据验证 19/19：src/ 零变更（diff 仅 index 双页 + test_index_sync.py + features.md + 建议文档）；双页对称全项对应——组数 5/5（Start+Bookmark/View/Kill+Manage↔启动+书签/查看/关闭+管理）、场景 cmd-row 14/14、首屏 code-block 4/4（hs -o / hs --open --index index.html / hs list / hs kill 8081）、对比表 <tr> 6/6、title 全称 HTTP Server、window.innerHeight - 55 双页；**data-copy 与 .cmd 显示命令 19/19 逐字一致且不含 $ prompt**（84f53d9 修正闭环，脚本提取比对）；page-index 结构要素 25 项抽验 + 测试 37 项全在（hero-title 渐变/hero-blocks/code-block/scroll-bounce/templates-title/sub/grid 1500/1100 断点/back-top/site-footer/id="top"）；旧结构残留 8/8 模式 0 hits（含连字符旧链接）；test_index_sync.py 14/14 定向 passed；全量 **357 passed in 1.44s**（.venv）；features.md 计数 352→357 三段随 commit 原子同步；favicon 3/3 URL 200（设计 3A 要求实测）；无敏感信息；commit 格式 scan-commits.py 5/5 ok（feat@index ×4 + docs@review ×1）；.hermes-project.yaml 未混入。🟢 仅 3 条记录（SEC-019-1 features.md 计数内嵌 feat commit 与前批独立 docs commit 惯例不同但保持原子一致；SEC-019-2 建议文档 2 处 /Users 参考源路径属文档惯例；SEC-019-3 新建议文档无版本段属 §1 工作文件豁免），0 扣分。**已 push：fa853e3..84f53d9 main -> main，origin/main 新 tip = 84f53d9**。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| SEC-019-1 | 🟢 | features.md 测试计数内嵌 feat@index commit（352→355→356→357，与前批独立 docs commit 惯例不同；每 commit 文档-代码原子一致，无漂移窗口） | features.md:98 | 记录 |
+| SEC-019-2 | 🟢 | 建议文档含 2 处 /Users 参考源路径（既有已 push review/design 文档均含，文档惯例，非代码/配置） | documents/review/html-gen-optimize-suggestions-20260825.md:4,72 | 记录 |
+| SEC-019-3 | 🟢 | 新建议文档命名无 v{major}.{minor} 版本段（§1 工作文件豁免；目标项目为 html-gen，跨项目回哺语义清晰） | documents/review/html-gen-optimize-suggestions-20260825.md | 记录 |
+
+### Positives
+
+- data-copy 修正项用脚本程序化比对 19 处（非抽查），双页 .cmd 显示与复制值逐字一致、无 $ prompt 混入
+- page-index 对齐核验双层：独立脚本 25 项 + 测试 STRUCTURE_FEATURES 37 项，与落地页实测全部吻合
+- 旧结构残留 8 模式全查（含连字符旧链接/qs-col/cmp-col/jaden.local 等隐蔽类），0 hits 有据
+- favicon 可访问性实测 3/3 200，落实设计 3A "验证 200" 要求
+- 84f53d9 手工微调 diff 逐行核验（title/命令增删/height 修正/data-copy 同步/测试断言同步 EN/ZH 对称）
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| SEC-019-1 | features.md 计数内嵌 feat commit（记录项） | 🟢 | — | ✅ Closed (2026-08-25, PASS 100/100, pushed) |
+| SEC-019-2 | 建议文档 /Users 参考源路径（记录项） | 🟢 | — | ✅ Closed (2026-08-25, PASS 100/100, pushed) |
+| SEC-019-3 | 建议文档命名无版本段（记录项） | 🟢 | — | ✅ Closed (2026-08-25, PASS 100/100, pushed) |
+| OBS-1 | 工作区 .hermes-project.yaml 修改未提交（并发会话 WIP，承上批） | 🟢 | — | ⏸ 待 ops 确认（与本批无关，未随 push） |
+
+---
+
