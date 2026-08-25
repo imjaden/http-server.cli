@@ -116,7 +116,7 @@ class TestDualSourceSync:
             assert 'class="scroll-hint"' in page
             assert 'scroll-bounce' in page
             assert 'updateHeroHeight' in page
-            assert "window.innerHeight - 110" in page
+            assert "window.innerHeight - 55" in page
 
     def test_code_block_copy_buttons(self, _pages):
         """首屏每条 code-block 命令带行内复制按钮（6A 保留逐条复制能力）。"""
@@ -139,9 +139,9 @@ class TestDualSourceSync:
         assert "hs mcp" in _pages["zh"]
 
     def test_title_full_name(self, _pages):
-        """title 使用全称 http-server（hs 缩写仅保留在命令/图标/对比行名）。"""
+        """title 使用全称（HTTP Server，2026-08-25 手工微调定案；hs 缩写仅保留在命令/图标/对比行名）。"""
         for name, page in (("en", _pages["en"]), ("zh", _pages["zh"])):
-            assert "<title>http-server" in page, f"{name} title 未用全称 http-server"
+            assert "<title>HTTP Server" in page, f"{name} title 未用全称 HTTP Server"
             assert "<title>hs" not in page, f"{name} title 仍以 hs 缩写开头"
 
     def test_page_index_structure_aligned(self, _pages):
