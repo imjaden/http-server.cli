@@ -1,4 +1,4 @@
-# http-server.cli — Features
+# http-server — Features
 
 > 零依赖 Python HTTP 服务 CLI。一键启动本地静态文件服务，忘记端口。
 >

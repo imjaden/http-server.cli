@@ -73,7 +73,7 @@ class Config:
             }
             json_output(success=True, command='config', data=data)
             return
-        print('📋 http-server.cli configuration')
+        print('📋 http-server configuration')
         print(f'  port:   {self.port}')
         print(f'  domain: {self.domain}')
         print(f'  data dir: {CONFIG_PATH.replace(os.path.expanduser("~"), "~")}')
