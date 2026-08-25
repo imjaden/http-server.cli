@@ -16,7 +16,7 @@ import glob
 
 # ── 帮助文本 ──────────────────────────────────────────
 
-_HELP = """http-server.cli v{version} — 忘记端口，只管预览
+_HELP = """http-server v{version} — 忘记端口，只管预览
 
 用法:  hs [command] [args]
 
@@ -529,13 +529,13 @@ def _cmd_version(manager, args):
         import sys
         data = {
             'version': __version__,
-            'name': 'http-server.cli',
+            'name': 'http-server',
             'python': sys.version.split()[0],
             'platform': sys.platform,
         }
         json_output(True, 'version', data=data)
     else:
-        print(f'http-server.cli v{__version__}')
+        print(f'http-server v{__version__}')
 
 
 @_register
