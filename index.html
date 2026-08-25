@@ -43,14 +43,16 @@
       --text-accent: #8250df;
       --border-default: #d0d7de;
       --border-light: #d0d7de;
-      --gh-corner-fill: #d0d7de;
+      --gh-corner-fill: rgba(0, 0, 0, 0.75);
       --gh-corner-hover: #0969da;
-      --gh-octocat: #fff;
+      --gh-octocat: #ffffff;
       --lang-switch-bg: rgba(255, 255, 255, 0.9);
       --lang-toggle-active-bg: #0969da;
       --lang-toggle-active-color: #fff;
       --table-hover: #f6f8fa;
     }
+    [data-theme="light"] .github-corner { color: var(--gh-octocat); }
+    [data-theme="light"] .github-corner:hover { color: var(--gh-octocat); }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -105,16 +107,19 @@
     }
     .theme-btn:hover { color: var(--text-body); border-color: var(--gh-corner-hover); }
 
-    /* ── Hero ── */
-    .hero { padding: 48px 0 28px; }
+    /* ── Hero (screen 1) ── */
+    .hero {
+      padding: 40px 0 32px; min-height: 80vh;
+      display: flex; flex-direction: column; justify-content: center;
+    }
     .hero .logo {
       display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px;
     }
     .hero .logo svg { width: 32px; height: 32px; }
     .hero .logo span { font-size: 24px; font-weight: 600; color: var(--text-primary); }
-    .hero .tagline { text-align: center; font-size: 16px; color: var(--text-secondary); margin-bottom: 18px; }
+    .hero .tagline { text-align: center; font-size: 16px; color: var(--text-secondary); margin-bottom: 14px; }
     .hero .badges {
-      text-align: center; font-size: 12px; color: var(--text-muted); margin-bottom: 22px;
+      text-align: center; font-size: 12px; color: var(--text-muted); margin-bottom: 18px;
     }
     .hero .badges span { margin: 0 6px; }
 
@@ -136,25 +141,46 @@
     }
     .install-box .copy-btn:hover { color: var(--text-body); }
 
-    /* ── Intro ── */
-    .intro { padding: 22px 0 18px; }
-    .intro p {
-      font-size: 15px; color: var(--text-secondary); margin-bottom: 10px;
+    /* Quick start */
+    .quick-start { max-width: 530px; margin: 18px auto 0; text-align: left; }
+    .qs-title {
+      font-size: 13px; font-weight: 600; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; text-align: center;
     }
-    .intro p strong { color: var(--text-body); font-weight: 600; }
-    .intro code {
-      background: var(--bg-card); padding: 1px 5px; border-radius: 3px;
-      font-family: 'SF Mono', Monaco, monospace; font-size: 13px; color: var(--text-code);
-      transition: background 0.2s;
-    }
+    .qs-desc { font-size: 12px; color: var(--text-muted); margin: 0 0 2px 12px; }
 
-    /* ── Scenarios ── */
-    .scenarios { padding: 4px 0 16px; }
+    /* ── Command rows (shared: quick start + scenarios) ── */
+    .cmd-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 6px;
+      margin: 4px 0; padding: 2px 6px 2px 10px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .cmd-row .line { border: none; padding: 0; flex: 1; }
+    .cmd-row .copy-btn {
+      background: transparent; border: none; border-left: 1px solid var(--border-light);
+      color: var(--text-secondary); cursor: pointer; font-size: 11px; padding: 6px 8px;
+      transition: color 0.15s; white-space: nowrap; user-select: none;
+    }
+    .cmd-row .copy-btn:hover { color: var(--text-body); }
+
+    /* ── Scroll hint ── */
+    .scroll-hint {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 5;
+      font-size: 13px; color: var(--text-secondary); text-decoration: none;
+      background: var(--bg-page); border: 1px solid var(--border-light); border-radius: 16px;
+      padding: 4px 14px; opacity: 1; visibility: visible;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+    .scroll-hint.hide { opacity: 0; visibility: hidden; }
+
+    /* ── Scenarios (screen 2) ── */
+    .scenarios { padding: 24px 0 16px; }
     .scenarios .group { margin-bottom: 18px; }
     .scenarios .group:last-child { margin-bottom: 0; }
     .scenarios .group-title {
       font-size: 13px; font-weight: 600; color: var(--text-secondary);
-      text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px;
+      text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px;
     }
 
     /* Terminal-style output lines */
@@ -198,9 +224,11 @@
     footer a { color: var(--text-link); text-decoration: none; }
     footer a:hover { text-decoration: underline; }
     footer .sep { margin: 0 10px; color: var(--border-light); }
+    .favicon { width: 14px; height: 14px; vertical-align: -2px; margin-right: 5px; }
+    .npm-note { margin-top: 10px; font-size: 12px; color: var(--text-muted); }
 
     @media (max-width: 480px) {
-      .hero { padding: 40px 0 24px; }
+      .hero { padding: 36px 0 28px; }
       .install-box { max-width: 100%; flex-direction: column; }
       .install-box .copy-btn { border-left: none; border-top: 1px solid var(--border-default); width: 100%; }
       .toolbar { right: 72px; }
@@ -221,7 +249,7 @@
   </div>
 
   <!-- ── GitHub Corner ── -->
-  <a href="https://github.com/imjaden/http-server.cli" class="github-corner" target="_blank" aria-label="View source on GitHub">
+  <a href="https://github.com/imjaden/http-server.cli" class="github-corner" target="_blank" rel="noopener" aria-label="View source on GitHub">
     <svg viewBox="0 0 250 250" aria-hidden="true">
       <path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path>
       <path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6
@@ -251,7 +279,7 @@
     </svg>
   </a>
 
-  <!-- ── Hero ── -->
+  <!-- ── Screen 1: Hero ── -->
   <div class="hero">
     <div class="container">
       <div class="logo">
@@ -261,7 +289,7 @@
                 font-family="Arial,Helvetica,sans-serif"
                 font-weight="900" font-size="9" fill="#333">hs</text>
         </svg>
-        <span>http-server.cli</span>
+        <span>http-server</span>
       </div>
       <p class="tagline">Forget ports, just preview.</p>
       <p class="badges">
@@ -269,79 +297,132 @@
       </p>
       <div class="install-box">
         <code>pip install http-server-cli</code>
-        <button class="copy-btn" onclick="copyInstall(this)">📋 Copy</button>
+        <button class="copy-btn" data-copy="pip install http-server-cli" onclick="copyText(this.getAttribute('data-copy'), this)">📋 Copy</button>
+      </div>
+      <div class="quick-start">
+        <div class="qs-title">Quick start</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs -o</div>
+          <button class="copy-btn" data-copy="hs -o" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
+        <div class="qs-desc">Start in current dir + open browser</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs list</div>
+          <button class="copy-btn" data-copy="hs list" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
+        <div class="qs-desc">List all running services</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs kill 8080</div>
+          <button class="copy-btn" data-copy="hs kill 8080" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
+        <div class="qs-desc">Stop the service on a port</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs dashboard -o</div>
+          <button class="copy-btn" data-copy="hs dashboard -o" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
+        <div class="qs-desc">Open the web dashboard</div>
       </div>
     </div>
   </div>
 
-  <!-- ── Intro ── -->
-  <div class="intro">
-    <div class="container">
-      <p>
-        A zero-dependency CLI for <strong>local HTTP preview</strong> that remembers what you're serving.
-        Run <code>hs -o</code> — no port juggling, no &quot;which project was on 8080?&quot;, no &quot;how do I kill it?&quot;.
-      </p>
-      <p>
-        Starts at <strong>8080</strong>, auto-increments on conflict. Tracks every server you launch.
-        List all running services, kill by port or path, or open the web dashboard — all in one tool.
-      </p>
-    </div>
-  </div>
+  <a href="#scenarios" class="scroll-hint">↓ More</a>
 
-  <!-- ── Scenarios ── -->
-  <div class="scenarios">
+  <!-- ── Screen 2: Scenarios ── -->
+  <div class="scenarios" id="scenarios">
     <div class="container">
 
       <div class="group">
         <div class="group-title">▶  Start</div>
-        <div class="line prompt">$ hs -o</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs -o</div>
+          <button class="copy-btn" data-copy="hs -o" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
         <div class="line out">   ✅  http://jaden.local:8081           →  ~/project-alpha</div>
-        <div class="line prompt">$ hs snapshots/*.html -o</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs snapshots/*.html -o</div>
+          <button class="copy-btn" data-copy="hs snapshots/*.html -o" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
         <div class="line out">   ✅  http://jaden.local:8083/snapshots/latest.html</div>
       </div>
 
       <div class="group">
         <div class="group-title">▶  View</div>
-        <div class="line prompt">$ hs list</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs list</div>
+          <button class="copy-btn" data-copy="hs list" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
         <div class="line out">   📊  Total 2 HTTP services</div>
         <div class="line url">       http://jaden.local:8080  →  ~/project-beta</div>
         <div class="line url">       http://jaden.local:8081  →  ~/project-alpha</div>
-        <div class="line prompt">$ hs list --json</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs list --json</div>
+          <button class="copy-btn" data-copy="hs list --json" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
         <div class="line out">   [{&quot;port&quot;:8080,&quot;path&quot;:&quot;~/beta&quot;,...}]</div>
-        <div class="line prompt">$ hs status</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs status</div>
+          <button class="copy-btn" data-copy="hs status" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
         <div class="line out">   ✅  Daemon running (PID: 12345)</div>
-        <div class="line prompt">$ hs dashboard -o</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs dashboard -o</div>
+          <button class="copy-btn" data-copy="hs dashboard -o" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
         <div class="line out">   📊  Dashboard → http://jaden.local:8180</div>
       </div>
 
       <div class="group">
         <div class="group-title">▶  Kill</div>
-        <div class="line prompt">$ hs kill 8080</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs kill 8080</div>
+          <button class="copy-btn" data-copy="hs kill 8080" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
         <div class="line out">   🛑  Terminated PID: 45678</div>
         <div class="line out">   ✅  Port 8080 closed</div>
-        <div class="line prompt">$ hs kill ~/project-alpha</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs kill ~/project-alpha</div>
+          <button class="copy-btn" data-copy="hs kill ~/project-alpha" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
         <div class="line out">   ✅  ~/project-alpha closed</div>
-        <div class="line prompt">$ hs kill-all</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs kill-all</div>
+          <button class="copy-btn" data-copy="hs kill-all" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
         <div class="line out">   ✅  3 service(s) closed</div>
       </div>
 
       <div class="group">
         <div class="group-title">▶  Bookmark</div>
-        <div class="line prompt">$ hs bookmark add alpha ~/project-alpha</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs bookmark add alpha ~/project-alpha</div>
+          <button class="copy-btn" data-copy="hs bookmark add alpha ~/project-alpha" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
         <div class="line out">   ✅  Bookmark 'alpha' → ~/project-alpha</div>
-        <div class="line prompt">$ hs bookmark list</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs bookmark list</div>
+          <button class="copy-btn" data-copy="hs bookmark list" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
         <div class="line out">   📊  1 bookmark(s):</div>
         <div class="line out">     📌 alpha</div>
         <div class="line out">        📁 ~/project-alpha</div>
-        <div class="line prompt">$ hs alpha -o</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs alpha -o</div>
+          <button class="copy-btn" data-copy="hs alpha -o" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
         <div class="line out">   ✅  http://localhost:8080  →  ~/project-alpha</div>
       </div>
 
       <div class="group">
         <div class="group-title">▶  Manage</div>
-        <div class="line prompt">$ hs dashboard -o</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs dashboard -o</div>
+          <button class="copy-btn" data-copy="hs dashboard -o" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
         <div class="line out">   📊  Dashboard → http://localhost:8180</div>
-        <div class="line prompt">$ hs mcp</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs mcp</div>
+          <button class="copy-btn" data-copy="hs mcp" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
         <div class="line out">   🤖  hs mcp (SSE)  →  http://127.0.0.1:8765/sse</div>
       </div>
 
@@ -414,30 +495,34 @@
   <!-- ── Footer ── -->
   <footer>
     <div class="container">
-      <a href="https://github.com/imjaden/http-server.cli">GitHub</a>
+      <a href="https://github.com/imjaden/http-server.cli" target="_blank" rel="noopener"><img class="favicon" src="https://github.com/favicon.ico" alt="">GitHub</a>
       <span class="sep">·</span>
-      <a href="https://pypi.org/project/http-server-cli/">PyPI</a>
+      <a href="https://pypi.org/project/http-server-cli" target="_blank" rel="noopener"><img class="favicon" src="https://pypi.org/static/images/favicon.35549fe8.ico" alt="">PyPI</a>
       <span class="sep">·</span>
-      <a href="https://http-server.cli.jaden.tech">http-server.cli.jaden.tech</a>
+      <a href="https://http-server.cli.jaden.tech" target="_blank" rel="noopener"><img class="favicon" src="https://raw.githubusercontent.com/imjaden/http-server.cli/main/src/http_server_cli/hs-icon.svg" alt="">Site</a>
       <span class="sep">·</span>
       MIT License
     </div>
+    <div class="container npm-note">hs is an independent tool — not the npm package &quot;http-server&quot;.</div>
   </footer>
 
   <script>
-    function copyInstall(btn) {
-      var text = 'pip install http-server-cli';
+    function copyText(text, btn) {
+      var orig = btn ? btn.textContent : '';
+      var done = function() {
+        if (btn) {
+          btn.textContent = '✅';
+          setTimeout(function() { btn.textContent = orig; }, 1500);
+        }
+      };
       var fallback = function() {
         var ta = document.createElement('textarea');
         ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px';
         document.body.appendChild(ta); ta.select();
-        try { document.execCommand('copy'); } catch(e) {}
+        var ok = false;
+        try { ok = document.execCommand('copy'); } catch(e) {}
         document.body.removeChild(ta);
-        done();
-      };
-      var done = function() {
-        btn.textContent = '✅ Copied!';
-        setTimeout(function() { btn.textContent = '📋 Copy'; }, 2000);
+        if (ok) done();
       };
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(done).catch(fallback);
@@ -445,6 +530,22 @@
         fallback();
       }
     }
+
+    /* ── Dynamic two-screen hero ── */
+    function updateHeroHeight() {
+      var hero = document.querySelector('.hero');
+      if (hero) hero.style.minHeight = (window.innerHeight - 110) + 'px';
+    }
+    updateHeroHeight();
+    window.addEventListener('resize', updateHeroHeight);
+
+    /* ── Scroll hint ── */
+    var hint = document.querySelector('.scroll-hint');
+    window.addEventListener('scroll', function() {
+      if (!hint) return;
+      if (window.scrollY > 8) hint.classList.add('hide');
+      else hint.classList.remove('hide');
+    });
 
     /* ── Theme ── */
     function setTheme(theme) {

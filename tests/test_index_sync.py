@@ -18,18 +18,28 @@ INDEX_EN = PROJECT / "index.html"
 INDEX_ZH = PROJECT / "index.zh.html"
 
 # 结构特征（与文案无关，双页必须一致）
+# 两屏重构（2026-08-25）后新增: hero 两屏 / quick-start / scroll-hint /
+# cmd-row 命令卡片 / favicon 图标 / npm 注记 / 动态高度 JS
 STRUCTURE_FEATURES = [
     'class="toolbar"',
     'id="themeBtn"',
     'aria-pressed="false"',
     'class="github-corner"',
+    'class="hero"',
     'class="install-box"',
     'class="copy-btn"',
+    'class="quick-start"',
+    'class="cmd-row"',
+    'class="scroll-hint"',
     'class="group-title"',
     'hs bookmark',
     'hs dashboard',
     'hs mcp',
     'class="compare"',
+    'npm-note',
+    'class="favicon"',
+    'data-copy=',
+    'updateHeroHeight',
     '<footer>',
     'http-server.cli.jaden.tech',
 ]
@@ -68,6 +78,22 @@ class TestDualSourceSync:
         zh = _pages["zh"].count('class="group-title"')
         assert en == zh, f"组数不一致: EN={en} ZH={zh}"
         assert en == 5, f"预期 5 组, 实际 {en}"
+
+    def test_cmd_row_count_equal(self, _pages):
+        """命令卡片行数一致（quick start 4 + 场景 14 = 18），兼作两屏结构漂移哨兵。"""
+        en = _pages["en"].count('class="cmd-row"')
+        zh = _pages["zh"].count('class="cmd-row"')
+        assert en == zh, f"cmd-row 数量不一致: EN={en} ZH={zh}"
+        assert en == 18, f"预期 18 行(quick start 4 + 场景 14), 实际 {en}"
+
+    def test_hero_quickstart_and_scrollhint_present(self, _pages):
+        """两屏要素: hero / quick-start / scroll-hint / 动态高度 JS 双页齐全。"""
+        for page in (_pages["en"], _pages["zh"]):
+            assert 'class="hero"' in page
+            assert 'class="quick-start"' in page
+            assert 'class="scroll-hint"' in page
+            assert 'updateHeroHeight' in page
+            assert "window.innerHeight - 110" in page
 
     def test_compare_table_rows_equal(self, _pages):
         """对比表行数一致（1 表头 + 5 工具 = 6 行）。"""
