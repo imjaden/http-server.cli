@@ -111,33 +111,44 @@
     }
     .theme-btn:hover { color: var(--text-body); border-color: var(--gh-corner-hover); }
 
-    /* ── Hero (screen 1) ── */
+    /* ── Hero (screen 1) — page-index aligned ── */
     .hero {
-      padding: 44px 0 24px; min-height: 80vh;
+      text-align: center;
+      padding: 80px 24px 120px;
+      position: relative;
+      min-height: 80vh;
       display: flex; flex-direction: column; justify-content: flex-start;
     }
-    .hero .container { max-width: 960px; margin: 0 auto; padding: 0 20px; width: 100%; }
     .hero-title {
-      display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px;
+      display: flex; align-items: center; justify-content: center; gap: 12px;
     }
-    .hero-title .hero-logo { width: 40px; height: 40px; flex-shrink: 0; }
+    .hero-title .hero-logo { width: 44px; height: 44px; flex-shrink: 0; }
     .hero-title span {
-      font-size: 44px; font-weight: 700; line-height: 1.2;
+      font-size: clamp(2.6rem, 7vw, 4.6rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
       background: linear-gradient(180deg, var(--hero-title-from) 20%, var(--hero-title-to) 100%);
       -webkit-background-clip: text; background-clip: text;
       -webkit-text-fill-color: transparent; color: transparent;
     }
-    .hero-tagline { text-align: center; font-size: 16px; color: var(--text-secondary); margin-bottom: 14px; }
+    .hero-tagline {
+      font-size: 1.05rem;
+      color: var(--text-secondary);
+      max-width: 760px;
+      margin: 20px auto 10px;
+      line-height: 1.8;
+    }
     .hero .badges {
       text-align: center; font-size: 12px; color: var(--text-muted); margin-bottom: 18px;
     }
     .hero .badges span { margin: 0 6px; }
 
-    /* Install box */
+    /* Install box (kept extra) */
     .install-box {
       display: flex; align-items: center; justify-content: space-between;
       background: var(--bg-card); border: 1px solid var(--border-default); border-radius: 8px;
-      max-width: 530px; margin: 0 auto; transition: background 0.2s, border-color 0.2s;
+      max-width: 530px; margin: 0 auto 24px; transition: background 0.2s, border-color 0.2s;
     }
     .install-box code {
       padding: 10px 16px; font-size: 14px; color: var(--text-code);
@@ -151,24 +162,59 @@
     }
     .install-box .copy-btn:hover { color: var(--text-body); }
 
-    /* ── Hero blocks: QUICK START | COMPARISON ── */
+    /* ── Hero blocks (page-index aligned) ── */
     .hero-blocks {
-      display: flex; gap: 20px; margin-top: 26px; align-items: flex-start; text-align: left;
+      display: flex; gap: 20px; width: 100%; max-width: 1024px;
+      flex-wrap: wrap; justify-content: center; margin: 0 auto;
     }
-    .hero-block { min-width: 0; }
-    .hero-block.qs { flex: 0 0 45%; }
-    .hero-block.cmp { flex: 1; }
-    .block-title {
-      font-size: 13px; font-weight: 600; color: var(--text-secondary);
-      text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; text-align: center;
+    .hero-block {
+      flex: 1 1 340px;
+      background: var(--bg-card); border: 1px solid var(--border-default); border-radius: 14px;
+      padding: 20px; text-align: left; position: relative;
     }
-    .qs-desc { font-size: 12px; color: var(--text-muted); margin: 0 0 2px 12px; }
-    .cmp-block .table-wrap { overflow-x: auto; }
-    .cmp-block table { font-size: 11px; }
-    .cmp-block th, .cmp-block td { padding: 6px 8px; }
-    .cmp-block td:first-child { white-space: nowrap; }
+    .hero-block .block-title {
+      font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin-bottom: 12px;
+    }
+    .code-block {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--bg-page); border: 1px solid var(--border-light); border-radius: 8px;
+      padding: 8px 10px; font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+      font-size: 0.78rem; line-height: 1.7; color: var(--text-code); overflow-x: auto;
+    }
+    .code-block + .code-block { margin-top: 8px; }
+    .code-block .prompt { color: var(--text-muted); }
+    .code-block .cmd { color: var(--text-code); white-space: nowrap; }
+    .code-block .copy-btn {
+      background: transparent; border: none; border-left: 1px solid var(--border-light);
+      color: var(--text-secondary); cursor: pointer; font-size: 11px; padding: 2px 8px;
+      flex-shrink: 0; transition: color 0.15s; user-select: none;
+    }
+    .code-block .copy-btn:hover { color: var(--text-body); }
 
-    /* ── Command rows (shared: quick start + templates) ── */
+    /* Comparison table inside hero block (kept extra) */
+    .hero-block .table-wrap { overflow-x: auto; }
+    .hero-block table { font-size: 11px; }
+    .hero-block th, .hero-block td { padding: 6px 8px; }
+    .hero-block td:first-child { white-space: nowrap; }
+
+    /* ── Scroll hint (page-index aligned) ── */
+    .scroll-hint {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 800;
+      color: var(--text-secondary); font-size: 0.85rem; letter-spacing: 0.12em;
+      text-decoration: none; cursor: pointer;
+      background: var(--bg-page); border: 1px solid var(--border-light); border-radius: 16px;
+      padding: 4px 14px;
+      animation: scroll-bounce 2s ease-in-out infinite;
+      opacity: 1; visibility: visible;
+      transition: opacity 0.25s, visibility 0.25s;
+    }
+    .scroll-hint.hide { opacity: 0; visibility: hidden; }
+    @keyframes scroll-bounce {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(6px); }
+    }
+
+    /* ── Command rows (screen 2 scenario cards) ── */
     .cmd-row {
       display: flex; align-items: center; justify-content: space-between;
       background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 6px;
@@ -182,16 +228,6 @@
       transition: color 0.15s; white-space: nowrap; user-select: none;
     }
     .cmd-row .copy-btn:hover { color: var(--text-body); }
-
-    /* ── Scroll hint ── */
-    .scroll-hint {
-      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 5;
-      font-size: 13px; color: var(--text-secondary); text-decoration: none;
-      background: var(--bg-page); border: 1px solid var(--border-light); border-radius: 16px;
-      padding: 4px 14px; opacity: 1; visibility: visible;
-      transition: opacity 0.3s, visibility 0.3s;
-    }
-    .scroll-hint.hide { opacity: 0; visibility: hidden; }
 
     /* ── Templates (screen 2, scenario cards) ── */
     .templates { padding: 44px 0 24px; }
@@ -268,11 +304,10 @@
     }
     @media (max-width: 760px) {
       .hero-blocks { flex-direction: column; }
-      .hero-block.qs { flex: 1 1 auto; width: 100%; }
+      .hero-block { flex: 1 1 auto; }
     }
     @media (max-width: 480px) {
-      .hero { padding: 36px 0 28px; }
-      .hero-title span { font-size: 32px; }
+      .hero { padding: 56px 16px 100px; }
       .install-box { max-width: 100%; flex-direction: column; }
       .install-box .copy-btn { border-left: none; border-top: 1px solid var(--border-default); width: 100%; }
       .toolbar { right: 72px; }
@@ -325,118 +360,110 @@
 
   <!-- ── Screen 1: Hero ── -->
   <section class="hero">
-    <div class="container">
-      <h1 class="hero-title">
-        <svg class="hero-logo" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="8" cy="8" r="7.5" fill="#e0e0e0"/>
-          <text x="8" y="11.5" text-anchor="middle"
-                font-family="Arial,Helvetica,sans-serif"
-                font-weight="900" font-size="9" fill="#333">hs</text>
-        </svg>
-        <span>http-server</span>
-      </h1>
-      <p class="hero-tagline">忘掉端口，只管预览。</p>
-      <p class="badges">
-        <span>🔄 自动分配端口</span>· <span>🧠 智能首页</span>· <span>📋 项目追踪</span>· <span>⚡ 零依赖</span>
-      </p>
-      <div class="install-box">
-        <code>pip install http-server-cli</code>
-        <button class="copy-btn" data-copy="pip install http-server-cli" onclick="copyText(this.getAttribute('data-copy'), this)">📋 复制</button>
+    <h1 class="hero-title">
+      <svg class="hero-logo" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="8" cy="8" r="7.5" fill="#e0e0e0"/>
+        <text x="8" y="11.5" text-anchor="middle"
+              font-family="Arial,Helvetica,sans-serif"
+              font-weight="900" font-size="9" fill="#333">hs</text>
+      </svg>
+      <span>http-server</span>
+    </h1>
+    <p class="hero-tagline">忘掉端口，只管预览。</p>
+    <p class="badges">
+      <span>🔄 自动分配端口</span>· <span>🧠 智能首页</span>· <span>📋 项目追踪</span>· <span>⚡ 零依赖</span>
+    </p>
+    <div class="install-box">
+      <code>pip install http-server-cli</code>
+      <button class="copy-btn" data-copy="pip install http-server-cli" onclick="copyText(this.getAttribute('data-copy'), this)">📋 复制</button>
+    </div>
+
+    <div class="hero-blocks">
+      <div class="hero-block">
+        <div class="block-title">🚀 快速开始</div>
+        <div class="code-block">
+          <span><span class="prompt">$</span> <span class="cmd">hs -o</span></span>
+          <button class="copy-btn" data-copy="hs -o" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
+        <div class="code-block">
+          <span><span class="prompt">$</span> <span class="cmd">hs list</span></span>
+          <button class="copy-btn" data-copy="hs list" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
+        <div class="code-block">
+          <span><span class="prompt">$</span> <span class="cmd">hs kill 8081</span></span>
+          <button class="copy-btn" data-copy="hs kill 8081" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
+        <div class="code-block">
+          <span><span class="prompt">$</span> <span class="cmd">hs dashboard -o</span></span>
+          <button class="copy-btn" data-copy="hs dashboard -o" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
       </div>
 
-      <div class="hero-blocks">
-        <div class="hero-block qs">
-          <div class="quick-start">
-            <div class="block-title">快速开始</div>
-            <div class="cmd-row">
-              <div class="line prompt">$ hs -o</div>
-              <button class="copy-btn" data-copy="hs -o" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
-            </div>
-            <div class="qs-desc">当前目录启动 + 打开浏览器</div>
-            <div class="cmd-row">
-              <div class="line prompt">$ hs list</div>
-              <button class="copy-btn" data-copy="hs list" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
-            </div>
-            <div class="qs-desc">列出所有运行中的服务</div>
-            <div class="cmd-row">
-              <div class="line prompt">$ hs kill 8081</div>
-              <button class="copy-btn" data-copy="hs kill 8081" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
-            </div>
-            <div class="qs-desc">按端口关闭服务</div>
-            <div class="cmd-row">
-              <div class="line prompt">$ hs dashboard -o</div>
-              <button class="copy-btn" data-copy="hs dashboard -o" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
-            </div>
-            <div class="qs-desc">打开 Web 管理面板</div>
-          </div>
-        </div>
-
-        <div class="hero-block cmp">
-          <div class="block-title">功能对比</div>
-          <div class="table-wrap">
-            <table>
-              <tr>
-                <th>工具</th>
-                <th>启动</th>
-                <th>自动端口</th>
-                <th>项目追踪</th>
-                <th>列表</th>
-                <th>关闭</th>
-                <th>浏览器打开</th>
-              </tr>
-              <tr>
-                <td><code>python3 -m http.server</code></td>
-                <td class="check">✅</td>
-                <td class="cross">—</td>
-                <td class="cross">—</td>
-                <td class="cross">—</td>
-                <td class="cross">—</td>
-                <td class="cross">—</td>
-              </tr>
-              <tr>
-                <td><code>http-server</code> (npm)</td>
-                <td class="check">✅</td>
-                <td class="cross">—</td>
-                <td class="cross">—</td>
-                <td class="cross">—</td>
-                <td class="cross">—</td>
-                <td class="check">✅</td>
-              </tr>
-              <tr>
-                <td><code>serve</code> (npm)</td>
-                <td class="check">✅</td>
-                <td class="cross">—</td>
-                <td class="cross">—</td>
-                <td class="cross">—</td>
-                <td class="cross">—</td>
-                <td class="check">✅</td>
-              </tr>
-              <tr>
-                <td><code>live-server</code> (npm)</td>
-                <td class="check">✅</td>
-                <td class="check">✅</td>
-                <td class="cross">—</td>
-                <td class="cross">—</td>
-                <td class="cross">—</td>
-                <td class="check">✅</td>
-              </tr>
-              <tr>
-                <td class="highlight"><strong>hs</strong> (pip)</td>
-                <td class="check">✅</td>
-                <td class="check">✅</td>
-                <td class="check">✅</td>
-                <td class="check">✅</td>
-                <td class="check">✅</td>
-                <td class="check">✅</td>
-              </tr>
-            </table>
-          </div>
+      <div class="hero-block">
+        <div class="block-title">📊 功能对比</div>
+        <div class="table-wrap">
+          <table>
+            <tr>
+              <th>工具</th>
+              <th>启动</th>
+              <th>自动端口</th>
+              <th>项目追踪</th>
+              <th>列表</th>
+              <th>关闭</th>
+              <th>浏览器打开</th>
+            </tr>
+            <tr>
+              <td><code>python3 -m http.server</code></td>
+              <td class="check">✅</td>
+              <td class="cross">—</td>
+              <td class="cross">—</td>
+              <td class="cross">—</td>
+              <td class="cross">—</td>
+              <td class="cross">—</td>
+            </tr>
+            <tr>
+              <td><code>http-server</code> (npm)</td>
+              <td class="check">✅</td>
+              <td class="cross">—</td>
+              <td class="cross">—</td>
+              <td class="cross">—</td>
+              <td class="cross">—</td>
+              <td class="check">✅</td>
+            </tr>
+            <tr>
+              <td><code>serve</code> (npm)</td>
+              <td class="check">✅</td>
+              <td class="cross">—</td>
+              <td class="cross">—</td>
+              <td class="cross">—</td>
+              <td class="cross">—</td>
+              <td class="check">✅</td>
+            </tr>
+            <tr>
+              <td><code>live-server</code> (npm)</td>
+              <td class="check">✅</td>
+              <td class="check">✅</td>
+              <td class="cross">—</td>
+              <td class="cross">—</td>
+              <td class="cross">—</td>
+              <td class="check">✅</td>
+            </tr>
+            <tr>
+              <td class="highlight"><strong>hs</strong> (pip)</td>
+              <td class="check">✅</td>
+              <td class="check">✅</td>
+              <td class="check">✅</td>
+              <td class="check">✅</td>
+              <td class="check">✅</td>
+              <td class="check">✅</td>
+            </tr>
+          </table>
         </div>
       </div>
     </div>
-  </section>
 
-  <a href="#templates" class="scroll-hint">↓ 场景详解</a>
+    <a href="#templates" class="scroll-hint">↓ 场景详解</a>
+  </section>
 
   <!-- ── Screen 2: Templates (scenario cards) ── -->
   <section class="templates" id="templates">
