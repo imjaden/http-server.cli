@@ -1,0 +1,95 @@
+# -*- coding: utf-8 -*-
+"""
+双源防漂移测试 — index.html / index.zh.html
+
+两个落地页是独立副本（EN/ZH 文案必然不同），但功能特征必须同步。
+本测试纯文件断言：核对两页的关键功能特征一致（结构特征、非文案），
+防止只改一页导致的漂移。参考 pages-index 双源防漂移模式。
+
+不引入 Selenium —— 页面是静态落地页，纯文件级断言足够。
+"""
+
+from pathlib import Path
+
+import pytest
+
+PROJECT = Path(__file__).resolve().parent.parent
+INDEX_EN = PROJECT / "index.html"
+INDEX_ZH = PROJECT / "index.zh.html"
+
+# 结构特征（与文案无关，双页必须一致）
+STRUCTURE_FEATURES = [
+    'class="toolbar"',
+    'id="themeBtn"',
+    'aria-pressed="false"',
+    'class="github-corner"',
+    'class="install-box"',
+    'class="copy-btn"',
+    'class="group-title"',
+    'hs bookmark',
+    'hs dashboard',
+    'hs mcp',
+    'class="compare"',
+    '<footer>',
+    'http-server.cli.jaden.tech',
+]
+
+pytestmark = pytest.mark.spec("index")
+
+
+def _read(page: Path) -> str:
+    """读取落地页源码（UTF-8）。"""
+    assert page.exists(), f"{page.name} 不存在"
+    return page.read_text(encoding="utf-8")
+
+
+@pytest.fixture(scope="module")
+def _pages():
+    return {"en": _read(INDEX_EN), "zh": _read(INDEX_ZH)}
+
+
+class TestDualSourceSync:
+    """index.html 与 index.zh.html 功能特征必须同步。"""
+
+    def test_both_pages_exist(self):
+        assert INDEX_EN.exists() and INDEX_ZH.exists()
+
+    def test_structure_features_in_both(self, _pages):
+        """每个结构特征必须同时出现在双页。"""
+        missing = []
+        for feat in STRUCTURE_FEATURES:
+            if feat not in _pages["en"] or feat not in _pages["zh"]:
+                missing.append(feat)
+        assert not missing, f"双页缺失结构特征: {missing}"
+
+    def test_scenario_group_count_equal(self, _pages):
+        """scenarios 组数必须一致（当前 5 组: Start/View/Kill/Bookmark/Manage）。"""
+        en = _pages["en"].count('class="group-title"')
+        zh = _pages["zh"].count('class="group-title"')
+        assert en == zh, f"组数不一致: EN={en} ZH={zh}"
+        assert en == 5, f"预期 5 组, 实际 {en}"
+
+    def test_compare_table_rows_equal(self, _pages):
+        """对比表行数一致（1 表头 + 5 工具 = 6 行）。"""
+        en = _pages["en"].count("<tr>")
+        zh = _pages["zh"].count("<tr>")
+        assert en == zh, f"对比表行数不一致: EN={en} ZH={zh}"
+        assert en == 6, f"预期 6 行(含表头), 实际 {en}"
+
+    def test_bookmark_and_manage_groups_present(self, _pages):
+        """Bookmark 与 Manage/管理 组均存在（非回归防护）。"""
+        assert "hs bookmark add" in _pages["en"]
+        assert "hs bookmark add" in _pages["zh"]
+        assert "hs mcp" in _pages["en"]
+        assert "hs mcp" in _pages["zh"]
+
+    def test_theme_js_sync_in_both(self, _pages):
+        """主题 JS 的 aria-pressed 同步逻辑双页一致。"""
+        en_ok = "btn.setAttribute('aria-pressed'" in _pages["en"]
+        zh_ok = "btn.setAttribute('aria-pressed'" in _pages["zh"]
+        assert en_ok and zh_ok, "aria-pressed 同步逻辑缺失"
+
+    def test_no_stale_github_link(self, _pages):
+        """落地页不残留旧仓库链接（http-server-cli 无点形态）。"""
+        for page in (_pages["en"], _pages["zh"]):
+            assert "github.com/imjaden/http-server-cli" not in page, "残留旧链接"
