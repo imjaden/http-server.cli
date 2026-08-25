@@ -7,9 +7,17 @@
   http-server
 </h1>
 
+<p align="center">
+  <a href="https://github.com/imjaden/http-server.cli"><img src="https://github.com/favicon.ico" width="16" height="16" alt="GitHub"> GitHub</a>
+  <span> · </span>
+  <a href="https://pypi.org/project/http-server-cli"><img src="https://pypi.org/static/images/favicon.35549fe8.ico" width="16" height="16" alt="PyPI"> PyPI</a>
+</p>
+
 > Forget ports. Just preview.
 >
 > Based on `python3 -m http.server`, zero external dependencies. Just `hs -o` to preview your project.
+>
+> hs is an independent tool — unrelated to the npm package "http-server".
 
 - [x] **Zero External Dependencies** — Python 3.7+, macOS/Linux/Windows (`pip install http-server-cli`)
 - [x] **Auto Port + Smart Index** — Default 8080, auto-increment on conflict; auto-open most-recent HTML when no index.html; specify with `-i` (`hs -o`)
@@ -42,7 +50,7 @@ pip install http-server-cli
 
 Verify:
 ```
-hs version     # → http-server.cli v1.0.x
+hs version     # → http-server v1.0.x
 hs -o        # Start in current directory + open browser
 ```
 
@@ -174,4 +182,4 @@ python3 -m pytest tests/
 | `portless` (npm) | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
 | `kill-port-cli` (npm) | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ |
 | `lsof` / `netstat` | ❌ | ❌ | ❌ | Manual | Manual | ❌ |
-| **`http-server.cli`** | **✅** | **✅** | **✅** | **✅** | **✅** | **✅** |
+| **`http-server`** | **✅** | **✅** | **✅** | **✅** | **✅** | **✅** |

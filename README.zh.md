@@ -7,9 +7,17 @@
   http-server
 </h1>
 
+<p align="center">
+  <a href="https://github.com/imjaden/http-server.cli"><img src="https://github.com/favicon.ico" width="16" height="16" alt="GitHub"> GitHub</a>
+  <span> · </span>
+  <a href="https://pypi.org/project/http-server-cli"><img src="https://pypi.org/static/images/favicon.35549fe8.ico" width="16" height="16" alt="PyPI"> PyPI</a>
+</p>
+
 > 忘记端口，只管预览 — Forget ports. Just preview.
 >
 > 基于 `python3 -m http.server`，零外部依赖。项目目录下 `hs -o` 一键预览。
+>
+> hs 是独立工具，与 npm 的 http-server 包无关。
 
 - [x] **零外部依赖** — 仅需 Python 3.7+，macOS/Linux/Windows（`pip install http-server-cli`）
 - [x] **自动端口 + 智能首页** — 默认 8080，冲突自动递增；无 index.html 时自动打开最近修改的 html；支持 `-i` 指定（`hs -o`）
@@ -174,4 +182,4 @@ python3 -m pytest tests/
 | `portless` (npm) | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
 | `kill-port-cli` (npm) | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ |
 | `lsof` / `netstat` | ❌ | ❌ | ❌ | 手动 | 手动 | ❌ |
-| **`http-server.cli`** | **✅** | **✅** | **✅** | **✅** | **✅** | **✅** |
+| **`http-server`** | **✅** | **✅** | **✅** | **✅** | **✅** | **✅** |
