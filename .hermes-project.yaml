@@ -1,18 +1,18 @@
-project: http-server.cli
+project: http-server
 profiles:
 - name: dev
 - name: review
 sessions:
 - role: ops
   profile: ops
-  title: http-server.cli-ops
+  title: http-server-ops
 - role: dev
   profile: dev
-  title: http-server.cli-dev
+  title: http-server-dev
 - role: review
   profile: review
-  title: http-server.cli-review
+  title: http-server-review
 handoff:
   enabled: true
-  doc: documents/handoff/handoff-http-server.cli-review.md
+  doc: documents/handoff/handoff-http-server-review.md
   updated_at: '2026-08-23'
