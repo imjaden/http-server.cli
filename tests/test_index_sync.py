@@ -20,6 +20,7 @@ INDEX_ZH = PROJECT / "index.zh.html"
 # 结构特征（与文案无关，双页必须一致）
 # 两屏重构（2026-08-25）后新增: hero 两屏 / quick-start / scroll-hint /
 # cmd-row 命令卡片 / favicon 图标 / npm 注记 / 动态高度 JS
+# 第二轮（2026-08-25）: 第1屏两列 quick-compare(qs-col|cmp-col) / 第2屏 scenarios-grid
 STRUCTURE_FEATURES = [
     'class="toolbar"',
     'id="themeBtn"',
@@ -29,13 +30,18 @@ STRUCTURE_FEATURES = [
     'class="install-box"',
     'class="copy-btn"',
     'class="quick-start"',
+    'class="quick-compare"',
+    'class="qs-col"',
+    'class="cmp-col"',
+    'class="table-wrap"',
     'class="cmd-row"',
     'class="scroll-hint"',
     'class="group-title"',
     'hs bookmark',
     'hs dashboard',
     'hs mcp',
-    'class="compare"',
+    'scenarios-grid',
+    'grid-template-columns: repeat(3, 1fr)',
     'npm-note',
     'class="favicon"',
     'data-copy=',
@@ -108,6 +114,29 @@ class TestDualSourceSync:
         assert "hs bookmark add" in _pages["zh"]
         assert "hs mcp" in _pages["en"]
         assert "hs mcp" in _pages["zh"]
+
+    def test_title_full_name(self, _pages):
+        """title 使用全称 http-server（2026-08-25 第二轮: hs 缩写仅保留在命令/图标/对比行名）。"""
+        for name, page in (("en", _pages["en"]), ("zh", _pages["zh"])):
+            assert "<title>http-server" in page, f"{name} title 未用全称 http-server"
+            assert "<title>hs" not in page, f"{name} title 仍以 hs 缩写开头"
+
+    def test_two_column_screen1(self, _pages):
+        """第1屏两列容器（QUICK START | COMPARISON）双页齐全。"""
+        for page in (_pages["en"], _pages["zh"]):
+            assert 'class="quick-compare"' in page
+            assert 'class="qs-col"' in page
+            assert 'class="cmp-col"' in page
+            assert 'class="table-wrap"' in page
+            assert "flex: 0 0 45%" in page  # qs-col 45% / cmp-col 55% 决策
+
+    def test_scenarios_grid_cards(self, _pages):
+        """第2屏场景组多列网格 + 组卡片化双页一致。"""
+        for page in (_pages["en"], _pages["zh"]):
+            assert 'scenarios-grid' in page
+            assert "grid-template-columns: repeat(3, 1fr)" in page
+            assert "@media (max-width: 1100px)" in page  # 3列→2列断点
+            assert "border-radius: 10px" in page  # 组卡片化
 
     def test_theme_js_sync_in_both(self, _pages):
         """主题 JS 的 aria-pressed 同步逻辑双页一致。"""
