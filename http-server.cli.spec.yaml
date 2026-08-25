@@ -17,6 +17,15 @@ capabilities:
   - smart-homepage
   - resource-monitoring
   - logging
+  - bookmark
+  - http-serving
+  - registry-managed
+  - dashboard
+  - mcp-integration
+  - json-output
+  - url-flag
+  - glob-resolution
+  - data-migration
 
 specs:
 
@@ -427,3 +436,384 @@ specs:
             given: 目录无 index.html，有 test.html
             when: 访问 /
             then: '日志输出"首页无 index.html，重定向到: test.html"'
+
+  # ── 书签系统 ─────────────────────────────────────
+
+  bookmark:
+    purpose: 命名书签的注册、更新、查询、删除，支持组合键唯一与通配符首页
+    requirements:
+      - id: bm-01
+        name: 注册书签
+        description: bookmark add 应注册命名书签，path 默认当前目录
+        priority: MUST
+        scenarios:
+          - name: 注册默认路径
+            when: 执行 hs bookmark add alpha
+            then:
+              - 书签 alpha 注册到当前目录
+              - 输出包含 Bookmark 'alpha'
+
+          - name: 注册指定路径
+            when: 执行 hs bookmark add alpha /tmp/project
+            then: 书签 alpha 指向 /tmp/project
+
+          - name: 名称与内置命令冲突
+            when: 执行 hs bookmark add list
+            then: 输出名称与内置命令冲突提示
+
+      - id: bm-02
+        name: 组合键唯一
+        description: (path, index_page) 组合键唯一，同路径不同首页可并存
+        priority: MUST
+        scenarios:
+          - name: 同路径不同首页
+            given: 已注册 alpha 指向 /tmp/project（index=index.html）
+            when: 执行 hs bookmark add beta /tmp/project -i app.html
+            then: beta 注册成功，与 alpha 并存
+
+          - name: 组合键冲突
+            given: 已注册 alpha 指向 /tmp/project（index=index.html）
+            when: 执行 hs bookmark add gamma /tmp/project -i index.html
+            then:
+              - 输出组合键冲突提示
+              - 不覆盖已有书签
+
+          - name: force 覆盖组合键
+            given: 已注册 alpha 指向 /tmp/project（index=index.html）
+            when: 执行 hs bookmark add delta /tmp/project -i index.html --force
+            then: delta 注册成功，覆盖组合键冲突
+
+      - id: bm-03
+        name: 通配符首页
+        description: -i 含 * 的 index_page 原样存储，运行时解析为最近修改文件
+        priority: MUST
+        scenarios:
+          - name: 通配符存储
+            when: 执行 hs bookmark add alpha /tmp/project -i 'snapshots/*.html'
+            then: 书签 index_page 存原始 pattern
+
+          - name: 字面量校验
+            when: 执行 hs bookmark add alpha /tmp/project -i app.html
+            then: 无效的 index_page 被拒绝，合法值保存
+
+      - id: bm-04
+        name: 更新与删除
+        description: bookmark update/remove 应支持路径与首页修改及书签删除
+        priority: MUST
+        scenarios:
+          - name: 更新路径
+            given: 已注册 alpha
+            when: 执行 hs bookmark update alpha /new/path
+            then: 书签 alpha 路径更新为 /new/path
+
+          - name: 删除书签
+            given: 已注册 alpha
+            when: 执行 hs bookmark remove alpha
+            then: 书签 alpha 被删除
+
+      - id: bm-05
+        name: 损坏检测
+        description: 书签文件损坏时应抛出 DataCorruptionError
+        priority: SHOULD
+        scenarios:
+          - name: 损坏文件
+            given: bookmarks.json 内容不是合法 JSON
+            when: 执行 hs bookmark list
+            then: 输出书签文件损坏提示
+
+  # ── HTTP 服务增强 ─────────────────────────────────
+
+  http-serving:
+    purpose: Range 请求支持与 MIME 自动识别等 HTTP 服务增强能力
+    requirements:
+      - id: http-01
+        name: Range 请求
+        description: 非目录文件应支持 Range 请求，返回 206 Partial Content
+        priority: MUST
+        scenarios:
+          - name: 完整文件响应
+            given: 目录存在 video.mp4
+            when: GET /video.mp4（无 Range 头）
+            then:
+              - 返回 200
+              - 响应头含 Accept-Ranges: bytes
+
+          - name: 部分内容响应
+            given: 目录存在 video.mp4
+            when: 'GET /video.mp4，Range: bytes=0-1023'
+            then:
+              - 返回 206 Partial Content
+              - Content-Range 头正确
+
+          - name: 起始位置请求
+            given: 目录存在 video.mp4
+            when: 'GET /video.mp4，Range: bytes=1024-'
+            then: 返回 206，从 1024 字节开始
+
+      - id: http-02
+        name: MIME 自动识别
+        description: 基于文件扩展名自动返回 Content-Type
+        priority: MUST
+        scenarios:
+          - name: HTML 文件
+            given: 目录存在 index.html
+            when: GET /index.html
+            then: Content-Type 为 text/html
+
+          - name: 未知扩展名
+            given: 目录存在 data.xyz
+            when: GET /data.xyz
+            then: Content-Type 为 application/octet-stream
+
+  # ── 托管服务注册表 ───────────────────────────────
+
+  registry-managed:
+    purpose: 基础设施服务（dashboard、MCP SSE）的独立注册与生命周期管理
+    requirements:
+      - id: mgd-01
+        name: 独立注册表
+        description: 托管服务登记在 registry-managed.json，与用户服务分离
+        priority: MUST
+        scenarios:
+          - name: 托管注册
+            given: 启动 MCP SSE 服务
+            when: 读取 registry-managed.json
+            then: 包含该 MCP 服务条目
+
+          - name: list 合并展示
+            given: registry-managed.json 有托管服务
+            when: 执行 hs list
+            then: 托管服务带 🔧 标记展示
+
+      - id: mgd-02
+        name: kill-all 隔离
+        description: kill-all 不应关闭托管服务
+        priority: MUST
+        scenarios:
+          - name: 托管服务存活
+            given: dashboard 运行中（托管）
+            when: 执行 hs kill-all
+            then: dashboard 仍在运行
+
+  # ── Web Dashboard ─────────────────────────────────
+
+  dashboard:
+    purpose: 图形化管理面板的启动、查询与 REST API
+    requirements:
+      - id: dash-01
+        name: 启动面板
+        description: dashboard 命令应启动 Web 管理面板（默认 8180）
+        priority: MUST
+        scenarios:
+          - name: 默认端口
+            when: 执行 hs dashboard
+            then: 面板监听 8180 端口
+
+          - name: 指定端口
+            when: 执行 hs dashboard -p 9000
+            then: 面板监听 9000 端口
+
+      - id: dash-02
+        name: 语言切换
+        description: 面板支持中英文切换
+        priority: MUST
+        scenarios:
+          - name: 中文参数
+            when: GET /?lang=zh
+            then: 返回中文界面
+
+          - name: 英文路由
+            when: GET /en
+            then: 返回英文界面
+
+      - id: dash-03
+        name: REST API
+        description: 面板提供服务列表/状态/关闭等 REST API
+        priority: MUST
+        scenarios:
+          - name: 服务列表
+            when: GET /api/servers
+            then: 返回 JSON 服务列表
+
+          - name: 状态查询
+            given: 端口 8080 有服务
+            when: GET /api/status/8080
+            then: 返回该服务状态 JSON
+
+          - name: 健康检查
+            given: 端口 8080 有服务
+            when: GET /api/ping/8080
+            then: 返回探活结果
+
+      - id: dash-04
+        name: 面板子命令
+        description: dashboard stop/status/restart 应管理面板生命周期
+        priority: MUST
+        scenarios:
+          - name: 停止面板
+            given: dashboard 运行中
+            when: 执行 hs dashboard stop
+            then: 面板停止
+
+          - name: 状态查询
+            given: dashboard 运行中
+            when: 执行 hs dashboard status
+            then: 输出端口/PID/时长信息
+
+  # ── MCP 集成 ──────────────────────────────────────
+
+  mcp-integration:
+    purpose: MCP Server 的启动、传输模式与工具调用
+    requirements:
+      - id: mcp-01
+        name: 启动 MCP Server
+        description: mcp 命令应启动 MCP Server，默认 SSE 后台模式
+        priority: MUST
+        scenarios:
+          - name: 默认 SSE 模式
+            when: 执行 hs mcp
+            then: 后台 SSE 服务启动并登记托管注册表
+
+          - name: stdio 模式
+            when: 执行 hs mcp --transport stdio
+            then: 前台 stdio 模式启动，不登记托管注册表
+
+      - id: mcp-02
+        name: 工具清单
+        description: MCP Server 应暴露 6 个工具
+        priority: MUST
+        scenarios:
+          - name: 工具完整
+            when: 客户端调用 tools/list
+            then: 返回 hs_list/hs_status/hs_start/hs_kill/hs_kill_all/hs_config 6 个工具
+
+          - name: 初始化校验
+            given: 客户端未发送 initialize
+            when: 客户端调用 tools/list
+            then: 拒绝请求
+
+      - id: mcp-03
+        name: 服务管理
+        description: mcp stop/status/restart 应管理 MCP 生命周期
+        priority: MUST
+        scenarios:
+          - name: 停止
+            given: MCP SSE 运行中
+            when: 执行 hs mcp stop
+            then: MCP 服务停止
+
+          - name: 状态
+            given: MCP SSE 运行中
+            when: 执行 hs mcp status
+            then: 输出端口/PID 信息
+
+  # ── JSON 输出 ─────────────────────────────────────
+
+  json-output:
+    purpose: 所有管理命令的统一 JSON 信封输出
+    requirements:
+      - id: json-01
+        name: 统一信封
+        description: --json 标志应输出 { success, command, data, error } 信封
+        priority: MUST
+        scenarios:
+          - name: 成功响应
+            when: 执行 hs list --json
+            then: JSON 包含 success=true、command=list、data、error=null
+
+          - name: 失败响应
+            when: 执行 hs kill 99999 --json
+            then: JSON 包含 success=false 与 error 描述
+
+      - id: json-02
+        name: 覆盖命令集
+        description: 管理命令均应支持 --json
+        priority: MUST
+        scenarios:
+          - name: 命令覆盖
+            when: 依次执行 hs list/status/kill/kill-all/history/search/config/set/version --json
+            then: 每个命令均输出 JSON 信封
+
+          - name: bookmark 子命令
+            when: 依次执行 hs bookmark add/list/show/update/remove --json
+            then: 每个子命令均输出 JSON 信封
+
+          - name: mcp/dashboard 子命令
+            when: 依次执行 hs mcp status/stop/restart --json 与 hs dashboard status/stop/restart --json
+            then: 每个子命令均输出 JSON 信封
+
+  # ── URL 输出 ──────────────────────────────────────
+
+  url-flag:
+    purpose: 启动后仅输出完整 URL 的干净模式
+    requirements:
+      - id: url-01
+        name: URL 输出
+        description: --url 标志应仅输出完整 URL，与 --json 互斥
+        priority: MUST
+        scenarios:
+          - name: 仅 URL
+            given: 服务成功启动
+            when: 执行 hs start . --url
+            then: 仅输出 http://localhost:PORT 形式的 URL
+
+          - name: 与 --json 互斥
+            when: 执行 hs start . --url --json
+            then: 提示互斥并遵循其一
+
+  # ── 通配符解析 ────────────────────────────────────
+
+  glob-resolution:
+    purpose: index 首页与路径参数的通配符解析，取最近修改文件
+    requirements:
+      - id: glob-01
+        name: index 通配符
+        description: -i 含通配符时应解析为最近修改的匹配文件
+        priority: MUST
+        scenarios:
+          - name: 最近文件
+            given: 目录有 snapshots/a.html、snapshots/b.html（b 最近）
+            when: 执行 hs start . -i 'snapshots/*.html'
+            then: 首页为 snapshots/b.html
+
+      - id: glob-02
+        name: 路径通配符
+        description: 路径参数含通配符时应解析为最近修改的匹配文件所在目录
+        priority: MUST
+        scenarios:
+          - name: 路径解析
+            given: /tmp/snapshots/ 有 a.html、b.html（b 最近）
+            when: 执行 hs /tmp/snapshots/*.html
+            then: 服务目录为 /tmp/snapshots，首页为 b.html
+
+  # ── 数据目录迁移 ──────────────────────────────────
+
+  data-migration:
+    purpose: 旧数据目录 ~/.http-server-cli 到新目录 ~/.http-server.cli 的自动迁移
+    requirements:
+      - id: mig-01
+        name: 自动迁移
+        description: 首次运行时旧目录存在应自动迁移到新目录
+        priority: MUST
+        scenarios:
+          - name: 迁移成功
+            given: ~/.http-server-cli 存在且 ~/.http-server.cli 不存在
+            when: 首次执行 hs 命令
+            then:
+              - 数据迁移到 ~/.http-server.cli
+              - 旧目录移除
+
+          - name: 复制兜底
+            given: 旧目录存在且 move 失败
+            when: 首次执行 hs 命令
+            then: 使用复制兜底，迁移成功
+
+          - name: 无旧目录
+            given: ~/.http-server-cli 不存在
+            when: 首次执行 hs 命令
+            then: 直接使用新目录，不迁移
+
+          - name: 迁移失败不中断
+            given: 旧目录存在且迁移完全失败
+            when: 首次执行 hs 命令
+            then: 输出警告并继续使用新目录
