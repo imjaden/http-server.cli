@@ -34,10 +34,13 @@ STRUCTURE_FEATURES = [
     'hero-tagline',
     'class="install-box"',
     'class="copy-btn"',
-    'class="quick-start"',
     'hero-blocks',
     'hero-block',
     'block-title',
+    'class="code-block"',
+    'scroll-bounce',
+    'flex: 1 1 340px',
+    'max-width: 1024px',
     'class="table-wrap"',
     'class="cmd-row"',
     'class="scroll-hint"',
@@ -97,20 +100,29 @@ class TestDualSourceSync:
         assert en == 5, f"预期 5 组标题, 实际 {en}"
 
     def test_cmd_row_count_equal(self, _pages):
-        """命令卡片行数一致（quick start 4 + 场景 14 = 18），兼作结构漂移哨兵。"""
-        en = _pages["en"].count('class="cmd-row"')
-        zh = _pages["zh"].count('class="cmd-row"')
-        assert en == zh, f"cmd-row 数量不一致: EN={en} ZH={zh}"
-        assert en == 18, f"预期 18 行(quick start 4 + 场景 14), 实际 {en}"
+        """命令行数一致：首屏 quick start 用 code-block（4），场景区用 cmd-row（14）。"""
+        en_cmd = _pages["en"].count('class="cmd-row"')
+        zh_cmd = _pages["zh"].count('class="cmd-row"')
+        assert en_cmd == zh_cmd == 14, f"场景 cmd-row 数量不一致: EN={en_cmd} ZH={zh_cmd}"
+        en_cb = _pages["en"].count('<div class="code-block">')
+        zh_cb = _pages["zh"].count('<div class="code-block">')
+        assert en_cb == zh_cb == 4, f"首屏 code-block 数量不一致: EN={en_cb} ZH={zh_cb}"
 
     def test_hero_quickstart_and_scrollhint_present(self, _pages):
-        """两屏要素: hero / quick-start / scroll-hint / 动态高度 JS 双页齐全。"""
+        """两屏要素: hero / code-block 命令 / scroll-hint(带动画) / 动态高度 JS 双页齐全。"""
         for page in (_pages["en"], _pages["zh"]):
             assert 'class="hero"' in page
-            assert 'class="quick-start"' in page
+            assert 'class="code-block"' in page
             assert 'class="scroll-hint"' in page
+            assert 'scroll-bounce' in page
             assert 'updateHeroHeight' in page
             assert "window.innerHeight - 110" in page
+
+    def test_code_block_copy_buttons(self, _pages):
+        """首屏每条 code-block 命令带行内复制按钮（6A 保留逐条复制能力）。"""
+        for page in (_pages["en"], _pages["zh"]):
+            assert page.count('class="code-block"') == 4
+            assert page.count('class="copy-btn"') >= 5  # install 1 + code-block 4 + 场景区
 
     def test_compare_table_rows_equal(self, _pages):
         """对比表行数一致（1 表头 + 5 工具 = 6 行）。"""
