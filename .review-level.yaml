@@ -91,3 +91,13 @@ review_history:
     tracking: HS-SEC-018 (closed)
     scope: "Commit audit: CL-SEC18 spec 补域 T5 (7352fbd) — capabilities 17=17 一一对应 (9 新 + 8 旧), 22 reqs/47 scenarios 与源码行为全部一致, 350 tests green (.venv), src/ 零变更, commit 格式 docs@spec + 命名 kebab-case 17/17 合规; 2×🟢 记录 SEC-018-1/2"
     report: documents/review/http-server-cli-spec-capabilities-review-v1.0-20260825.md
+  - date: 2026-08-25
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: PASS
+    score: 100
+    findings_total: 0
+    findings_open: 0
+    tracking: HS-SEC-019 (closed)
+    scope: "Commit audit: CL-SEC19 index 落地页 page-index 对齐批 5 commits (92250f4, 95cf6f7, a039321, 5f7028e, 84f53d9) — 双页对称全项 (组数 5/5, cmd-row 14/14, code-block 4/4, <tr> 6/6, title HTTP Server, innerHeight - 55), data-copy 19/19 与显示命令一致, page-index 结构要素双页齐全, 旧结构残留 8/8 模式 0 hits, test_index_sync.py 14/14, 357 tests green (.venv), src/ 零变更, commit 5/5 + 命名合规, favicon 3/3 200; 3×🟢 记录 SEC-019-1/2/3, pushed fa853e3..84f53d9"
+    report: documents/review/http-server-cli-index-page-index-audit-v1.0-20260825.md
