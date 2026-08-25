@@ -217,7 +217,7 @@
       <a href="./index.zh.html">🇨🇳</a>
       <a href="./index.html" class="active">🇺🇸</a>
     </div>
-    <button class="theme-btn" onclick="toggleTheme()" id="themeBtn" aria-label="Toggle theme">🌙</button>
+    <button class="theme-btn" onclick="toggleTheme()" id="themeBtn" aria-label="Toggle theme" aria-pressed="false">🌙</button>
   </div>
 
   <!-- ── GitHub Corner ── -->
@@ -337,6 +337,14 @@
         <div class="line out">   ✅  http://localhost:8080  →  ~/project-alpha</div>
       </div>
 
+      <div class="group">
+        <div class="group-title">▶  Manage</div>
+        <div class="line prompt">$ hs dashboard -o</div>
+        <div class="line out">   📊  Dashboard → http://localhost:8180</div>
+        <div class="line prompt">$ hs mcp</div>
+        <div class="line out">   🤖  hs mcp (SSE)  →  http://127.0.0.1:8765/sse</div>
+      </div>
+
     </div>
   </div>
 
@@ -410,6 +418,8 @@
       <span class="sep">·</span>
       <a href="https://pypi.org/project/http-server-cli/">PyPI</a>
       <span class="sep">·</span>
+      <a href="https://http-server.cli.jaden.tech">http-server.cli.jaden.tech</a>
+      <span class="sep">·</span>
       MIT License
     </div>
   </footer>
@@ -440,7 +450,9 @@
     function setTheme(theme) {
       var isLight = theme === 'light';
       document.documentElement.dataset.theme = isLight ? 'light' : '';
-      document.getElementById('themeBtn').textContent = isLight ? '☀️' : '🌙';
+      var btn = document.getElementById('themeBtn');
+      btn.textContent = isLight ? '☀️' : '🌙';
+      btn.setAttribute('aria-pressed', isLight ? 'true' : 'false');
     }
     function toggleTheme() {
       var isLight = document.documentElement.dataset.theme === 'light';
