@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>http-server — Forget ports, just preview.</title>
+  <title>HTTP Server — Forget ports, just preview.</title>
   <link rel="icon" href="https://raw.githubusercontent.com/imjaden/http-server.cli/main/src/http_server_cli/hs-icon.svg">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -386,16 +386,16 @@
           <button class="copy-btn" data-copy="hs -o" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
         </div>
         <div class="code-block">
+          <span><span class="prompt">$</span> <span class="cmd">hs --open --index index.html</span></span>
+          <button class="copy-btn" data-copy="hs --open --index index.html" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
+        <div class="code-block">
           <span><span class="prompt">$</span> <span class="cmd">hs list</span></span>
           <button class="copy-btn" data-copy="hs list" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
         </div>
         <div class="code-block">
           <span><span class="prompt">$</span> <span class="cmd">hs kill 8081</span></span>
           <button class="copy-btn" data-copy="hs kill 8081" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
-        </div>
-        <div class="code-block">
-          <span><span class="prompt">$</span> <span class="cmd">hs dashboard -o</span></span>
-          <button class="copy-btn" data-copy="hs dashboard -o" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
         </div>
       </div>
 
@@ -612,7 +612,7 @@
     /* ── Dynamic two-screen hero ── */
     function updateHeroHeight() {
       var hero = document.querySelector('.hero');
-      if (hero) hero.style.minHeight = (window.innerHeight - 110) + 'px';
+      if (hero) hero.style.minHeight = (window.innerHeight - 55) + 'px';
     }
     updateHeroHeight();
     window.addEventListener('resize', updateHeroHeight);
