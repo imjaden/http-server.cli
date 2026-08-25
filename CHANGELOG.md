@@ -6,6 +6,8 @@
 - Project renamed `http-server-cli` → `http-server.cli`; GitHub repo → `imjaden/http-server.cli`
 - Data directory migrated `~/.http-server-cli/` → `~/.http-server.cli/` (auto-migrate on first run, move + copy fallback)
 - CLI display strings, `hs version` output, docstrings updated to `http-server.cli`
+- Display name updated to `http-server` (CLI strings, `hs version` output, README h1/badges, index hero, features title); internal identifiers (repo/domain/data dir/spec/PyPI package) unchanged
+- npm disambiguation note added (README + landing pages): hs is unrelated to the npm package `http-server`
 - `pyproject.toml`: `readme` corrected `README.en.md` → `README.md` (file was already `README.md`)
 - Spec file renamed `http-server-cli.spec.yaml` → `http-server.cli.spec.yaml`
 
@@ -15,6 +17,17 @@
 - `hs bookmark list` / `show` / `add` / `update` / `remove` support `--json` envelope output
 - `hs mcp status|stop|restart` and `hs dashboard status|stop|restart` support `--json`
 - Data dir migration unit tests (5 cases: migrate, skip, no-legacy, copy fallback, full failure)
+
+### Fixed
+- PyPI project description missing ("The author of this package has not provided a project description"): v1.0.8 was built with `readme = "README.en.md"` (nonexistent file) → long_description empty; now `readme = "README.md"` produces a non-empty description with GitHub + PyPI links
+
+### Index (landing page)
+- `index.html` / `index.zh.html` two-screen redesign (pages-index pattern): screen 1 = hero + install + quick start (4 core commands, each copyable) + scroll-hint; screen 2 = 5 scenario groups with per-command copy buttons + comparison table
+- Dynamic two-screen hero height (`minHeight = innerHeight - 110` + resize), scroll-hint fixed bottom with fade-out
+- Footer links now use platform favicons (GitHub / PyPI / site), `rel="noopener"` on all external links
+- github-corner light-theme colors (dark triangle + white octocat), theme mechanism unchanged (`[data-theme=light]` + `hs-theme`)
+- README badges (GitHub / PyPI favicon icons) + PyPI↔GitHub cross links
+- Test suite: 352 tests (index sync +2: cmd-row count, two-screen elements)
 
 ## 1.0.8 (2026-07-01)
 
