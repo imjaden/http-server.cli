@@ -81,3 +81,13 @@ review_history:
     tracking: HS-SEC-017 (closed)
     scope: "Commit audit: CL-SEC17 index 双页优化批 3 commits (a032a5e, a231294, 6d42946) — Manage 组/aria-pressed/footer 域名双页对称, 场景输出与源码逐字一致, 350 tests green, src/ 零变更, commit 3/3 + 命名合规; 2×🟢 展示值记录 SEC-017-1/2"
     report: documents/review/http-server-cli-index-dualpage-implementation-review-v1.0-20260825.md
+  - date: 2026-08-25
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: PASS
+    score: 100
+    findings_total: 0
+    findings_open: 0
+    tracking: HS-SEC-018 (closed)
+    scope: "Commit audit: CL-SEC18 spec 补域 T5 (7352fbd) — capabilities 17=17 一一对应 (9 新 + 8 旧), 22 reqs/47 scenarios 与源码行为全部一致, 350 tests green (.venv), src/ 零变更, commit 格式 docs@spec + 命名 kebab-case 17/17 合规; 2×🟢 记录 SEC-018-1/2"
+    report: documents/review/http-server-cli-spec-capabilities-review-v1.0-20260825.md

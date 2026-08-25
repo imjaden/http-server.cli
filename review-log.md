@@ -302,3 +302,41 @@ Re-audit of the two fix commits closing all 6 🟡 findings (HS-SEC-011~016) plu
 
 ---
 
+## 2026-08-25 — Commit audit: CL-SEC18 spec 补域 T5 (7352fbd)
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（提交审计 — spec.yaml 补域 + 全量测试回归）
+- **Scope**: 1 个未 push commit — CL-SEC18 闭环（T5: spec.yaml 补齐 9 个新 capabilities，8→17）
+- **Commit(s)**: 7352fbd
+- **Verdict**: ✅ PASS
+- **Score**: 100 / 100 (Rating: A)
+- **Report**: documents/review/http-server-cli-spec-capabilities-review-v1.0-20260825.md
+
+### Summary
+
+单 commit 纯 spec 变更核验通过，数据验证 25/25：capabilities 声明 17 = specs 定义 17，一一对应无缺失无冗余（yaml.safe_load 实测）；9 新 capability req/scenario 计数与需求声明逐一吻合（bookmark 5/11、http-serving 2/5、registry-managed 2/3、dashboard 4/9、mcp-integration 3/6、json-output 2/5、url-flag 1/2、glob-resolution 2/2、data-migration 1/4 = 22 reqs/47 scenarios）；47 个新 scenarios 与源码行为全部一致——bookmark 组合键 (path,index_page)+--force 覆盖（bookmark.py:94-107）、DataCorruptionError（bookmark.py:23/49-53）、内置命令冲突（cli.py:827-833）、通配符原样/字面量校验（cli.py:846-859）；mcp _TOOLS 6 工具逐名一致（mcp.py:45-95）、initialize 校验（mcp.py:271-272）、stdio 不登记托管 vs SSE 登记（mcp.py:485-488/516-518）；handler Range 206+Content-Range+416（handler.py:110-131）；dashboard /api/* 路由 + /en + ?lang=zh（dashboard.py:85-129）、默认 8180 + -p + stop/status/restart（cli.py:551/546-548）；--url 与 --json 互斥（cli.py:172-174）+ url_only 退出码；json 信封 {success,command,data,error}（utils.py:306-322）；_migrate_legacy_data 4 场景（utils.py:47-74：无旧目录→return/新目录存在→return/move 失败→copytree 兜底/双失败→警告继续）；kill-all 隔离托管（server.py:620-622 仅遍历用户 registry）；YAML 语法有效；pytest 实测 **350 passed in 1.23s**（.venv）；src/ 零变更（diff 仅 http-server.cli.spec.yaml +390 行）；无 /Users 字面路径（0 hits）；commit 格式 docs@spec: 合规（scope 非空，无 body 亦可）。命名规范：capability 17/17 kebab-case（正则实测）。🟢 仅 2 条记录（SEC-018-1 dashboard CORS * + 无认证但绑定 127.0.0.1 loopback 边界明确；SEC-018-2 bookmark.py:33 docstring 与新组合键语义不一致，属源码遗留文案，本 commit 未触碰 src/），0 扣分。已 push（见 Tracking 关闭说明）。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| SEC-018-1 | 🟢 | dashboard API 无认证 + Access-Control-Allow-Origin: *（绑定 127.0.0.1 loopback，本地工具边界明确） | src/http_server_cli/dashboard.py:64,521 | 记录 |
+| SEC-018-2 | 🟢 | bookmark.py:33 docstring "路径唯一约束" 与组合键新语义（同 path 不同 index_page 可并存）不一致 — 源码遗留文案，spec 未断言 | src/http_server_cli/bookmark.py:33 | 记录 |
+
+### Positives
+
+- capabilities 17=17 用 yaml.safe_load 程序化比对（非人工数数），缺失/冗余/重复三类全查
+- 9 个新 capability 全部锚定到具体源码行（bookmark.py/mcp.py/handler.py/dashboard.py/cli.py/utils.py/server.py），无凭空声明
+- 测试回归用项目 .venv 环境（350 passed in 1.23s），非系统 python3（系统 3.9 无包导致 collect 失败已识别）
+- 单文件纯 spec 变更 +390 行，无代码混入，commit 分组干净
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| SEC-018-1 | dashboard CORS/认证（记录项） | 🟢 | — | ✅ Closed (2026-08-25, PASS 100/100, pushed) |
+| SEC-018-2 | bookmark.py:33 docstring 组合键语义（记录项） | 🟢 | — | ✅ Closed (2026-08-25, PASS 100/100, pushed) |
+| OBS-1 | 工作区 .hermes-project.yaml 修改未提交（并发会话 WIP，承上批） | 🟢 | — | ⏸ 待 ops 确认（与本批无关，未随 push） |
+
+---
+
