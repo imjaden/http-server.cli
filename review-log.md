@@ -263,3 +263,42 @@ Re-audit of the two fix commits closing all 6 🟡 findings (HS-SEC-011~016) plu
 | OBS-2 | scan-commits.py default enum lacks feat@ | 🟢 | — | ✅ Closed (2026-08-24) |
 
 ---
+
+## 2026-08-25 — Commit audit: CL-SEC17 index 双页优化批 (a032a5e, a231294, 6d42946)
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（提交审计 — 落地页/测试/文档批 + 全量测试回归）
+- **Scope**: 3 个未 push commit — CL-SEC17 闭环（T1: Manage/管理 场景组 / T2: 双源防漂移测试 / T3: aria-pressed + footer 域名 / T4: features.md 同步）
+- **Commit(s)**: a032a5e, a231294, 6d42946
+- **Verdict**: ✅ PASS
+- **Score**: 100 / 100 (Rating: A)
+- **Report**: documents/review/http-server-cli-index-dualpage-implementation-review-v1.0-20260825.md
+
+### Summary
+
+3 commit 全部核验通过，数据验证 14/14：未 push 恰为 3 个；src/ 零变更（diff 仅 features.md/index.html/index.zh.html/tests/test_index_sync.py 4 文件）；双页组数 = 5（EN Start/View/Kill/Bookmark/Manage ↔ ZH 启动/查看/关闭/书签/管理）、对比表 <tr> = 6、aria-pressed 初始态 + setTheme JS 同步、footer 域名 + CNAME 四方一致；dashboard 场景输出 `📊 Dashboard → http://localhost:8180` 与 dashboard.py:160 URL 模型（domain 默认 localhost）及 cli.py:615 结构一致（8180 = cli.py:53 默认端口）；MCP 场景输出 `🤖 hs mcp (SSE) → http://127.0.0.1:8765/sse` 与 cli.py:731 逐字一致（示例端口 8180/8765 为展示值，测试未断言端口）；无旧仓库链接残留（0 hits）；无 /Users 字面路径；features.md 343→350/11→12 与 `grep -c 'def test_'` 求和 350 实测吻合；pytest 实测 **350 passed in 1.28s**（含 test_index_sync.py 7/7）。commit 格式 3/3 type@scope 合规（feat@index/test@index/docs@features），分组按属性无混批，scan-commits.py 0 violations；命名规范：新增 test_*.py 符合 pytest 约定。🟢 仅 2 条展示值记录（SEC-017-1 dashboard 主机名 localhost vs cli.py:615 的 127.0.0.1，与数据模型一致；SEC-017-2 MCP 静态 🤖 vs 源码状态 🟢/🔴），0 扣分。已 push（见 Tracking 关闭说明）。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| SEC-017-1 | 🟢 | dashboard 展示主机名 localhost（与 dashboard.py:160 数据模型一致；cli.py:615 启动输出为 127.0.0.1，loopback 等价） | index.html:343 | 记录 |
+| SEC-017-2 | 🟢 | MCP 展示图标为静态 🤖（源码 cli.py:731 为状态 🟢/🔴，`{icon}` 为占位） | index.html:345 | 记录 |
+
+### Positives
+
+- 场景输出与源码逐字/逐结构比对（cli.py:615/731 + dashboard.py:160），非凭描述；示例端口明确为展示值且测试零端口断言
+- 双页 +16/+16 逐块对称，diff 逐行比对无漂移
+- T2 防漂移测试为纯文件断言（无 Selenium），14 项结构特征 + 组数/行数/残留三类计数，覆盖面与落地页实测吻合
+- 3 commit 单一属性分组（feat=双页 / test=测试 / docs=features.md），scope 语义准确
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| SEC-017-1 | dashboard 展示主机名（展示值说明） | 🟢 | — | ✅ Closed (2026-08-25, PASS 100/100, pushed) |
+| SEC-017-2 | MCP 展示图标（展示值说明） | 🟢 | — | ✅ Closed (2026-08-25, PASS 100/100, pushed) |
+| OBS-1 | 工作区 .hermes-project.yaml 修改未提交（并发会话 WIP，承上批） | 🟢 | — | ⏸ 待 ops 确认（与本批无关，未随 push） |
+
+---
+

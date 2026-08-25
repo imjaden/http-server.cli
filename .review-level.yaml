@@ -71,3 +71,13 @@ review_history:
     findings_open: 0
     tracking: OBS-2 (closed)
     scope: "Skill-fix: design-review scan-commits.py DEFAULT_TYPES 补入 feat — OBS-2 挂账翻转 Closed; feat@ 扫描实测 ok (http-server.cli 7/7, hermes-manager 5/5), 其余类型回归不变, --type 覆盖语义不变"
+  - date: 2026-08-25
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: PASS
+    score: 100
+    findings_total: 0
+    findings_open: 0
+    tracking: HS-SEC-017 (closed)
+    scope: "Commit audit: CL-SEC17 index 双页优化批 3 commits (a032a5e, a231294, 6d42946) — Manage 组/aria-pressed/footer 域名双页对称, 场景输出与源码逐字一致, 350 tests green, src/ 零变更, commit 3/3 + 命名合规; 2×🟢 展示值记录 SEC-017-1/2"
+    report: documents/review/http-server-cli-index-dualpage-implementation-review-v1.0-20260825.md
