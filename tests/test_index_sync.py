@@ -7,6 +7,12 @@
 防止只改一页导致的漂移。参考 pages-index 双源防漂移模式。
 
 不引入 Selenium —— 页面是静态落地页，纯文件级断言足够。
+
+结构演进（2026-08-25）:
+- 第一轮: 两屏 hero + quick-start + scroll-hint + cmd-row 卡片 + favicon + npm 注记
+- 第二轮: 第1屏两列 QUICK START | COMPARISON / 第2屏场景网格 3 列
+- 第三轮: 对齐 html-gen page-index 结构 — hero-title / hero-tagline /
+  hero-blocks / templates-title / templates-sub / template-grid / back-top / site-footer
 """
 
 from pathlib import Path
@@ -18,21 +24,20 @@ INDEX_EN = PROJECT / "index.html"
 INDEX_ZH = PROJECT / "index.zh.html"
 
 # 结构特征（与文案无关，双页必须一致）
-# 两屏重构（2026-08-25）后新增: hero 两屏 / quick-start / scroll-hint /
-# cmd-row 命令卡片 / favicon 图标 / npm 注记 / 动态高度 JS
-# 第二轮（2026-08-25）: 第1屏两列 quick-compare(qs-col|cmp-col) / 第2屏 scenarios-grid
 STRUCTURE_FEATURES = [
     'class="toolbar"',
     'id="themeBtn"',
     'aria-pressed="false"',
     'class="github-corner"',
     'class="hero"',
+    'hero-title',
+    'hero-tagline',
     'class="install-box"',
     'class="copy-btn"',
     'class="quick-start"',
-    'class="quick-compare"',
-    'class="qs-col"',
-    'class="cmp-col"',
+    'hero-blocks',
+    'hero-block',
+    'block-title',
     'class="table-wrap"',
     'class="cmd-row"',
     'class="scroll-hint"',
@@ -40,13 +45,19 @@ STRUCTURE_FEATURES = [
     'hs bookmark',
     'hs dashboard',
     'hs mcp',
-    'scenarios-grid',
+    'class="templates"',
+    'id="templates"',
+    'templates-title',
+    'templates-sub',
+    'template-grid',
+    'back-top-link',
     'grid-template-columns: repeat(3, 1fr)',
     'npm-note',
     'class="favicon"',
+    'site-footer',
+    'id="top"',
     'data-copy=',
     'updateHeroHeight',
-    '<footer>',
     'http-server.cli.jaden.tech',
 ]
 
@@ -79,14 +90,14 @@ class TestDualSourceSync:
         assert not missing, f"双页缺失结构特征: {missing}"
 
     def test_scenario_group_count_equal(self, _pages):
-        """scenarios 组数必须一致（当前 5 组: Start/View/Kill/Bookmark/Manage）。"""
+        """场景组标题数必须一致（Start/Bookmark/View/Kill/Manage = 5，Bookmark 并入 Start 卡、Manage 并入 Kill 卡）。"""
         en = _pages["en"].count('class="group-title"')
         zh = _pages["zh"].count('class="group-title"')
         assert en == zh, f"组数不一致: EN={en} ZH={zh}"
-        assert en == 5, f"预期 5 组, 实际 {en}"
+        assert en == 5, f"预期 5 组标题, 实际 {en}"
 
     def test_cmd_row_count_equal(self, _pages):
-        """命令卡片行数一致（quick start 4 + 场景 14 = 18），兼作两屏结构漂移哨兵。"""
+        """命令卡片行数一致（quick start 4 + 场景 14 = 18），兼作结构漂移哨兵。"""
         en = _pages["en"].count('class="cmd-row"')
         zh = _pages["zh"].count('class="cmd-row"')
         assert en == zh, f"cmd-row 数量不一致: EN={en} ZH={zh}"
@@ -116,26 +127,42 @@ class TestDualSourceSync:
         assert "hs mcp" in _pages["zh"]
 
     def test_title_full_name(self, _pages):
-        """title 使用全称 http-server（2026-08-25 第二轮: hs 缩写仅保留在命令/图标/对比行名）。"""
+        """title 使用全称 http-server（hs 缩写仅保留在命令/图标/对比行名）。"""
         for name, page in (("en", _pages["en"]), ("zh", _pages["zh"])):
             assert "<title>http-server" in page, f"{name} title 未用全称 http-server"
             assert "<title>hs" not in page, f"{name} title 仍以 hs 缩写开头"
 
-    def test_two_column_screen1(self, _pages):
-        """第1屏两列容器（QUICK START | COMPARISON）双页齐全。"""
+    def test_page_index_structure_aligned(self, _pages):
+        """与 html-gen page-index 规范对齐的结构要素双页齐全。"""
         for page in (_pages["en"], _pages["zh"]):
-            assert 'class="quick-compare"' in page
-            assert 'class="qs-col"' in page
-            assert 'class="cmp-col"' in page
-            assert 'class="table-wrap"' in page
-            assert "flex: 0 0 45%" in page  # qs-col 45% / cmp-col 55% 决策
+            assert 'class="hero-title"' in page
+            assert 'class="hero-tagline"' in page
+            assert 'class="hero-blocks"' in page
+            assert 'class="hero-block' in page
+            assert 'class="templates"' in page
+            assert 'id="templates"' in page
+            assert 'class="templates-title"' in page
+            assert 'class="templates-sub"' in page
+            assert 'class="template-grid"' in page
+            assert 'class="back-top-link"' in page
+            assert 'class="site-footer"' in page
+            assert 'id="top"' in page
+            assert 'href="#templates"' in page  # scroll-hint 指向第二屏
 
-    def test_scenarios_grid_cards(self, _pages):
-        """第2屏场景组多列网格 + 组卡片化双页一致。"""
+    def test_hero_title_gradient(self, _pages):
+        """hero-title 渐变标题（--hero-title-from/to 变量，浅色对比度）。"""
         for page in (_pages["en"], _pages["zh"]):
-            assert 'scenarios-grid' in page
-            assert "grid-template-columns: repeat(3, 1fr)" in page
-            assert "@media (max-width: 1100px)" in page  # 3列→2列断点
+            assert "--hero-title-from" in page
+            assert "--hero-title-to" in page
+            assert "linear-gradient(180deg" in page
+            assert "background-clip: text" in page
+
+    def test_template_grid_breakpoints(self, _pages):
+        """template-grid 1200px + 1500/1100 断点 + 组卡片化双页一致。"""
+        for page in (_pages["en"], _pages["zh"]):
+            assert "max-width: 1200px" in page
+            assert "@media (max-width: 1500px)" in page  # 3列→2列
+            assert "@media (max-width: 1100px)" in page  # 2列→1列
             assert "border-radius: 10px" in page  # 组卡片化
 
     def test_theme_js_sync_in_both(self, _pages):
