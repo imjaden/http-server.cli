@@ -92,8 +92,9 @@
 
 ## AI 对接
 
-1. `hs prompt [<skill>]` — 输出 skills/ 使用说明（hs-cli/hs-bookmark/hs-mcp/hs-dashboard，--brief/--json）✅ — `documents/hs-ai-integration-design-v1.0-20260825.md`
-2. 批次二（暂缓）— hs export / hs doctor 🚧
+1. `hs prompt [<skill>]` — 输出 skills/ 使用说明（hs-cli/hs-bookmark/hs-mcp/hs-dashboard/ai-interchange，--brief/--json）✅ — `documents/hs-ai-integration-design-v1.0-20260825.md`
+2. skills/ai-interchange — AI 互通数据对接方法论（三通道框架 + hs 实证 + 验收清单），供其他项目核对复用 ✅ — CL-SEC21
+3. 批次二（暂缓）— hs export / hs doctor 🚧
 
 ## 配置管理
 
