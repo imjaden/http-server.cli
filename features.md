@@ -23,6 +23,7 @@
 11. `hs help` — 帮助信息 ✅
 12. `hs --url` — 启动后仅输出完整 URL（与 --json 互斥）✅ — `documents/url-flag-design-v2.0-20250715.md`
 13. 全局 `--json` 标志 — 所有管理命令（list/status/kill/kill-all/history/search/config/set/version）均支持 ✅
+14. `hs prompt [<skill>]` — 输出技能使用说明（AI 对接）✅
 
 ## 书签系统
 
@@ -84,8 +85,15 @@
 1. `hs mcp` — 启动 MCP Server（后台 SSE），AI Agent 集成 ✅ — `documents/hs-mcp-design-v1.0-20260624.md`
 2. `hs mcp stop [--json]` — 停止 MCP 服务 ✅
 3. `hs mcp status [--json]` — 查看 MCP 状态 ✅
-4. JSON-RPC 2.0 协议 — stdio/SSE 传输，6 个工具（hs_list/hs_status/hs_start/hs_kill/hs_kill_all/hs_config）✅
-5. 零外部依赖 — 纯标准库实现 MCP 协议 ✅
+4. `hs mcp --config` — 输出 mcpServers 接入配置（stdio，Claude Code/Cursor/Hermes 一行接入）✅
+5. JSON-RPC 2.0 协议 — stdio/SSE 传输，11 个工具（6 管理：hs_list/status/start/kill/kill_all/config；5 数据：hs_bookmark_list/add/remove、hs_history、hs_search）✅
+6. MCP Resources 3 项（只读）— hs://registry / hs://bookmarks / hs://config ✅
+7. 零外部依赖 — 纯标准库实现 MCP 协议 ✅
+
+## AI 对接
+
+1. `hs prompt [<skill>]` — 输出 skills/ 使用说明（hs-cli/hs-bookmark/hs-mcp/hs-dashboard，--brief/--json）✅ — `documents/hs-ai-integration-design-v1.0-20260825.md`
+2. 批次二（暂缓）— hs export / hs doctor 🚧
 
 ## 配置管理
 
@@ -95,7 +103,7 @@
 
 ## 测试
 
-1. 12 个测试模块，357 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
+1. 12 个测试模块，378 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
 2. `conftest.py` — autouse 数据隔离 + monkeypatch 路径注入 ✅
 3. 集成测试模式 — mock `_COMMANDS` / `ensure_storage`，set `sys.argv`，catch `SystemExit` ✅
 
