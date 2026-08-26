@@ -797,7 +797,7 @@ def _cmd_mcp(manager, args):
         # 输出 mcpServers 接入配置片段（AI 工具一行接入）
         from http_server_cli.utils import json_output
         config_data = {'mcpServers': {
-            'hs': {'command': 'hs', 'args': ['mcp'], 'transport': 'stdio'},
+            'hs': {'command': 'hs', 'args': ['mcp', '--transport', 'stdio'], 'transport': 'stdio'},
         }}
         if '--json' in args:
             json_output(True, 'mcp-config', data=config_data)
@@ -806,10 +806,10 @@ def _cmd_mcp(manager, args):
             print('mcpServers:')
             print('  hs:')
             print('    command: hs')
-            print('    args: ["mcp"]')
+            print('    args: ["mcp", "--transport", "stdio"]')
             print('    transport: stdio')
             print()
-            print('# 注: hs mcp 默认后台 SSE → http://127.0.0.1:8765/sse; --stdio 前台 stdio 模式')
+            print('# 注: hs mcp 默认后台 SSE → http://127.0.0.1:8181/sse; --transport stdio 前台 stdio 模式')
         return
     if parsed.transport == 'stdio':
         from http_server_cli.mcp import serve_stdio

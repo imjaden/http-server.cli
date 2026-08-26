@@ -52,7 +52,7 @@ hs dashboard -o           打开 Web 管理面板（默认 8180）
 hs dashboard [stop|status|restart] [--json]
 hs mcp                     启动 MCP Server（后台 SSE，AI 集成）
 hs mcp [stop|status|restart] [--json]
-hs mcp --stdio             前台 stdio 模式
+hs mcp --transport stdio   前台 stdio 模式
 hs mcp --config            输出 mcpServers 接入配置
 hs prompt [<skill>]       输出技能使用说明（本命令）
 ```

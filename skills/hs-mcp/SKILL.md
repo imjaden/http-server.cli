@@ -13,8 +13,8 @@ hs 内置 MCP (Model Context Protocol) 服务器，让 AI Agent 直接管理 HTT
 ## 启动
 
 ```bash
-hs mcp                    # 后台运行 SSE → http://127.0.0.1:8765/sse（registry-managed 托管）
-hs mcp --stdio            # 前台 stdio 模式（AI 工具子进程方式）
+hs mcp                    # 后台运行 SSE → http://127.0.0.1:8181/sse（registry-managed 托管）
+hs mcp --transport stdio  # 前台 stdio 模式（AI 工具子进程方式）
 hs mcp status             # 查看状态
 hs mcp stop               # 停止
 hs mcp restart            # 重启
@@ -70,7 +70,7 @@ AI 可直接读取资源，无需工具调用。
 
 - 只操作用户 registry/bookmark 数据；registry-managed（dashboard/MCP 自身）不参与 kill-all
 - 工具调用通过子进程执行 `hs ... --json`，解析结构化输出
-- 未 initialize 前 tools/list 与 tools/call 拒绝（-32601）
+- 未 initialize 前 tools/list 与 tools/call 拒绝（-32602）
 
 ## 关联文档
 

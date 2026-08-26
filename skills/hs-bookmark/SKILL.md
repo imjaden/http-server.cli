@@ -49,7 +49,7 @@ hs alpha -o        # 等价 hs start ~/project-alpha -o
 ## JSON 信封示例
 
 ```json
-{"success": true, "command": "bookmark", "data": {"bookmarks": [{"name": "alpha", "path": "~/project-alpha", "index_page": null}]}, "error": null}
+{"success": true, "command": "bookmark-list", "data": {"bookmarks": [{"name": "alpha", "path": "~/project-alpha", "index_page": null}]}, "error": null}
 ```
 
 ## 关联文档
