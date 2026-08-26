@@ -6,7 +6,9 @@ CLI 入口：argparse 解析 + 命令分派。
 
 import argparse
 import os
+import subprocess
 import sys
+import webbrowser
 
 from http_server_cli import __version__
 from http_server_cli.config import Config
@@ -77,6 +79,17 @@ _HELP = """http-server v{version} — 忘记端口，只管预览
     hs <name> --url        获取 URL
     hs <name> -o           启动 + 打开浏览器
     hs kill <name>         停止服务
+
+━━━ Web 服务注册 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  hs web add <name> --cmd '<cmd>' [--url <url>] [--open cmd|url|both|none]
+  hs web list / show <name> / remove <name> / update <name>
+  hs web <name> [--no-probe]      已运行→直接访问; 未运行→执行启动命令
+
+  注册任意 web 服务启动命令（可跨项目），按名称快速启动/访问:
+    hs web daily.checker        启动/访问 daily-checker 面板
+    hs web jaden.tech           启动/访问 jaden.tech 站点
+    hs web <name> --no-probe    跳过探测，强制重启
 
 ━━━ 其他 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1252,6 +1265,442 @@ def _bookmark_update(args):
             json_output(False, cmd, error='bookmarks file corrupted')
         else:
             print('❌ bookmarks file corrupted', file=sys.stderr)
+
+# ── Web 服务注册（hs web）──────────────────────────────
+
+@_register
+def _cmd_web(manager, args):
+    """hs web — 跨项目 Web 服务注册管理"""
+    sub = args[0] if args else None
+    if sub == 'add':
+        _web_add(args[1:])
+    elif sub == 'update':
+        _web_update(args[1:])
+    elif sub == 'list':
+        _web_list(args[1:])
+    elif sub == 'show':
+        _web_show(args[1:])
+    elif sub == 'remove':
+        _web_remove(args[1:])
+    elif sub in ('help', '-h', '--help'):
+        _web_help()
+    else:
+        # 未识别子命令 → 视为执行: hs web <name> [--no-probe]
+        _web_run(args)
+
+
+def _web_help():
+    print('━━━ hs web ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    print('  注册任意 web 服务启动命令，按名称快速启动/访问')
+    print()
+    print("  hs web add <name> --cmd '<cmd>' [--url <url>] [--open cmd|url|both|none]")
+    print('      --cmd  启动命令（如 dk server start --daemon --open）')
+    print('      --url  服务 URL（固定端口必填；动态端口不填，启动前未知）')
+    print('      --open 开浏览器策略（默认 url: web 统一开; cmd: 命令自带 -o; both: 都试; none: 不开）')
+    print('  hs web update <name> [--cmd ...] [--url ...] [--open ...]')
+    print('  hs web list [--json] / show <name> / remove <name>')
+    print('  hs web <name> [--no-probe]   执行：已运行→直接访问；未运行→执行启动命令')
+    print('      --no-probe 跳过探测，总是执行启动命令（强制重启）')
+    print('  hs web help')
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+
+
+def _web_add(args):
+    parser = argparse.ArgumentParser(prog='hs web add', add_help=False)
+    parser.add_argument('name')
+    parser.add_argument('--cmd', default=None)
+    parser.add_argument('--url', default=None)
+    parser.add_argument('--open', dest='open_mode', default=None)
+    parser.add_argument('--force', action='store_true')
+    parser.add_argument('--json', action='store_true')
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
+        return
+
+    from http_server_cli.services import ServiceStore, DataCorruptionError
+    from http_server_cli.utils import json_output
+
+    json_mode = parsed.json
+    cmd = 'web-add'
+
+    if not parsed.cmd:
+        err = "--cmd is required (e.g. --cmd 'dk server start --daemon --open')"
+        if json_mode:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
+        return
+
+    name_err = ServiceStore.validate_name(parsed.name)
+    if name_err:
+        if json_mode:
+            json_output(False, cmd, error=name_err)
+        else:
+            print(f'❌ {name_err}', file=sys.stderr)
+        return
+    if parsed.name in _COMMANDS:
+        err = f"'{parsed.name}' conflicts with built-in command"
+        if json_mode:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
+        return
+
+    open_mode = parsed.open_mode or 'url'
+    err = ServiceStore.validate_open_mode(open_mode)
+    if err:
+        if json_mode:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
+        return
+    err = ServiceStore.validate_url(parsed.url)
+    if err:
+        if json_mode:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
+        return
+
+    store = ServiceStore()
+    try:
+        store.add(parsed.name, parsed.cmd, url=parsed.url,
+                  open_mode=open_mode, force=parsed.force)
+        svc = store.get(parsed.name)
+        if svc is None:  # pragma: no cover - add 成功后必然存在
+            return
+        if json_mode:
+            json_output(True, cmd, data=svc)
+        else:
+            print(f"✅ Service '{parsed.name}' registered")
+            print(f"   🚀 Cmd: {svc['cmd']}")
+            if svc.get('url'):
+                print(f"   🌐 URL: {svc['url']}")
+            print(f"   👁  Open: {svc.get('open', 'url')}")
+    except ValueError as e:
+        if json_mode:
+            json_output(False, cmd, error=str(e))
+        else:
+            print(f'❌ {e}', file=sys.stderr)
+    except DataCorruptionError:
+        if json_mode:
+            json_output(False, cmd, error='services file corrupted')
+        else:
+            print('❌ services file corrupted', file=sys.stderr)
+
+
+def _web_list(args):
+    parser = argparse.ArgumentParser(prog='hs web list', add_help=False)
+    parser.add_argument('--json', action='store_true')
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
+        return
+
+    from http_server_cli.services import ServiceStore, DataCorruptionError
+    from http_server_cli.utils import json_output
+
+    cmd = 'web-list'
+    store = ServiceStore()
+    try:
+        services = store.list_all()
+    except DataCorruptionError:
+        if parsed.json:
+            json_output(False, cmd, error='services file corrupted')
+        else:
+            print('❌ services file corrupted', file=sys.stderr)
+        return
+
+    if parsed.json:
+        json_output(True, cmd, data={
+            'count': len(services),
+            'services': services,
+        })
+        return
+
+    if not services:
+        print('No services registered')
+        return
+    print(f'📊 {len(services)} service(s):')
+    print()
+    for svc in services:
+        print(f"  🌐 {svc['name']}")
+        print(f"     🚀 {svc['cmd']}")
+        if svc.get('url'):
+            print(f"     🌍 {svc['url']}")
+        print(f"     👁  Open: {svc.get('open', 'url')}")
+        print()
+
+
+def _web_show(args):
+    parser = argparse.ArgumentParser(prog='hs web show', add_help=False)
+    parser.add_argument('name', nargs='?', default=None)
+    parser.add_argument('--json', action='store_true')
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
+        return
+
+    from http_server_cli.services import ServiceStore, DataCorruptionError
+    from http_server_cli.utils import json_output
+
+    cmd = 'web-show'
+    if not parsed.name:
+        err = 'Usage: hs web show <name>'
+        if parsed.json:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
+        return
+
+    store = ServiceStore()
+    try:
+        svc = store.get(parsed.name)
+    except DataCorruptionError:
+        if parsed.json:
+            json_output(False, cmd, error='services file corrupted')
+        else:
+            print('❌ services file corrupted', file=sys.stderr)
+        return
+
+    if not svc:
+        err = f"service '{parsed.name}' not found"
+        if parsed.json:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
+        return
+
+    if parsed.json:
+        json_output(True, cmd, data=svc)
+        return
+
+    print(f"🌐 {svc['name']}")
+    print(f"   🚀 Cmd: {svc['cmd']}")
+    if svc.get('url'):
+        print(f"   🌍 URL: {svc['url']}")
+    print(f"   👁  Open: {svc.get('open', 'url')}")
+    print(f"   🕐 Created: {svc.get('created_at', '-')}")
+
+
+def _web_remove(args):
+    parser = argparse.ArgumentParser(prog='hs web remove', add_help=False)
+    parser.add_argument('name', nargs='?', default=None)
+    parser.add_argument('--json', action='store_true')
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
+        return
+
+    from http_server_cli.services import ServiceStore, DataCorruptionError
+    from http_server_cli.utils import json_output
+
+    cmd = 'web-remove'
+    if not parsed.name:
+        err = 'Usage: hs web remove <name>'
+        if parsed.json:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
+        return
+
+    store = ServiceStore()
+    try:
+        removed = store.remove(parsed.name)
+    except DataCorruptionError:
+        if parsed.json:
+            json_output(False, cmd, error='services file corrupted')
+        else:
+            print('❌ services file corrupted', file=sys.stderr)
+        return
+
+    if parsed.json:
+        if removed:
+            json_output(True, cmd, data={'name': parsed.name})
+        else:
+            json_output(False, cmd, error=f"service '{parsed.name}' not found")
+        return
+
+    if removed:
+        print(f"✅ Service '{parsed.name}' removed")
+    else:
+        print(f"❌ service '{parsed.name}' not found", file=sys.stderr)
+
+
+def _web_update(args):
+    parser = argparse.ArgumentParser(prog='hs web update', add_help=False)
+    parser.add_argument('name')
+    parser.add_argument('--cmd', default=None)
+    parser.add_argument('--url', default=None)
+    parser.add_argument('--open', dest='open_mode', default=None)
+    parser.add_argument('--json', action='store_true')
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
+        return
+
+    from http_server_cli.services import ServiceStore, DataCorruptionError
+    from http_server_cli.utils import json_output
+
+    json_mode = parsed.json
+    cmd = 'web-update'
+
+    store = ServiceStore()
+    try:
+        existing = store.get(parsed.name)
+    except DataCorruptionError:
+        if json_mode:
+            json_output(False, cmd, error='services file corrupted')
+        else:
+            print('❌ services file corrupted', file=sys.stderr)
+        return
+
+    if not existing:
+        err = f"service '{parsed.name}' not found"
+        if json_mode:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
+        return
+
+    if parsed.cmd is None and parsed.url is None and parsed.open_mode is None:
+        err = 'Nothing to update: pass --cmd / --url / --open'
+        if json_mode:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
+        return
+
+    if parsed.open_mode is not None:
+        err = ServiceStore.validate_open_mode(parsed.open_mode)
+        if err:
+            if json_mode:
+                json_output(False, cmd, error=err)
+            else:
+                print(f'❌ {err}', file=sys.stderr)
+            return
+    if parsed.url is not None:
+        err = ServiceStore.validate_url(parsed.url)
+        if err:
+            if json_mode:
+                json_output(False, cmd, error=err)
+            else:
+                print(f'❌ {err}', file=sys.stderr)
+            return
+
+    try:
+        store.update(parsed.name, cmd=parsed.cmd, url=parsed.url,
+                     open_mode=parsed.open_mode)
+        updated = store.get(parsed.name)
+        if updated is None:  # pragma: no cover - update 成功后必然存在
+            return
+        if json_mode:
+            json_output(True, cmd, data=updated)
+        else:
+            print(f"✅ Service '{parsed.name}' updated")
+            print(f"   🚀 Cmd: {updated['cmd']}")
+            if updated.get('url'):
+                print(f"   🌍 URL: {updated['url']}")
+            print(f"   👁  Open: {updated.get('open', 'url')}")
+    except ValueError as e:
+        if json_mode:
+            json_output(False, cmd, error=str(e))
+        else:
+            print(f'❌ {e}', file=sys.stderr)
+    except DataCorruptionError:
+        if json_mode:
+            json_output(False, cmd, error='services file corrupted')
+        else:
+            print('❌ services file corrupted', file=sys.stderr)
+
+
+def _web_run(args):
+    parser = argparse.ArgumentParser(prog='hs web', add_help=False)
+    parser.add_argument('name', nargs='?', default=None)
+    parser.add_argument('--no-probe', action='store_true')
+    parser.add_argument('--json', action='store_true')
+    try:
+        parsed, _ = parser.parse_known_args(args)
+    except SystemExit:
+        return
+
+    from http_server_cli.services import ServiceStore, DataCorruptionError
+    from http_server_cli.utils import (
+        json_output, url_reachable, wait_url_reachable,
+    )
+
+    cmd = 'web-run'
+    json_mode = parsed.json
+    if not parsed.name:
+        _web_help()
+        return
+
+    store = ServiceStore()
+    try:
+        svc = store.get(parsed.name)
+    except DataCorruptionError:
+        if json_mode:
+            json_output(False, cmd, error='services file corrupted')
+        else:
+            print('❌ services file corrupted', file=sys.stderr)
+        return
+
+    if not svc:
+        err = f"service '{parsed.name}' not found"
+        if json_mode:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
+            available = sorted(store.names())
+            if available:
+                print(f'   Available: {", ".join(available)}')
+        sys.exit(1)
+
+    url = svc.get('url') or None
+    open_mode = svc.get('open') or 'url'
+
+    # 探测阶段：url 已配置且未跳过 → 可达则直接访问（幂等）
+    if url and not parsed.no_probe:
+        if url_reachable(url):
+            if open_mode in ('url', 'both'):
+                webbrowser.open(url)
+            if json_mode:
+                json_output(True, cmd, data={
+                    'name': parsed.name, 'url': url, 'status': 'running',
+                })
+            else:
+                print(f"✅ Service '{parsed.name}' already running")
+                print(f"   🌐 {url}")
+            return
+
+    # 执行阶段：执行启动命令（透传，cmd 需为守护/后台形式）
+    result = subprocess.run(svc['cmd'], shell=True)
+
+    # 启动后确认 + open（url/both 策略）
+    if url and open_mode in ('url', 'both'):
+        reachable = wait_url_reachable(url)
+        if reachable:
+            webbrowser.open(url)
+        elif not json_mode:
+            print(f'   ⚠️ URL not ready yet: {url}', file=sys.stderr)
+
+    if json_mode:
+        json_output(True, cmd, data={
+            'name': parsed.name,
+            'cmd': svc['cmd'],
+            'url': url,
+            'open': open_mode,
+            'status': 'started',
+            'exit_code': result.returncode,
+        })
+    else:
+        print(f"✅ Service '{parsed.name}' started")
+        if url:
+            print(f"   🌐 {url}")
+        if result.returncode != 0:
+            print(f'   ⚠️ Cmd exited with code {result.returncode}', file=sys.stderr)
+
 
 # ── main ───────────────────────────────────────────────
 
