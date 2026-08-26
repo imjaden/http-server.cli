@@ -101,3 +101,13 @@ review_history:
     tracking: HS-SEC-019 (closed)
     scope: "Commit audit: CL-SEC19 index 落地页 page-index 对齐批 5 commits (92250f4, 95cf6f7, a039321, 5f7028e, 84f53d9) — 双页对称全项 (组数 5/5, cmd-row 14/14, code-block 4/4, <tr> 6/6, title HTTP Server, innerHeight - 55), data-copy 19/19 与显示命令一致, page-index 结构要素双页齐全, 旧结构残留 8/8 模式 0 hits, test_index_sync.py 14/14, 357 tests green (.venv), src/ 零变更, commit 5/5 + 命名合规, favicon 3/3 200; 3×🟢 记录 SEC-019-1/2/3, pushed fa853e3..84f53d9"
     report: documents/review/http-server-cli-index-page-index-audit-v1.0-20260825.md
+  - date: 2026-08-26
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: PASS
+    score: 100
+    findings_total: 8
+    findings_open: 0
+    tracking: HS-SEC-020 (closed)
+    scope: "Commit audit re-review: CL-SEC20 hs AI 对接批次一 6 commits (5e9f7aa, 6fafaa1, cf21184, 6371725, e693ba6, 7f0ab1c) + review-fix f734042 + audit@review — SEC-020-1 修复经端到端 stdio 实测 (initialize serverInfo 1.1.0 + capabilities{tools,resources}, tools/list 11, resources/list 3), SEC-020-2/3/5/6 勘误到位 (skills 残留 0 hits), SEC-020-4 amend subject tests (12) 与 diff 一致, SEC-020-7 记录, 复查新发现 SEC-020-8 (design §四:111/114 args:[\"mcp\"] 残留) 由 f734042 推前闭环; 378 tests green (.venv), PASS 100/100, pushed baead3b..(8 commits)"
+    report: documents/review/http-server-cli-ai-integration-audit-v1.1-20260826.md

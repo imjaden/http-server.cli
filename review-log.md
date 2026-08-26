@@ -381,3 +381,102 @@ Re-audit of the two fix commits closing all 6 🟡 findings (HS-SEC-011~016) plu
 
 ---
 
+## 2026-08-26 — Commit audit: CL-SEC20 hs AI 对接批次一 (5e9f7aa, 6fafaa1, cf21184, 8aaca27, 3a82cd9)
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（提交审计 — hs prompt 子命令 + MCP 数据工具/Resources + mcp --config + 版本 1.2.0）
+- **Scope**: 5 个未 push commit — CL-SEC20 闭环（prompt 供给站 / MCP 5 数据工具 + Resources / mcp --config / 版本 1.2.0）
+- **Commit(s)**: 5e9f7aa, 6fafaa1, cf21184, 8aaca27, 3a82cd9
+- **Verdict**: ⚠️ CONDITIONAL PASS
+- **Score**: 70 / 100 (Rating: B)
+- **Report**: documents/review/http-server-cli-ai-integration-audit-v1.0-20260825.md
+
+### Summary
+
+批次主体核验通过:hs prompt 全路径 5/5 实测（列表 4 skill / 详情全文 / --brief / --json 信封正常+错误 / 不存在 exit 1）;MCP 11 工具（6 管理 + 5 数据）tools/list 实测 + _TOOL_MAP 全覆盖;`_build_hs_args` 回归 8 例（旧 6 工具不变,kill 特例保留）+ bookmark_add 三形态 3 例;Resources 3 项 list/read 实测 + 缺失容错 '{}' + initialize capabilities.resources;新工具端到端 tools/call 5/5（隔离 HOME）;`hs mcp --config` YAML 合法 + --json 信封正确;版本 1.2.0 五处一致（__init__/CHANGELOG/`hs version`/features.md/pyproject dynamic）;**378 passed in 1.36s**（.venv）;diff 12 文件无越界;无敏感信息 0 hits;.hermes-project.yaml 未混入;commit 格式 5/5 + 命名规范合规。
+
+**🔴 SEC-020-1（阻断）**:`hs mcp --config` 输出的 stdio 配置不可用 —— 实测 `hs mcp`（= config 的 `args:["mcp"]` + transport stdio）管道握手输出 `SSE daemon -> http://127.0.0.1:8181/sse` 后退出,无任何 JSON-RPC 响应,后台 daemon 监听 8181（lsof + registry-managed.json 双证）;对照 `--transport stdio` 全部正常。根因:cli.py:789 仅识别 `--transport`,config args 缺 `--transport stdio`;设计 §四:116 错误前提 "`--stdio` 已存在" 被照抄。连带 🟡 SEC-020-2（--stdio/8765 文档失实 6 处:cli.py:812, hs-cli:55, hs-mcp:16-17, design:64/115/116 —— 实测默认端口 8181,8765 系本批笔误）+ 🟡 SEC-020-3（hs-mcp:73 错误码 -32601 vs 实测 -32602）+ 🟡 SEC-020-4（8aaca27 subject "tests (21)" 实测 12,21 为批次总量）+ 🟢 SEC-020-5/6/7（bookmark JSON 示例 command、design 模板表格漂移、skills 缺失测试场景未落地）。**未 push**,修复清单回 ops,复审通过后 push。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| SEC-020-1 | 🔴 | `hs mcp --config` 输出 stdio 配置不可用（args ["mcp"] 启动后台 SSE daemon,无 JSON-RPC 握手;设计错误前提 "--stdio 已存在" 被照抄） | src/http_server_cli/cli.py:800,809,812 | ⏳ 待 ops 修复 |
+| SEC-020-2 | 🟡 | 文档声称 `--stdio` flag（不存在,仅 `--transport stdio`）与端口 8765（实测默认 8181,本批笔误） | cli.py:812;skills/hs-cli/SKILL.md:55;skills/hs-mcp/SKILL.md:16,17;documents/hs-ai-integration-design-v1.0-20260825.md:64,115,116 | ⏳ 待 ops 修复 |
+| SEC-020-3 | 🟡 | 边界错误码 -32601 与实现不符（实测 -32602） | skills/hs-mcp/SKILL.md:73 | ⏳ 待 ops 修复 |
+| SEC-020-4 | 🟡 | commit subject "tests (21)" 计数失实（该 commit 新增 12,21 为批次总量） | commit 8aaca27 | ⏳ 待 ops 决定（amend 或记录） |
+| SEC-020-5 | 🟢 | JSON 示例 command 值 "bookmark" 与实现 'bookmark-list' 不符（示例文案） | skills/hs-bookmark/SKILL.md:52 | 记录 |
+| SEC-020-6 | 🟢 | design §三 hs_bookmark_add 模板示例漂移（缺 -i/--force;param_map 'index'→'index_page';实现为超集,决策级一致） | documents/hs-ai-integration-design-v1.0-20260825.md:76,85 | 记录 |
+| SEC-020-7 | 🟢 | 测试计划 "skills 缺失场景（monkeypatch SKILLS_DIR）" 未落地（SKILLS_DIR 为函数内局部变量;代码路径存在且正确） | tests/test_prompt.py;documents/hs-ai-integration-design-v1.0-20260825.md:126 | 记录 |
+
+### Positives
+
+- hs prompt 全路径 5/5 实测（含 exit code 与 stderr/stdout 分流）,非仅单测
+- MCP 新工具端到端 tools/call 5/5 在隔离 HOME（/tmp/hs-audit-home）实测,不触碰真实用户数据
+- `--config` 问题用行为证据闭环:管道握手 + lsof + registry-managed.json 双证,并对照 `--transport stdio` 正常路径
+- 测试 378 全绿用项目 .venv（Python 3.11.15）,非系统 python3
+- diff 范围 12 文件逐一核对,无越界;敏感信息 0 hits
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| SEC-020-1 | mcp --config stdio 配置不可用（args 缺 --transport stdio） | 🔴 | P0 | ⏳ 待 ops 修复 |
+| SEC-020-2 | --stdio/8765 文档失实 6 处 | 🟡 | P1 | ⏳ 待 ops 修复 |
+| SEC-020-3 | 错误码 -32601 vs -32602 | 🟡 | P1 | ⏳ 待 ops 修复 |
+| SEC-020-4 | 8aaca27 subject 计数失实 | 🟡 | P2 | ⏳ 待 ops 决定 |
+| SEC-020-5 | bookmark JSON 示例 command（记录项） | 🟢 | — | ⏳ 记录 |
+| SEC-020-6 | design 模板表格漂移（记录项） | 🟢 | — | ⏳ 记录 |
+| SEC-020-7 | skills 缺失测试场景未落地（记录项） | 🟢 | — | ⏳ 记录 |
+
+---
+
+## [v1.1 re-review] CL-SEC20 hs AI 对接批次一 — 修复闭环 re-review PASS
+
+- **Date**: 2026-08-26
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（提交审计 re-review — SEC-020 修复复核 + push 闭环）
+- **Scope**: 批次 6 commit（5e9f7aa, 6fafaa1, cf21184, 6371725, e693ba6, 7f0ab1c）+ review-fix f734042 + audit@review;baead3b 已在 origin/main
+- **Commit(s)**: 5e9f7aa..7f0ab1c + f734042 + audit@review
+- **Verdict**: ✅ PASS
+- **Score**: 100 / 100 (Rating: A)
+- **Report**: documents/review/http-server-cli-ai-integration-audit-v1.1-20260826.md
+
+### Summary
+
+7 项首审条目逐条复核:SEC-020-1 代码修复（cli.py:800-812 config args → `['mcp','--transport','stdio']` + YAML/--json 同步 + 注释 8181/--transport stdio）经**端到端实测**:按 config args 启动子进程（隔离 HOME）stdio JSON-RPC initialize → serverInfo 1.1.0 + capabilities{tools,resources}、notifications/initialized 静默、tools/list 11 工具、resources/list 3 项（hs://registry|bookmarks|config）全应答;SEC-020-2 六处勘误（cli.py:812 / hs-cli:55 / hs-mcp:16,17 / design:64,115,116 → `--transport stdio` / `127.0.0.1:8181/sse`）+ SEC-020-3（hs-mcp:73 → -32602）+ SEC-020-5（hs-bookmark:52 `command:"bookmark-list"`）+ SEC-020-6（design §三:73 模板与 mcp.py:180-181 逐字一致）全部到位,skills/ 残留扫描 8765/--stdio/-32601 = 0 hits;SEC-020-4 经 amend:6371725 subject `tests (12)` 与 diff 计数一致（test_mcp 29→41,+12:BuildArgs 7 + Resources 5,改名 1 例非新增）,e693ba6 docs@changelog（"378 tests" 实测一致）;SEC-020-7 记录接受（SKILLS_DIR 函数内局部变量 cli.py:666,monkeypatch 成本高,代码路径 cli.py:668-675 正确）。**全量 pytest 378 passed in 1.30s**（.venv）。复查另发现 **SEC-020-8 🟡**:design doc §四:111/114 残留 `args:["mcp"]`（首审 P0 修复建议"设计文档 §四 勘误"未完全执行,7f0ab1c 仅勘误 115/116 备注行）— 由 review-fix **f734042** 推前闭环（args `['mcp','--transport','stdio']`）。**push origin main 完成**（baead3b 已在远端,实际推送 6 + 2 = 8 commits）。
+
+### Findings (re-review)
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| SEC-020-1 | 🔴 | `hs mcp --config` 输出 stdio 配置不可用 | src/http_server_cli/cli.py:800-812 | ✅ 已修（7f0ab1c）+ E2E 实测握手 |
+| SEC-020-2 | 🟡 | --stdio/8765 文档失实 6 处 | cli.py:812;skills/hs-cli:55;skills/hs-mcp:16,17;design:64,115,116 | ✅ 已修（7f0ab1c） |
+| SEC-020-3 | 🟡 | 错误码 -32601 vs -32602 | skills/hs-mcp/SKILL.md:73 | ✅ 已修（7f0ab1c） |
+| SEC-020-4 | 🟡 | commit subject "tests (21)" 计数失实 | commit 8aaca27→6371725 | ✅ 已修（amend subject "tests (12)",29→41 实测一致） |
+| SEC-020-5 | 🟢 | JSON 示例 command 值失实 | skills/hs-bookmark/SKILL.md:52 | ✅ 已修（7f0ab1c） |
+| SEC-020-6 | 🟢 | design §三 hs_bookmark_add 模板漂移 | documents/hs-ai-integration-design-v1.0-20260825.md:73 | ✅ 已修（7f0ab1c） |
+| SEC-020-7 | 🟢 | skills 缺失测试场景未落地 | tests/test_prompt.py;design:126 | 记录接受 |
+| SEC-020-8 | 🟡 | design §四:111,114 残留 args:["mcp"]（§四勘误未完全执行） | documents/hs-ai-integration-design-v1.0-20260825.md:111,114 | ✅ 已修（f734042,推前闭环） |
+
+### Positives
+
+- SEC-020-1 修复用行为证据闭环:按 `hs mcp --config` 输出原样启动子进程（隔离 HOME）,initialize/tools-list/resources-list 全应答,非仅静态比对
+- 全量 378 passed 用项目 .venv（Python 3.11.15）;skills 残留扫描 0 hits 覆盖 3 个失实 token
+- subject 计数用 git show 逐 diff 核验（29→41 = +12 改名 1 例）,非凭 subject 自述
+- 复查新增发现（SEC-020-8）推前闭环,不把已知"文档教坏配置"推上远端
+- baead3b 状态实测（已在 origin/main）纠正简报计数,避免重复 push
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| SEC-020-1 | mcp --config stdio 配置不可用（args 缺 --transport stdio） | 🔴 | P0 | ✅ 已修 + E2E 实测 |
+| SEC-020-2 | --stdio/8765 文档失实 6 处 | 🟡 | P1 | ✅ 已修 |
+| SEC-020-3 | 错误码 -32601 vs -32602 | 🟡 | P1 | ✅ 已修 |
+| SEC-020-4 | 8aaca27 subject 计数失实 | 🟡 | P2 | ✅ 已修（amend 6371725） |
+| SEC-020-5 | bookmark JSON 示例 command（记录项） | 🟢 | — | ✅ 已修 |
+| SEC-020-6 | design 模板表格漂移（记录项） | 🟢 | — | ✅ 已修 |
+| SEC-020-7 | skills 缺失测试场景未落地（记录项） | 🟢 | — | 记录接受 |
+| SEC-020-8 | design §四:111/114 args 残留 | 🟡 | P1 | ✅ 已修（f734042） |
+
