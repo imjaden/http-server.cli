@@ -108,10 +108,10 @@ SERVER_VERSION '1.0.0' → '1.1.0'（MCP 服务能力扩展）。
   mcpServers:
     hs:
       command: hs
-      args: ["mcp"]
+      args: ["mcp", "--transport", "stdio"]
       transport: stdio
   ```
-- --json：信封 data={mcpServers:{hs:{command:'hs',args:['mcp'],transport:'stdio'}}}
+- --json：信封 data={mcpServers:{hs:{command:'hs',args:['mcp','--transport','stdio'],transport:'stdio'}}}
 - 同时输出备注（SSE 方式：hs mcp 默认 SSE → http://127.0.0.1:8181/sse）
 - 不影响现有子命令（start/stop/status/restart）；stdio 模式经 `--transport stdio` 调用 serve_stdio
 
