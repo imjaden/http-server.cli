@@ -57,6 +57,7 @@ _HELP = """http-server v{version} — 忘记端口，只管预览
   hs mcp                   启动 MCP Server（后台运行 SSE，AI Agent 集成）
   hs mcp stop              停止 MCP 服务
   hs mcp status            查看 MCP 状态
+  hs prompt                列出可用技能（AI 对接，`hs prompt <name>` 输出全文）
 
 ━━━ 配置 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -657,6 +658,122 @@ def _manage_dashboard(subcmd: str, json_mode: bool = False) -> None:
             json_output(True, 'dashboard-restart', data={
                 'name': 'dashboard', 'port': port, 'restarted': True,
             })
+
+
+@_register
+def _cmd_prompt(manager, args):
+    """hs prompt — 输出 skills/ 使用说明（AI 对接，参考 html-gen prompt）"""
+    import json as _json
+    from pathlib import Path as _Path
+
+    SKILLS_DIR = _Path(__file__).resolve().parents[2] / 'skills'
+    json_mode = '--json' in args
+    brief = '--brief' in args
+    skill_name = next((a for a in args if not a.startswith('-')), None)
+
+    if not SKILLS_DIR.is_dir():
+        if json_mode:
+            print(_json.dumps({'status': 'error', 'data': None,
+                               'error': 'skills/ 目录不存在'}, ensure_ascii=False))
+        else:
+            print('❌ skills/ 目录不存在', file=sys.stderr)
+        sys.exit(1)
+
+    def _skill_desc(smd):
+        try:
+            for _line in open(smd, encoding='utf-8'):
+                if _line.startswith('description:'):
+                    return _line.split(':', 1)[1].strip()
+        except Exception:
+            pass
+        return ''
+
+    skills = []
+    for d in sorted(SKILLS_DIR.iterdir()):
+        if d.is_dir():
+            smd = d / 'SKILL.md'
+            if smd.exists():
+                skills.append({'name': d.name, 'path': smd, 'dir': d})
+
+    if not skills:
+        if json_mode:
+            print(_json.dumps({'status': 'error', 'data': None,
+                               'error': '无可用 skill'}, ensure_ascii=False))
+        else:
+            print('❌ 无可用 skill', file=sys.stderr)
+        sys.exit(1)
+
+    # 无参: 列出所有
+    if not skill_name:
+        if json_mode:
+            print(_json.dumps({'status': 'ok', 'error': '', 'data': [
+                {'name': s['name'],
+                 'description': _skill_desc(s['path']),
+                 'references': [r.name for r in s['dir'].glob('references/*.md')]}
+                for s in skills]}, ensure_ascii=False, indent=2))
+            return
+        print('可用 skills:\n')
+        for s in skills:
+            desc = _skill_desc(s['path'])
+            refs = [r.name for r in s['dir'].glob('references/*.md')]
+            print(f"  {s['name']}")
+            if desc:
+                print(f"    {desc}")
+            if refs:
+                print(f"    references: {', '.join(refs)}")
+            print(f"    用法: hs prompt {s['name']}")
+            print()
+        return
+
+    # 带参: 查找 skill
+    target = next((s for s in skills if s['name'] == skill_name), None)
+    if not target:
+        if json_mode:
+            print(_json.dumps({'status': 'error', 'data': None,
+                               'error': f"skill '{skill_name}' 不存在"},
+                              ensure_ascii=False, indent=2))
+            sys.exit(1)
+        print(f"❌ skill '{skill_name}' 不存在", file=sys.stderr)
+        print(f"可用: {', '.join(s['name'] for s in skills)}")
+        sys.exit(1)
+
+    content_text = target['path'].read_text(encoding='utf-8')
+
+    if json_mode:
+        refs = sorted(target['dir'].glob('references/*.md'))
+        print(_json.dumps({'status': 'ok', 'error': '', 'data': {
+            'name': target['name'],
+            'content': content_text,
+            'references': {r.stem: r.read_text(encoding='utf-8') for r in refs},
+        }}, ensure_ascii=False, indent=2))
+        return
+
+    if brief:
+        lines = content_text.split('\n')
+        desc = next((l.split(':', 1)[1].strip() for l in lines if l.startswith('description:')), '')
+        headings = [l for l in lines if l.startswith('## ')]
+        refs = [r.name for r in target['dir'].glob('references/*.md')]
+        if desc:
+            print(desc)
+            print()
+        if headings:
+            print('章节:')
+            for h in headings:
+                print(f"  {h[3:]}")
+            print()
+        if refs:
+            print(f"references: {', '.join(refs)}")
+        return
+
+    # 全文
+    print(content_text)
+    refs = sorted(target['dir'].glob('references/*.md'))
+    if refs:
+        print('\n---\n')
+        for r in refs:
+            print(f'## {r.stem}')
+            print(r.read_text(encoding='utf-8'))
+            print()
 
 
 @_register
