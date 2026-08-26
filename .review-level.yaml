@@ -111,3 +111,13 @@ review_history:
     tracking: HS-SEC-020 (closed)
     scope: "Commit audit re-review: CL-SEC20 hs AI 对接批次一 6 commits (5e9f7aa, 6fafaa1, cf21184, 6371725, e693ba6, 7f0ab1c) + review-fix f734042 + audit@review — SEC-020-1 修复经端到端 stdio 实测 (initialize serverInfo 1.1.0 + capabilities{tools,resources}, tools/list 11, resources/list 3), SEC-020-2/3/5/6 勘误到位 (skills 残留 0 hits), SEC-020-4 amend subject tests (12) 与 diff 一致, SEC-020-7 记录, 复查新发现 SEC-020-8 (design §四:111/114 args:[\"mcp\"] 残留) 由 f734042 推前闭环; 378 tests green (.venv), PASS 100/100, pushed baead3b..(8 commits)"
     report: documents/review/http-server-cli-ai-integration-audit-v1.1-20260826.md
+  - date: 2026-08-26
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: PASS
+    score: 100
+    findings_total: 0
+    findings_open: 0
+    tracking: HS-SEC-021 (closed)
+    scope: "Commit audit: CL-SEC21 AI 互通沉淀三件套 4 commits (efddb48, d5a3ce1, a156a89, 851bbf1) — SKILL.md 11 条断言与 src/ 逐字一致 (--transport stdio/8181/-32602/_TOOL_MAP/Resources '{}'/registry-managed 边界/11=6+5), hs prompt 实测 5 篇+--json 5 项, index 双源 6/17/4/6 对称 + test_index_sync 14 passed + 8765/--stdio 零残留, README EN/ZH 对称 (YAML L77/11 tools/双表合并/v1.2.x 实测 v1.2.0), features 4→5, subject vs diff 4/4, 378 tests green (.venv), 敏感信息 0 hits; 2×🟢 记录 SEC-021-1/2, PASS 100/100, pushed efddb48..851bbf1"
+    report: documents/review/http-server-cli-ai-interchange-settle-audit-v1.0-20260826.md

@@ -480,3 +480,42 @@ Re-audit of the two fix commits closing all 6 🟡 findings (HS-SEC-011~016) plu
 | SEC-020-7 | skills 缺失测试场景未落地（记录项） | 🟢 | — | 记录接受 |
 | SEC-020-8 | design §四:111/114 args 残留 | 🟡 | P1 | ✅ 已修（f734042） |
 
+---
+
+## 2026-08-26 — Commit audit: CL-SEC21 hs AI 互通沉淀三件套 (efddb48, d5a3ce1, a156a89, 851bbf1)
+
+- **Date**: 2026-08-26
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（提交审计 + 功能实测）
+- **Scope**: 4 commits（efddb48, d5a3ce1, a156a89, 851bbf1），基底 origin/main 863b85c（4 commits 全部未 push）
+- **Commit(s)**: efddb48..851bbf1
+- **Verdict**: ✅ PASS
+- **Score**: 100 / 100 (Rating: A)
+- **Report**: documents/review/http-server-cli-ai-interchange-settle-audit-v1.0-20260826.md
+
+### Summary
+
+8 项审计全过。①SKILL.md 内容真实性 11 条断言逐字对照 src/ 全真:`--transport stdio`（cli.py:789/800,全仓 --stdio 0 hits）、8181（cli.py:790/812,8765 0 hits）、-32602（mcp.py:207,未 initialize → ValueError → mcp.py:370）、_TOOL_MAP 双类参数映射（mcp.py:172-185 + 299-322 短 flag 两段式/布尔 True 才追加）、Resources 缺失 '{}'（mcp.py:435-439）、registry-managed 边界（_TOOL_MAP 11 项全用户 registry 命令）、11=6 管理+5 数据（mcp.py:74-170）、--json 信封、SKILLS_DIR parents[2]（cli.py:669）、SERVER_VERSION 1.1.0 + hs:// 三 URI。②hs prompt 实测:无参 5 篇列表、`prompt ai-interchange` 全文与仓库一致、--json status ok + 5 项、--brief、不存在 exit 1。③index 双源:group-title=6/cmd-row=17/code-block=4/tr=6 双页一致,test_index_sync 14 passed,AI 组命令与 data-copy 逐字一致,Manage 去 hs mcp 行、8765→8181、badge 双源同步。④README EN/ZH 对称:YAML 片段 L77 双端一致、6 tools→11（与 _TOOLS 逐名一致）+3 Resources、双表合并降级（Comparison/对比一览 0 残留）、v1.2.x vs 实测 `http-server v1.2.0`、MCP 表 +--config/+prompt 行。⑤features.md skills 4→5 + ai-interchange 行。⑥subject vs diff 4/4（test_prompt 4→5、断言 5→6/14→17、README 双端 61 行对称、features 3+/2−）。⑦**378 passed in 1.34s**（.venv,用例数不变仅断言修改）。⑧diff 敏感信息 0 hits,~/.hermes 镜像说明属有意记录。2×🟢 记录项（SEC-021-1 CHANGELOG v1.2.0 L6 "无参列出 4 篇" 未随第 5 篇同步,按不 bump 版本决策;SEC-021-2 design doc "6 工具" 历史快照）,0 扣分。**push origin main（efddb48..851bbf1, 4 commits）**。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| SEC-021-1 | 🟢（记录） | CHANGELOG v1.2.0 条目 "无参列出 4 篇" 未同步第 5 篇 ai-interchange（不 bump 版本决策,发布快照） | CHANGELOG.md:6 | 记录,待确认 |
+| SEC-021-2 | 🟢（记录） | design doc "6 工具" 为设计时点快照（实现已扩展 11）,本批未触碰 | documents/hs-ai-integration-design-v1.0-20260825.md:10,143 | 记录,保持不动 |
+
+### Positives
+
+- SKILL.md 每条实证断言都有 src/ 行号证据（-32602 走 ValueError→mcp.py:370 全链路,非仅静态常量）
+- hs prompt 四行为 + exit code + stderr/stdout 分流运行时实测;全文输出与仓库文件逐字一致
+- index 双源防漂移用 grep 计数 + pytest 双证;data-copy 与显示命令逐字核对
+- README 双端对称逐一比对（YAML 片段 / 工具清单 / 表合并 / 版本）,`hs version` 实测 v1.2.0 而非信 subject
+- 全量 378 用项目 .venv;diff 敏感信息 0 hits;cache/ gitignored 确认不入 commit
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| SEC-021-1 | CHANGELOG v1.2.0 "无参列出 4 篇" 未同步（记录项） | 🟢 | — | 记录 |
+| SEC-021-2 | design doc "6 工具" 历史快照（记录项） | 🟢 | — | 记录 |
+
