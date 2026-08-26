@@ -23,6 +23,7 @@ CONFIG_PATH = os.path.join(DATA_DIR, 'config.json')
 REGISTRY_PATH = os.path.join(DATA_DIR, 'registry.json')
 HISTORY_PATH = os.path.join(DATA_DIR, 'history.json')
 BOOKMARKS_PATH = os.path.join(DATA_DIR, 'bookmarks.json')
+SERVICES_PATH = os.path.join(DATA_DIR, 'services.json')
 LOG_DIR = os.path.join(DATA_DIR, 'logs')
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 MAX_PORT = 10000
@@ -87,6 +88,8 @@ def ensure_storage() -> None:
         write_json(HISTORY_PATH, {'records': []})
     if not os.path.exists(BOOKMARKS_PATH):
         write_json(BOOKMARKS_PATH, {'bookmarks': []})
+    if not os.path.exists(SERVICES_PATH):
+        write_json(SERVICES_PATH, {'services': []})
 
 def read_json(filepath: str) -> dict:
     """安全读 JSON，失败返回空 dict"""
@@ -254,6 +257,28 @@ def get_process_stats(pid) -> dict:
         pass
     
     return {'cpu': '-', 'memory': '-', 'memory_percent': '-'}
+
+# ── URL 探测 ────────────────────────────────────────────
+
+def url_reachable(url: str, timeout: float = 1.0) -> bool:
+    """探测 URL 是否可达（HTTP GET 成功且状态 < 500）。零依赖 urllib。"""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
+            return resp.status < 500
+    except Exception:
+        return False
+
+
+def wait_url_reachable(url: str, retries: int = 10, delay: float = 0.3) -> bool:
+    """启动后等待 URL 就绪。返回最终是否可达（超时返回 False）。"""
+    import time
+    for _ in range(retries):
+        if url_reachable(url):
+            return True
+        time.sleep(delay)
+    return url_reachable(url)
+
 
 # ── 路径 / 时间 ─────────────────────────────────────────
 
