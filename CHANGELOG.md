@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.0 (2026-08-27)
+
+### Added
+- `hs web` — 跨项目 Web 服务注册管理（HTTP-SERVER-CL001）：注册任意 CLI 启动命令到名称，`hs web <name>` 已运行→直接访问 / 未运行→执行启动命令
+  - `hs web add <name> --cmd '<cmd>' [--url <url>] [--open cmd|url|both|none]` — 注册（open 默认 url：web 统一开浏览器；cmd：命令自带 -o；both：都试；none：不开）
+  - `hs web list/show/remove/update` + 全部 `--json` 信封；url 可选——固定端口填 url（web 先探测，可达则幂等直达），动态端口不填（启动前未知端口，直接透传）
+  - `hs web <name> --no-probe` — 跳过探测，强制重启
+  - 存储 `~/.http-server.cli/services.json`（独立于 bookmarks.json，bookmark 管静态目录、services 管任意命令）
+  - 全局薄壳 `~/.local/bin/web` 转发，达成 `web <name>` 语法
+- Test suite: 442 tests（+64：test_web）
+
 ## 1.2.0 (2026-08-25)
 
 ### Added
