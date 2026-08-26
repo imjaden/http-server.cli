@@ -23,9 +23,9 @@ from http_server_cli.mcp import (
 # ── 工具定义 ────────────────────────────────────────────
 
 class TestToolDefinitions:
-    def test_all_six_tools(self):
-        """应有 6 个工具"""
-        assert len(_TOOLS) == 6
+    def test_all_eleven_tools(self):
+        """应有 11 个工具（6 管理 + 5 数据）"""
+        assert len(_TOOLS) == 11
 
     def test_tool_names(self):
         """工具名符合 hs_ 前缀规范"""
@@ -36,6 +36,11 @@ class TestToolDefinitions:
         assert 'hs_kill' in names
         assert 'hs_kill_all' in names
         assert 'hs_config' in names
+        assert 'hs_bookmark_list' in names
+        assert 'hs_bookmark_add' in names
+        assert 'hs_bookmark_remove' in names
+        assert 'hs_history' in names
+        assert 'hs_search' in names
 
     def test_tool_map_completeness(self):
         """_TOOL_MAP 覆盖所有工具"""
@@ -134,6 +139,85 @@ class TestBuildArgs:
         args = _build_hs_args('hs_config', {})
         assert args == ['config']
 
+    def test_hs_bookmark_list_no_params(self):
+        """hs_bookmark_list 生成 ['bookmark', 'list']"""
+        args = _build_hs_args('hs_bookmark_list', {})
+        assert args == ['bookmark', 'list']
+
+    def test_hs_bookmark_add_full(self):
+        """hs_bookmark_add 全参（含 -i index_page 与 --force 布尔）"""
+        args = _build_hs_args('hs_bookmark_add', {
+            'name': 'alpha', 'path': '~/p', 'index_page': 'index.html', 'force': True,
+        })
+        assert args == ['bookmark', 'add', 'alpha', '~/p', '-i', 'index.html', '--force']
+
+    def test_hs_bookmark_add_minimal(self):
+        """hs_bookmark_add 仅 name（path 默认 '.'，无 -i/--force）"""
+        args = _build_hs_args('hs_bookmark_add', {'name': 'alpha'})
+        assert args == ['bookmark', 'add', 'alpha', '.']
+
+    def test_hs_bookmark_add_no_force(self):
+        """hs_bookmark_add force=False 不追加 --force"""
+        args = _build_hs_args('hs_bookmark_add', {'name': 'alpha', 'path': '~/p', 'force': False})
+        assert args == ['bookmark', 'add', 'alpha', '~/p']
+
+    def test_hs_bookmark_remove(self):
+        """hs_bookmark_remove 生成 ['bookmark', 'remove', 'alpha']"""
+        args = _build_hs_args('hs_bookmark_remove', {'name': 'alpha'})
+        assert args == ['bookmark', 'remove', 'alpha']
+
+    def test_hs_history_no_params(self):
+        """hs_history 生成 ['history']"""
+        args = _build_hs_args('hs_history', {})
+        assert args == ['history']
+
+    def test_hs_search_with_keyword(self):
+        """hs_search 生成 ['search', '8081']"""
+        args = _build_hs_args('hs_search', {'keyword': '8081'})
+        assert args == ['search', '8081']
+
+
+# ── MCP Resources ──────────────────────────────────────
+
+class TestResources:
+    def test_list_resources(self):
+        """resources/list 返回 3 项资源"""
+        server = MCPServer()
+        result = server._handle_list_resources()
+        uris = [r['uri'] for r in result['resources']]
+        assert uris == ['hs://registry', 'hs://bookmarks', 'hs://config']
+
+    def test_read_resource_missing_file(self, tmp_path, monkeypatch):
+        """resources/read 文件缺失返回空 JSON {}（不报错）"""
+        from http_server_cli import utils
+        monkeypatch.setattr(utils, 'DATA_DIR', str(tmp_path))
+        server = MCPServer()
+        result = server._handle_read_resource({'uri': 'hs://registry'})
+        assert result['contents'][0]['uri'] == 'hs://registry'
+        assert result['contents'][0]['mimeType'] == 'application/json'
+        assert result['contents'][0]['text'] == '{}'
+
+    def test_read_resource_returns_file(self, tmp_path, monkeypatch):
+        """resources/read 返回文件真实内容"""
+        from http_server_cli import utils
+        (tmp_path / 'bookmarks.json').write_text('{"bookmarks": []}', encoding='utf-8')
+        monkeypatch.setattr(utils, 'DATA_DIR', str(tmp_path))
+        server = MCPServer()
+        result = server._handle_read_resource({'uri': 'hs://bookmarks'})
+        assert '"bookmarks"' in result['contents'][0]['text']
+
+    def test_read_unknown_resource(self):
+        """未知 URI 抛 ValueError"""
+        server = MCPServer()
+        with pytest.raises(ValueError):
+            server._handle_read_resource({'uri': 'hs://unknown'})
+
+    def test_initialize_capabilities_resources(self):
+        """initialize capabilities 含 resources"""
+        server = MCPServer()
+        result = server._handle_initialize({'protocolVersion': '2025-03-26', 'clientInfo': {}})
+        assert 'resources' in result['capabilities']
+
 
 # ── MCP Server 功能 ────────────────────────────────────
 
@@ -155,7 +239,7 @@ class TestMCPServerInitialization:
         server = MCPServer()
         result = server._handle_list_tools()
         assert 'tools' in result
-        assert len(result['tools']) == 6
+        assert len(result['tools']) == 11
         names = [t['name'] for t in result['tools']]
         assert 'hs_list' in names
         assert 'hs_kill' in names
