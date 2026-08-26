@@ -371,7 +371,7 @@
     </h1>
     <p class="hero-tagline">Forget ports, just preview.</p>
     <p class="badges">
-      <span>🔄 Auto port</span>· <span>🧠 Smart index</span>· <span>📋 Project tracking</span>· <span>⚡ Zero dep</span>
+      <span>🔄 Auto port</span>· <span>🧠 Smart index</span>· <span>📋 Project tracking</span>· <span>⚡ Zero dep</span>· <span>🤖 AI-ready (MCP + prompt)</span>
     </p>
     <div class="install-box">
       <code>pip install http-server-cli</code>
@@ -468,7 +468,7 @@
   <!-- ── Screen 2: Templates (scenario cards) ── -->
   <section class="templates" id="templates">
     <h2 class="templates-title">http-server · Scenarios <a href="#top" class="back-top-link">↑ Back to top</a></h2>
-    <p class="templates-sub">Start · View · Kill · Bookmark · Manage — every command with one-click copy</p>
+    <p class="templates-sub">Start · View · Kill · Bookmark · Manage · AI — every command with one-click copy</p>
 
     <div class="template-grid">
 
@@ -560,11 +560,30 @@
           <button class="copy-btn" data-copy="hs dashboard -o" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
         </div>
         <div class="line out">📊  Dashboard → http://localhost:8180</div>
+      </div>
+
+      <div class="group">
+        <div class="group-title">▶  AI</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs prompt</div>
+          <button class="copy-btn" data-copy="hs prompt" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
+        <div class="line out">📖  Usage docs for AI agents (5 skills)</div>
         <div class="cmd-row">
           <div class="line prompt">$ hs mcp</div>
           <button class="copy-btn" data-copy="hs mcp" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
         </div>
-        <div class="line out">🤖  hs mcp (SSE)  →  http://localhost:8765/sse</div>
+        <div class="line out">🤖  hs mcp (SSE)  →  http://localhost:8181/sse</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs mcp --transport stdio</div>
+          <button class="copy-btn" data-copy="hs mcp --transport stdio" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
+        <div class="line out">🔌  stdio mode — for Claude Code / Cursor / Hermes</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs mcp --config</div>
+          <button class="copy-btn" data-copy="hs mcp --config" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
+        <div class="line out">⚙️  mcpServers snippet — paste &amp; connect</div>
       </div>
 
     </div>

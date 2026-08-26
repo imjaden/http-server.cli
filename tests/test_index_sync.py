@@ -48,6 +48,8 @@ STRUCTURE_FEATURES = [
     'hs bookmark',
     'hs dashboard',
     'hs mcp',
+    'hs prompt',
+    'hs mcp --config',
     'class="templates"',
     'id="templates"',
     'templates-title',
@@ -93,17 +95,17 @@ class TestDualSourceSync:
         assert not missing, f"双页缺失结构特征: {missing}"
 
     def test_scenario_group_count_equal(self, _pages):
-        """场景组标题数必须一致（Start/Bookmark/View/Kill/Manage = 5，Bookmark 并入 Start 卡、Manage 并入 Kill 卡）。"""
+        """场景组标题数必须一致（Start/Bookmark/View/Kill/Manage/AI = 6，Bookmark 并入 Start 卡、Manage 并入 Kill 卡、AI 互通独立卡）。"""
         en = _pages["en"].count('class="group-title"')
         zh = _pages["zh"].count('class="group-title"')
         assert en == zh, f"组数不一致: EN={en} ZH={zh}"
-        assert en == 5, f"预期 5 组标题, 实际 {en}"
+        assert en == 6, f"预期 6 组标题, 实际 {en}"
 
     def test_cmd_row_count_equal(self, _pages):
-        """命令行数一致：首屏 quick start 用 code-block（4），场景区用 cmd-row（14）。"""
+        """命令行数一致：首屏 quick start 用 code-block（4），场景区用 cmd-row（17，CL-SEC21 加 AI 互通组 4 行、Manage 组去 hs mcp 1 行）。"""
         en_cmd = _pages["en"].count('class="cmd-row"')
         zh_cmd = _pages["zh"].count('class="cmd-row"')
-        assert en_cmd == zh_cmd == 14, f"场景 cmd-row 数量不一致: EN={en_cmd} ZH={zh_cmd}"
+        assert en_cmd == zh_cmd == 17, f"场景 cmd-row 数量不一致: EN={en_cmd} ZH={zh_cmd}"
         en_cb = _pages["en"].count('<div class="code-block">')
         zh_cb = _pages["zh"].count('<div class="code-block">')
         assert en_cb == zh_cb == 4, f"首屏 code-block 数量不一致: EN={en_cb} ZH={zh_cb}"
