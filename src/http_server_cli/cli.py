@@ -788,9 +788,28 @@ def _cmd_mcp(manager, args):
     parser = argparse.ArgumentParser(prog='hs mcp', add_help=False)
     parser.add_argument('--transport', choices=['stdio', 'sse'], default='sse')
     parser.add_argument('--port', type=int, default=8181)
+    parser.add_argument('--config', action='store_true')
     try:
         parsed, _ = parser.parse_known_args(args)
     except SystemExit:
+        return
+    if parsed.config:
+        # 输出 mcpServers 接入配置片段（AI 工具一行接入）
+        from http_server_cli.utils import json_output
+        config_data = {'mcpServers': {
+            'hs': {'command': 'hs', 'args': ['mcp'], 'transport': 'stdio'},
+        }}
+        if '--json' in args:
+            json_output(True, 'mcp-config', data=config_data)
+        else:
+            print('# hs MCP Server 接入配置 — 粘贴到 Claude Code / Cursor / Hermes 的 MCP 配置')
+            print('mcpServers:')
+            print('  hs:')
+            print('    command: hs')
+            print('    args: ["mcp"]')
+            print('    transport: stdio')
+            print()
+            print('# 注: hs mcp 默认后台 SSE → http://127.0.0.1:8765/sse; --stdio 前台 stdio 模式')
         return
     if parsed.transport == 'stdio':
         from http_server_cli.mcp import serve_stdio

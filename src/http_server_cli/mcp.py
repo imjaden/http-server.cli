@@ -24,7 +24,36 @@ from http_server_cli.utils import is_port_in_use, is_process_alive
 
 MCP_PROTOCOL_VERSION = '2025-03-26'
 SERVER_NAME = 'hs-mcp'
-SERVER_VERSION = '1.0.0'
+SERVER_VERSION = '1.1.0'
+
+# ── MCP Resources（只读数据资源）──────────────────────
+
+RESOURCES: list[dict[str, str]] = [
+    {
+        'uri': 'hs://registry',
+        'name': '运行中服务注册表',
+        'description': '用户 registry（registry.json）：端口/路径/PID/首页',
+        'mimeType': 'application/json',
+    },
+    {
+        'uri': 'hs://bookmarks',
+        'name': '书签数据',
+        'description': '书签列表（bookmarks.json）：名称/路径/首页',
+        'mimeType': 'application/json',
+    },
+    {
+        'uri': 'hs://config',
+        'name': '当前配置',
+        'description': 'hs 配置（config.json）：默认端口/域名',
+        'mimeType': 'application/json',
+    },
+]
+
+_RESOURCE_FILES = {
+    'hs://registry': 'registry.json',
+    'hs://bookmarks': 'bookmarks.json',
+    'hs://config': 'config.json',
+}
 
 # ── Tool 定义 ──────────────────────────────────────────
 
@@ -92,6 +121,52 @@ _TOOLS = [
         description='显示当前 hs 配置（默认端口、域名）',
         input_schema={'type': 'object', 'properties': {}},
     ),
+    MCPTool(
+        name='hs_bookmark_list',
+        description='列出所有书签（名称/路径/首页）',
+        input_schema={'type': 'object', 'properties': {}},
+    ),
+    MCPTool(
+        name='hs_bookmark_add',
+        description='注册书签（组合键 name+path+index_page，force 布尔覆盖组合键冲突）',
+        input_schema={
+            'type': 'object',
+            'properties': {
+                'name': {'type': 'string', 'description': '书签名（必填）'},
+                'path': {'type': 'string', 'description': '项目路径（默认当前目录）'},
+                'index_page': {'type': 'string', 'description': '首页文件名'},
+                'force': {'type': 'boolean', 'description': '覆盖组合键冲突'},
+            },
+            'required': ['name'],
+        },
+    ),
+    MCPTool(
+        name='hs_bookmark_remove',
+        description='删除书签',
+        input_schema={
+            'type': 'object',
+            'properties': {
+                'name': {'type': 'string', 'description': '书签名（必填）'},
+            },
+            'required': ['name'],
+        },
+    ),
+    MCPTool(
+        name='hs_history',
+        description='历史启动记录',
+        input_schema={'type': 'object', 'properties': {}},
+    ),
+    MCPTool(
+        name='hs_search',
+        description='模糊搜索运行中的服务（按端口或路径，忽略大小写）',
+        input_schema={
+            'type': 'object',
+            'properties': {
+                'keyword': {'type': 'string', 'description': '搜索关键字（必填）'},
+            },
+            'required': ['keyword'],
+        },
+    ),
 ]
 
 _TOOL_MAP: dict[str, tuple[list[str], dict[str, str]]] = {
@@ -101,6 +176,12 @@ _TOOL_MAP: dict[str, tuple[list[str], dict[str, str]]] = {
     'hs_kill':    (['kill', '{port}'], {'port': 'port', 'path': 'path'}),
     'hs_kill_all': (['kill-all'], {}),
     'hs_config':  (['config'], {}),
+    'hs_bookmark_list':   (['bookmark', 'list'], {}),
+    'hs_bookmark_add':    (['bookmark', 'add', '{name}', '{path}', '-i', '{index_page}', '--force'],
+                           {'name': 'name', 'path': 'path', 'index_page': 'index_page', 'force': 'force'}),
+    'hs_bookmark_remove': (['bookmark', 'remove', '{name}'], {'name': 'name'}),
+    'hs_history': (['history'], {}),
+    'hs_search':  (['search', '{keyword}'], {'keyword': 'keyword'}),
 }
 
 # ── JSON-RPC 2.0 ───────────────────────────────────────
@@ -201,7 +282,9 @@ def _build_hs_args(tool_name: str, params: dict) -> list[str]:
 
     template, param_map = _TOOL_MAP[tool_name]
     args = []
-    for item in template:
+    i = 0
+    while i < len(template):
+        item = template[i]
         if item.startswith('{') and item.endswith('}'):
             key = item[1:-1]
             mapped_key = param_map.get(key, key)
@@ -212,8 +295,34 @@ def _build_hs_args(tool_name: str, params: dict) -> list[str]:
                 val = '.'
             if val is not None:
                 args.append(str(val))
+            i += 1
+        elif item.startswith('-i') and not item.startswith('--'):
+            # 短 flag + 可选值：下一项为占位符且值存在才追加两项
+            nxt = template[i + 1] if i + 1 < len(template) else None
+            if nxt and nxt.startswith('{') and nxt.endswith('}'):
+                key = nxt[1:-1]
+                mapped_key = param_map.get(key, key)
+                val = params.get(mapped_key)
+                if val is None:
+                    val = params.get(key)
+                if val is not None:
+                    args.append(item)
+                    args.append(str(val))
+                i += 2
+                continue
+            args.append(item)
+            i += 1
+        elif item.startswith('--'):
+            # 布尔 flag：param_map 对应键为 True 才追加
+            flag_key = param_map.get(item[2:])
+            if flag_key is not None and params.get(flag_key) is not True:
+                i += 1
+                continue
+            args.append(item)
+            i += 1
         else:
             args.append(item)
+            i += 1
 
     return args
 
@@ -274,6 +383,10 @@ class MCPServer:
             return self._handle_list_tools()
         elif method == 'tools/call':
             return self._handle_call_tool(params)
+        elif method == 'resources/list':
+            return self._handle_list_resources()
+        elif method == 'resources/read':
+            return self._handle_read_resource(params)
         elif method == 'notifications/initialized':
             self._initialized = True
             return {}
@@ -302,7 +415,33 @@ class MCPServer:
             },
             'capabilities': {
                 'tools': {},
+                'resources': {},
             },
+        }
+
+    def _handle_list_resources(self) -> dict:
+        """返回可读资源列表"""
+        return {'resources': RESOURCES}
+
+    def _handle_read_resource(self, params: dict) -> dict:
+        """读取资源内容（只读 JSON 文件，缺失返回空 JSON）"""
+        uri = params.get('uri', '')
+        filename = _RESOURCE_FILES.get(uri)
+        if not filename:
+            raise ValueError(f'Unknown resource: {uri}')
+
+        from http_server_cli.utils import DATA_DIR
+        path = os.path.join(DATA_DIR, filename)
+        try:
+            with open(path, encoding='utf-8') as f:
+                text = f.read()
+        except (OSError, IOError):
+            text = '{}'
+
+        return {
+            'contents': [
+                {'uri': uri, 'mimeType': 'application/json', 'text': text},
+            ],
         }
 
     def _handle_list_tools(self) -> dict:
