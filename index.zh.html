@@ -371,7 +371,7 @@
     </h1>
     <p class="hero-tagline">忘掉端口，只管预览。</p>
     <p class="badges">
-      <span>🔄 自动分配端口</span>· <span>🧠 智能首页</span>· <span>📋 项目追踪</span>· <span>⚡ 零依赖</span>
+      <span>🔄 自动分配端口</span>· <span>🧠 智能首页</span>· <span>📋 项目追踪</span>· <span>⚡ 零依赖</span>· <span>🤖 AI 互通（MCP + prompt）</span>
     </p>
     <div class="install-box">
       <code>pip install http-server-cli</code>
@@ -468,7 +468,7 @@
   <!-- ── Screen 2: Templates (scenario cards) ── -->
   <section class="templates" id="templates">
     <h2 class="templates-title">http-server · 场景详解 <a href="#top" class="back-top-link">↑ 返回首页</a></h2>
-    <p class="templates-sub">启动 · 查看 · 关闭 · 书签 · 管理 —— 每条命令一键复制</p>
+    <p class="templates-sub">启动 · 查看 · 关闭 · 书签 · 管理 · AI 互通 —— 每条命令一键复制</p>
 
     <div class="template-grid">
 
@@ -560,11 +560,30 @@
           <button class="copy-btn" data-copy="hs dashboard -o" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
         </div>
         <div class="line out">📊  管理面板 → http://localhost:8180</div>
+      </div>
+
+      <div class="group">
+        <div class="group-title">▶  AI 互通</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs prompt</div>
+          <button class="copy-btn" data-copy="hs prompt" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
+        <div class="line out">📖  AI 使用说明（5 篇 skills）</div>
         <div class="cmd-row">
           <div class="line prompt">$ hs mcp</div>
           <button class="copy-btn" data-copy="hs mcp" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
         </div>
-        <div class="line out">🤖  hs mcp (SSE)  →  http://localhost:8765/sse</div>
+        <div class="line out">🤖  hs mcp (SSE)  →  http://localhost:8181/sse</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs mcp --transport stdio</div>
+          <button class="copy-btn" data-copy="hs mcp --transport stdio" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
+        <div class="line out">🔌  stdio 模式 — 供 Claude Code / Cursor / Hermes</div>
+        <div class="cmd-row">
+          <div class="line prompt">$ hs mcp --config</div>
+          <button class="copy-btn" data-copy="hs mcp --config" onclick="copyText(this.getAttribute('data-copy'), this)">📋</button>
+        </div>
+        <div class="line out">⚙️  输出 mcpServers 配置 — 粘贴即接入</div>
       </div>
 
     </div>
