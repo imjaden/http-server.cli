@@ -2,7 +2,7 @@
 """
 hs prompt 子命令测试 — AI 对接（skills/ 供给站，参考 html-gen prompt）
 
-覆盖: skills/ 4 篇存在与 frontmatter / 无参列表 / 详情全文 / --brief /
+覆盖: skills/ 5 篇存在与 frontmatter / 无参列表 / 详情全文 / --brief /
 --json 信封（正常 + 错误路径）/ 不存在 skill 报错 + 可用列表 + exit 1。
 """
 
@@ -16,14 +16,14 @@ from http_server_cli.cli import _COMMANDS
 pytestmark = pytest.mark.spec("cli-interface")
 
 SKILLS_DIR = Path(__file__).resolve().parent.parent / 'skills'
-EXPECTED_SKILLS = {'hs-cli', 'hs-bookmark', 'hs-mcp', 'hs-dashboard'}
+EXPECTED_SKILLS = {'hs-cli', 'hs-bookmark', 'hs-mcp', 'hs-dashboard', 'ai-interchange'}
 
 
 class TestSkillsDir:
     """skills/ 目录与 frontmatter 合法性"""
 
-    def test_four_skills_exist(self):
-        """4 篇 SKILL.md 齐全"""
+    def test_five_skills_exist(self):
+        """5 篇 SKILL.md 齐全"""
         found = {d.name for d in SKILLS_DIR.iterdir() if (d / 'SKILL.md').exists()}
         assert EXPECTED_SKILLS == found
 
@@ -48,7 +48,7 @@ class TestPromptCommand:
             assert f'hs prompt {name}' in out
 
     def test_list_json(self, capsys):
-        """--json 信封: status ok + 4 项 + description 非空"""
+        """--json 信封: status ok + 5 项 + description 非空"""
         _COMMANDS['prompt'](None, ['--json'])
         d = json.loads(capsys.readouterr().out)
         assert d['status'] == 'ok'
@@ -87,7 +87,8 @@ class TestPromptCommand:
         assert exc.value.code == 1
         captured = capsys.readouterr()
         assert "skill 'nope' 不存在" in captured.err
-        assert '可用: hs-bookmark' in captured.out
+        assert 'hs-bookmark' in captured.out
+        assert 'ai-interchange' in captured.out
 
     def test_not_found_json(self, capsys):
         """不存在 skill --json: status error 信封 + exit 1"""
