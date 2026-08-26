@@ -519,3 +519,43 @@ Re-audit of the two fix commits closing all 6 🟡 findings (HS-SEC-011~016) plu
 | SEC-021-1 | CHANGELOG v1.2.0 "无参列出 4 篇" 未同步（记录项） | 🟢 | — | 记录 |
 | SEC-021-2 | design doc "6 工具" 历史快照（记录项） | 🟢 | — | 记录 |
 
+---
+
+## 2026-08-27 — Commit audit: HTTP-SERVER-CL001 hs web 跨项目 Web 服务注册管理 (2528128, 61d8ed7, 0a8e57d)
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（提交审计 + 功能实测）
+- **Scope**: 3 commits（2528128 feat@web, 61d8ed7 tests@web, 0a8e57d docs@web），基底 origin/main 99e104b（3 commits 全部未 push）
+- **Commit(s)**: 2528128..0a8e57d
+- **Verdict**: ✅ PASS
+- **Score**: 100 / 100 (Rating: A)
+- **Report**: documents/review/http-server-cli-web-registration-audit-v1.0-20260827.md
+
+### Summary
+
+HTTP-SERVER-CL001 闭环（hs web 一级子命令：ServiceStore + CLI 全套 + 版本 1.3.0）11 项审计全过。功能完整性：六子命令（add/list/show/remove/update/`<name>`）+ help + 六 `--json` 信封 command（web-add/web-list/web-show/web-remove/web-update/web-run）逐名一致（cli.py:1271-1702）。执行语义四分支 + open 策略四态以 mock 断言 + 运行时实测双证：`hs web nonexistent` → stderr 报错 + `Available: daily.checker, jaden.tech` + exit 1；`--no-probe` 强制执行；url 可达 → 跳过 cmd（幂等）直开；cmd 非 0 退出码 → stderr warning 不阻断（cli.py:1681-1702）。存储隔离：`~/.http-server.cli/services.json` 独立于 bookmarks.json，ensure_storage 初始化，DataCorruptionError 损坏检测，url 空串归一 None。校验：name `[a-zA-Z0-9][a-zA-Z0-9._-]*` 最长 128 + cmd 非空 + open_mode 四态 + url `^https?://` + name 拦内置命令（实测 `hs web add list` → conflict）。零外部依赖（urllib 探测，pyproject 无 dependencies）。**442 passed in 1.56s**（.venv，test_web 64 例；features.md 13 模块/442 同步）。文档四同步：CHANGELOG 1.3.0 / features.md / README×2 Web 服务注册节 / `__version__` 1.3.0，`hs version` 实测 `http-server v1.3.0`。注册表两条 intact（daily.checker url + jaden.tech null-url open=cmd，pytest 前后一致，conftest monkeypatch 隔离不触碰真实数据）。全局薄壳 `~/.local/bin/web`（mode 755，`exec hs web "$@"`）`web list` exit 0。diff 敏感信息 0 hits，shell=True 仅 1 处（cli.py:1678，设计 2C 明示语义，攻击面限于用户自有 services.json，无外部输入流入）。2×🟢 记录项（SEC-022-1 名称冲突仅拦顶层命令、未拦 web 子命令；SEC-022-2 合法 JSON 错误形状 → 裸 traceback 非 DataCorruptionError）+ 1×🟡 待确认 OBS-3（spec.yaml version 1.1.0 既有漂移，本批范围外），0 扣分。**push origin main（2528128..0a8e57d, 3 commits + audit）**。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| SEC-022-1 | 🟢（记录） | name 冲突校验仅覆盖顶层命令（_COMMANDS），未覆盖 web 子命令 add/show/remove/update —— 该名服务注册成功但恒被解析为子命令、永无法运行 | cli.py:1342 | 记录 |
+| SEC-022-2 | 🟢（记录） | services.json 合法 JSON 错误形状（如 `[1,2,3]`）→ `_read_all` 抛裸 AttributeError，非 DataCorruptionError | services.py:42-49 | 记录 |
+| OBS-3 | 🟡（待确认） | spec.yaml version 字段 L2 + version 场景 L291 停 1.1.0（落后 1.2.0/1.3.0 两次 bump），且输出串 `http-server.cli` ≠ 实测 `http-server` —— 既有漂移，本批未触碰 spec.yaml | http-server.cli.spec.yaml:2,291 | ⏳ 待确认 |
+
+### Positives
+
+- 执行语义四分支 + open 策略四态均以 mock 断言（subprocess/webbrowser/url_reachable）+ 运行时实测（`hs web nonexistent` exit 1 + 可用列表）双证，非仅静态比对
+- 442 全量零回归用项目 .venv；conftest.py:57 monkeypatch 隔离，pytest 不触碰真实 services.json（审计前后两次读取均 intact）
+- 零外部依赖坐实：pyproject 无 dependencies 段 + url_reachable 用标准库 urllib；diff 敏感信息/密钥//Users/eval 0 hits
+- 文档四同步以 `hs version` 实测 v1.3.0 为准，非信 subject；README EN/ZH Web 服务注册节双端对称
+- commit 3/3 type@scope 合规（feat@web/tests@web/docs@web），分组按属性无混批
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| SEC-022-1 | web 子命令名未拦截（记录项） | 🟢 | — | ✅ Closed (2026-08-27, PASS 100/100, pushed) |
+| SEC-022-2 | 合法 JSON 错误形状裸 traceback（记录项） | 🟢 | — | ✅ Closed (2026-08-27, PASS 100/100, pushed) |
+| OBS-3 | spec.yaml version 1.1.0 既有漂移（待确认） | 🟡 | P2 | ⏳ 待 ops 决定（docs@spec 同步，非本批） |
+
