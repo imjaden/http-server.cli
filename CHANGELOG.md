@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.0 (2026-08-25)
+
+### Added
+- `hs prompt [<skill>]` — 输出 skills/ 使用说明（AI 对接，参考 html-gen prompt）：无参列出 4 篇（hs-cli/hs-bookmark/hs-mcp/hs-dashboard）/ `<name>` 全文 / `--brief` / `--json` 信封 / 不存在报错 + 可用列表 + exit 1
+- `hs mcp` 扩展 5 个数据工具（6→11）：hs_bookmark_list / hs_bookmark_add（name/path/index_page/force，布尔 flag 映射 --force）/ hs_bookmark_remove / hs_history / hs_search
+- `hs mcp` MCP Resources 3 项（只读）：hs://registry / hs://bookmarks / hs://config；initialize capabilities 声明 resources；SERVER_VERSION 1.0.0→1.1.0
+- `hs mcp --config` — 输出 mcpServers 接入配置片段（Claude Code / Cursor / Hermes 一行接入，stdio）+ `--json` 信封
+
+### Notes
+- 批次二暂缓：hs export / hs doctor（draft CL-SEC20 记录）
+- Test suite: 378 tests（+21：test_prompt 9 / test_mcp 12）
+
 ## 1.1.0 (2026-08-23)
 
 ### Changed
