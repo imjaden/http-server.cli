@@ -1,4 +1,5 @@
 project: http-server
+website: https://http-server.cli.jaden.tech
 profiles:
 - name: dev
 - name: review
