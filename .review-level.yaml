@@ -121,3 +121,13 @@ review_history:
     tracking: HS-SEC-021 (closed)
     scope: "Commit audit: CL-SEC21 AI 互通沉淀三件套 4 commits (efddb48, d5a3ce1, a156a89, 851bbf1) — SKILL.md 11 条断言与 src/ 逐字一致 (--transport stdio/8181/-32602/_TOOL_MAP/Resources '{}'/registry-managed 边界/11=6+5), hs prompt 实测 5 篇+--json 5 项, index 双源 6/17/4/6 对称 + test_index_sync 14 passed + 8765/--stdio 零残留, README EN/ZH 对称 (YAML L77/11 tools/双表合并/v1.2.x 实测 v1.2.0), features 4→5, subject vs diff 4/4, 378 tests green (.venv), 敏感信息 0 hits; 2×🟢 记录 SEC-021-1/2, PASS 100/100, pushed efddb48..851bbf1"
     report: documents/review/http-server-cli-ai-interchange-settle-audit-v1.0-20260826.md
+  - date: 2026-08-27
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: PASS
+    score: 100
+    findings_total: 0
+    findings_open: 0
+    tracking: HS-SEC-022 (closed)
+    scope: "Commit audit: HTTP-SERVER-CL001 hs web 跨项目 Web 服务注册管理 3 commits (2528128, 61d8ed7, 0a8e57d) — 六子命令 + help + 六 --json 信封 command 逐名一致 (web-add/list/show/remove/update/run), 执行语义四分支 + open 策略四态 (mock 断言 + 运行时实测, hs web nonexistent exit 1 + 可用列表), services.json 隔离 + DataCorruptionError + url 空串归一 + 全量校验 (name 正则/128 + cmd 非空 + open_mode 四态 + url http(s):// + 内置命令冲突), 零外部依赖 (urllib, pyproject 无 dependencies), 442 tests green (.venv) + features.md 13 模块/442, CHANGELOG/features/README×2/__version__ 四同步 (hs version 实测 v1.3.0), 注册表两条 intact (pytest 前后一致, conftest 隔离), 全局薄壳 web 可执行, diff 敏感信息 0 hits (shell=True 仅 1 处设计语义), commit 3/3 type@scope + 命名合规; 2×🟢 记录 SEC-022-1/2 + 1×🟡 待确认 OBS-3 (spec.yaml version 1.1.0 既有漂移, 本批范围外), PASS 100/100, pushed 2528128..0a8e57d"
+    report: documents/review/http-server-cli-web-registration-audit-v1.0-20260827.md
