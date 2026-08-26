@@ -53,6 +53,10 @@ def _isolate_data_dir(monkeypatch):
     monkeypatch.setattr('http_server_cli.bookmark.BOOKMARKS_PATH',
                         os.path.join(tmp, 'bookmarks.json'))
 
+    # services 模块（from utils import SERVICES_PATH）
+    monkeypatch.setattr('http_server_cli.services.SERVICES_PATH',
+                        os.path.join(tmp, 'services.json'))
+
     os.makedirs(log_dir, exist_ok=True)
     yield
     shutil.rmtree(tmp, ignore_errors=True)
