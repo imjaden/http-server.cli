@@ -24,7 +24,7 @@
 - [x] **项目管理** — 追踪路径↔端口映射、监控 CPU/内存、JSON 输出（`hs list`）
 - [x] **多种启动模式** — daemon 后台或 foreground 前台（`-d`/`-f`）
 - [x] **Web 仪表盘** — `hs dashboard -o` 图形化管理（中英文切换 / 60s 倒计时 / Kill All / 异常捕捉）
-- [x] **AI Agent 集成** — `hs mcp` MCP Server（SSE/stdio，6 个工具），托管服务隔离管理
+- [x] **AI Agent 集成** — `hs mcp` MCP Server（SSE/stdio，11 工具 + 3 Resources），`hs prompt` 使用说明、`hs mcp --config` 一行接入
 
 ## 为什么用 `hs`
 
@@ -32,14 +32,55 @@
 
 `hs` 把**启动 → 追踪 → 列出 → 关闭**闭环了。
 
-## 对比一览
+- 启动服务：`hs -o` — 自动找空闲端口、打开浏览器（替代 `python3 -m http.server 8080` + 手动开）
+- 查看服务：`hs list`（替代 `lsof -i :8080` + `ps`）
+- 切换项目：`hs ../project-b`（无需先关旧的）
+- 关掉服务：`hs kill 8080`（替代 `lsof` 查 PID → `kill`）
 
-| 场景 | 以前 | 用 `hs` |
-|:---------|:-----|:--------|
-| 启动服务 | `python3 -m http.server 8080` + 手动开浏览器 | `hs -o` — 自动找空闲端口，打开浏览器 |
-| 查看服务 | `lsof -i :8080`，再 `ps` 看路径 | `hs list` |
-| 切换项目 | 先关旧的，再开新的（或冲突） | `hs ../project-b` |
-| 关掉服务 | `lsof` 查 PID → `kill` | `hs kill 8080` |
+## AI 互通
+
+`hs` 与 AI agent 有三条互通通道：**文档、数据、一行接入**。
+
+### 1. 文档 — `hs prompt`
+
+```bash
+hs prompt                # 列出全部 skills（name + description）
+hs prompt hs-cli         # 输出单篇完整使用说明
+hs prompt hs-mcp --brief # 摘要
+hs prompt --json         # 机器可读信封
+```
+
+内置 5 篇 skills：`hs-cli` / `hs-bookmark` / `hs-mcp` / `hs-dashboard` / `ai-interchange`。
+
+### 2. 数据与操作 — MCP Server
+
+```bash
+hs mcp                    # 后台 SSE → http://127.0.0.1:8181/sse
+hs mcp --transport stdio  # 前台 stdio 模式（供 Claude Code / Cursor / Hermes）
+hs mcp stop|status|restart
+```
+
+11 个工具（6 管理：`hs_list` / `status` / `start` / `kill` / `kill_all` / `config`；5 数据：`hs_bookmark_list` / `add` / `remove`、`hs_history`、`hs_search`）+ 3 个只读 Resources（`hs://registry` / `hs://bookmarks` / `hs://config`）。零外部依赖 — 纯标准库。
+
+### 3. 一行接入 — `hs mcp --config`
+
+```bash
+hs mcp --config
+```
+
+输出可直接粘贴到 Claude Code / Cursor / Hermes 的 `mcpServers` 配置片段：
+
+```yaml
+mcpServers:
+  hs:
+    command: hs
+    args: ["mcp", "--transport", "stdio"]
+    transport: stdio
+```
+
+粘贴到 AI 工具的 MCP 配置并重启，agent 即可列出服务、读取书签/历史、搜索运行实例并执行管理操作。
+
+> AI agent 建议先 `hs prompt hs-cli` — 零依赖拿完整用法，不用猜参数。
 
 ## 安装
 
@@ -50,7 +91,7 @@ pip install http-server-cli
 
 验证：
 ```
-hs version     # → http-server v1.0.x
+hs version     # → http-server v1.2.x
 hs -o        # 当前目录启动 + 打开浏览器
 ```
 
@@ -136,6 +177,8 @@ hs kill-all                 # 一键全关
 |:--------|:------------|
 | `hs mcp [--transport stdio|sse] [--port PORT]` | MCP Server |
 | `hs mcp stop|status|restart|help` | 子命令 |
+| `hs mcp --config` | 输出 `mcpServers` 配置片段（见 AI 互通） |
+| `hs prompt [<skill>]` | 输出 skills/ 使用说明（列表 / 详情 / --brief / --json） |
 
 ### 历史与配置
 
