@@ -61,7 +61,7 @@ cli.py 位于 `src/http_server_cli/cli.py`，skills/ 在项目根 →
 |-------|------|
 | hs-cli | 总览：安装（pip install http-server-cli）/ 命令速查（start/list/status/kill/kill-all/history/search/config/set/version/help/dashboard/mcp/bookmark）/ 数据目录 ~/.http-server.cli / --json 信封约定 / 启动方式（-d/-f/-o/-i/--url）/ npm 同名注记 |
 | hs-bookmark | 书签系统：add/update/remove/list/show、组合键 (path, index_page)、--force 覆盖、--json |
-| hs-mcp | MCP 服务：SSE（127.0.0.1:8765/sse）与 stdio、11 工具清单、Resources 3 项、mcpServers 接入配置（hs mcp --config） |
+| hs-mcp | MCP 服务：SSE（127.0.0.1:8181/sse）与 stdio、11 工具清单、Resources 3 项、mcpServers 接入配置（hs mcp --config） |
 | hs-dashboard | Web 面板：启动（hs dashboard -o）、路由（/api/*、/en）、?lang=zh、默认端口 8180、托管状态管理 |
 
 每篇 SKILL.md 带 YAML frontmatter（name/description），description 供 `hs prompt` 列表展示。
@@ -73,7 +73,7 @@ cli.py 位于 `src/http_server_cli/cli.py`，skills/ 在项目根 →
 | 工具 | description | input_schema | _TOOL_MAP |
 |------|------------|--------------|-----------|
 | hs_bookmark_list | 列出所有书签（名称/路径/首页） | {} | (['bookmark','list'], {}) |
-| hs_bookmark_add | 注册书签（组合键 (name,path,index_page)，--force 覆盖） | {name:str req, path:str, index_page:str, force:bool} | (['bookmark','add','{name}','{path}'], {'name':'name','path':'path','index_page':'index','force':'force'}) |
+| hs_bookmark_add | 注册书签（组合键 (name,path,index_page)，--force 覆盖） | {name:str req, path:str, index_page:str, force:bool} | (['bookmark','add','{name}','{path}','-i','{index_page}','--force'], {'name':'name','path':'path','index_page':'index_page','force':'force'}) |
 | hs_bookmark_remove | 删除书签 | {name:str req} | (['bookmark','remove','{name}'], {'name':'name'}) |
 | hs_history | 历史启动记录 | {} | (['history'], {}) |
 | hs_search | 模糊搜索运行中的服务 | {keyword:str req} | (['search','{keyword}'], {'keyword':'keyword'}) |
@@ -112,8 +112,8 @@ SERVER_VERSION '1.0.0' → '1.1.0'（MCP 服务能力扩展）。
       transport: stdio
   ```
 - --json：信封 data={mcpServers:{hs:{command:'hs',args:['mcp'],transport:'stdio'}}}
-- 同时输出备注（SSE 方式：hs mcp 默认 SSE → http://127.0.0.1:8765/sse）
-- 不影响现有子命令（start/stop/status/restart）；`hs mcp --stdio` 已存在（serve_stdio）
+- 同时输出备注（SSE 方式：hs mcp 默认 SSE → http://127.0.0.1:8181/sse）
+- 不影响现有子命令（start/stop/status/restart）；stdio 模式经 `--transport stdio` 调用 serve_stdio
 
 ## 五、版本 1.2.0
 
