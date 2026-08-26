@@ -37,6 +37,20 @@
 8. 损坏检测 — 非空文件 JSON 解析失败抛出 `DataCorruptionError` ✅
 9. 关联文档: `documents/bookmark-feature-design-v1.1-20250715.md` / `documents/bookmark-multi-page-design-v1.1-20260819.md`
 
+## Web 服务注册（hs web）
+
+1. `hs web add <name> --cmd '<cmd>' [--url <url>] [--open cmd|url|both|none]` — 注册任意 CLI 启动命令（跨项目，如 `dk server start --daemon --open`）✅ — HTTP-SERVER-CL001
+2. `hs web update <name> [--cmd] [--url] [--open]` — 更新（`--url ''` 清除）✅
+3. `hs web list [--json]` — 列出所有注册 ✅
+4. `hs web show <name> [--json]` — 查看详情 ✅
+5. `hs web remove <name> [--json]` — 删除 ✅
+6. `hs web <name> [--no-probe]` — 执行：url 可达→直接访问（幂等，不执行 cmd）；不可达/无 url→执行启动命令；`--no-probe` 跳过探测强制重启 ✅
+7. open 策略 — `url`（默认，web 统一开浏览器）/ `cmd`（命令自带 -o）/ `both` / `none` ✅
+8. url 可选 — 固定端口填 url（启动后 wait 就绪再 open）；动态端口不填（启动前未知端口，直接透传）✅
+9. 名称校验复用 bookmark 规则 `[a-zA-Z0-9][a-zA-Z0-9._-]*`；损坏检测同 `DataCorruptionError` ✅
+10. 全局薄壳 `~/.local/bin/web` 转发 — 达成 `web <name>` 语法 ✅
+11. 关联文档: HTTP-SERVER-CL001 draft (cache/draft/TODO-20260826.md)
+
 ## HTTP 服务
 
 1. 零外部依赖 — 仅 Python 3.12 标准库 ✅
@@ -63,8 +77,9 @@
 2. `history.json` — 历史记录（started_at/ended_at/memory_mb）✅
 3. `config.json` — 默认配置（port/domain）✅
 4. `bookmarks.json` — 书签持久化 ✅
-5. `logs/` — 按端口分日志文件 ✅
-6. 数据目录: `~/.http-server.cli/`
+5. `services.json` — Web 服务注册持久化（name/cmd/url/open/created_at）✅
+6. `logs/` — 按端口分日志文件 ✅
+7. 数据目录: `~/.http-server.cli/`
 
 ## Web Dashboard
 
@@ -104,7 +119,7 @@
 
 ## 测试
 
-1. 12 个测试模块，378 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
+1. 13 个测试模块，442 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
 2. `conftest.py` — autouse 数据隔离 + monkeypatch 路径注入 ✅
 3. 集成测试模式 — mock `_COMMANDS` / `ensure_storage`，set `sys.argv`，catch `SystemExit` ✅
 

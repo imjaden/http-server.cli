@@ -162,6 +162,28 @@ hs kill-all                 # 一键全关
 | `hs <name> [-o]` | 从书签启动服务 |
 | `hs kill <name>` | 按书签名关闭服务 |
 
+### Web 服务注册
+
+注册任意 web 服务启动命令（跨项目）到名称，快速启动/访问:
+
+| 命令 | 说明 |
+|:--------|:------------|
+| `hs web add <name> --cmd '<cmd>' [--url <url>] [--open cmd\|url\|both\|none]` | 注册服务（open 默认 url） |
+| `hs web update <name> [--cmd] [--url] [--open]` | 更新服务（`--url ''` 清除） |
+| `hs web list [--json]` | 列出所有注册 |
+| `hs web show <name>` / `hs web remove <name>` | 详情 / 删除 |
+| `hs web <name> [--no-probe]` | 执行：url 可达→直接打开（幂等）；否则执行启动命令 |
+| `web <name>` | 全局薄壳（`~/.local/bin/web`）转发到 hs web |
+
+```bash
+hs web add daily.checker --cmd 'dk server start --daemon --open' --url http://127.0.0.1:5001
+hs web daily.checker     # 5001 存活→直接打开；否则启动
+hs web jaden.tech        # 动态端口：无 url → 直接透传
+hs web jaden.tech --no-probe   # 跳过探测，强制重启
+```
+
+> `services.json` 独立于 bookmarks.json：bookmark 把名称映射到静态目录；`hs web` 把名称映射到任意命令。
+
 ### Dashboard
 
 | 命令 | 说明 |

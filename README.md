@@ -162,6 +162,28 @@ hs kill-all                 # Kill all
 | `hs <name> [-o]` | Start server from a bookmark |
 | `hs kill <name>` | Kill service by bookmark name |
 
+### Web Service Registry
+
+Register any web service startup command (cross-project) under a name:
+
+| Command | Description |
+|:--------|:------------|
+| `hs web add <name> --cmd '<cmd>' [--url <url>] [--open cmd\|url\|both\|none]` | Register a service (open defaults to `url`) |
+| `hs web update <name> [--cmd] [--url] [--open]` | Update a service (`--url ''` clears) |
+| `hs web list [--json]` | List all registered services |
+| `hs web show <name>` / `hs web remove <name>` | Details / remove |
+| `hs web <name> [--no-probe]` | Run: URL reachable → open directly (idempotent); otherwise execute the startup command |
+| `web <name>` | Global thin wrapper (`~/.local/bin/web`) forwarding to `hs web` |
+
+```bash
+hs web add daily.checker --cmd 'dk server start --daemon --open' --url http://127.0.0.1:5001
+hs web daily.checker     # 5001 alive → open; else start it
+hs web jaden.tech        # dynamic port: no url → transparent passthrough
+hs web jaden.tech --no-probe   # skip probe, force restart
+```
+
+> `services.json` (independent of bookmarks): bookmark maps a name to a static directory; `hs web` maps a name to any command.
+
 ### Dashboard
 
 | Command | Description |
