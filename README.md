@@ -24,7 +24,7 @@
 - [x] **Project Management** — Track port↔path mapping, monitor CPU/memory, JSON output (`hs list`)
 - [x] **Multiple Launch Modes** — Daemon or foreground (`-d`/`-f`)
 - [x] **Web Dashboard** — `hs dashboard -o` GUI (CN/EN toggle, 60s countdown, Kill All, error handler)
-- [x] **AI Agent Integration** — `hs mcp` MCP Server (SSE/stdio, 6 tools), managed infrastructure isolation
+- [x] **AI Agent Integration** — `hs mcp` MCP Server (SSE/stdio, 11 tools + 3 resources), `hs prompt` usage docs, `hs mcp --config` one-line connect
 
 ## Why `hs`
 
@@ -32,14 +32,55 @@ Multiple frontend projects → constant context switching: "Which port is A on?"
 
 `hs` closes the loop: **Start → Track → List → Kill**.
 
-## Comparison
+- Start server: `hs -o` — auto-find free port, open browser (instead of `python3 -m http.server 8080` + manual open)
+- View servers: `hs list` (instead of `lsof -i :8080` + `ps`)
+- Switch projects: `hs ../project-b` (no need to kill first)
+- Kill server: `hs kill 8080` (instead of `lsof` → `kill <pid>`)
 
-| Scenario | Before | With `hs` |
-|:---------|:-----|:--------|
-| Start server | `python3 -m http.server 8080` + open browser manually | `hs -o` — auto-find free port, open browser |
-| View servers | `lsof -i :8080`, then `ps` | `hs list` |
-| Switch projects | Kill old, start new (or conflict) | `hs ../project-b` |
-| Kill server | `lsof` → `kill <pid>` | `hs kill 8080` |
+## AI Interchange
+
+`hs` speaks three channels with AI agents — **docs, data, and one-line connect**.
+
+### 1. Docs — `hs prompt`
+
+```bash
+hs prompt                # list all skills (name + description)
+hs prompt hs-cli         # full usage guide for one skill
+hs prompt hs-mcp --brief # condensed summary
+hs prompt --json         # machine-readable envelope
+```
+
+Ships 5 skills: `hs-cli` / `hs-bookmark` / `hs-mcp` / `hs-dashboard` / `ai-interchange`.
+
+### 2. Data & Actions — MCP Server
+
+```bash
+hs mcp                    # background SSE server → http://127.0.0.1:8181/sse
+hs mcp --transport stdio  # foreground stdio mode (for Claude Code / Cursor / Hermes)
+hs mcp stop|status|restart
+```
+
+11 tools (6 management: `hs_list` / `status` / `start` / `kill` / `kill_all` / `config`; 5 data: `hs_bookmark_list` / `add` / `remove`, `hs_history`, `hs_search`) + 3 read-only resources (`hs://registry` / `hs://bookmarks` / `hs://config`). Zero external deps — pure stdlib.
+
+### 3. One-line connect — `hs mcp --config`
+
+```bash
+hs mcp --config
+```
+
+Prints an `mcpServers` snippet ready for Claude Code / Cursor / Hermes:
+
+```yaml
+mcpServers:
+  hs:
+    command: hs
+    args: ["mcp", "--transport", "stdio"]
+    transport: stdio
+```
+
+Paste it into the AI tool's MCP config, restart, and the agent can list servers, read bookmarks/history, search running services, and manage them.
+
+> AI agents should start with `hs prompt hs-cli` — zero-dependency usage docs, no guessing flags.
 
 ## Installation
 
@@ -50,7 +91,7 @@ pip install http-server-cli
 
 Verify:
 ```
-hs version     # → http-server v1.0.x
+hs version     # → http-server v1.2.x
 hs -o        # Start in current directory + open browser
 ```
 
@@ -136,6 +177,8 @@ hs kill-all                 # Kill all
 |:--------|:------------|
 | `hs mcp [--transport stdio\|sse] [--port PORT]` | MCP Server for AI Agent |
 | `hs mcp stop\|status\|restart\|help` | Subcommands |
+| `hs mcp --config` | Print `mcpServers` snippet (see AI Interchange) |
+| `hs prompt [<skill>]` | Print skills/ usage docs (list / detail / --brief / --json) |
 
 ### History & Config
 
