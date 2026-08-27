@@ -12,7 +12,8 @@
 - `hs web --domain`（HTTP-SERVER-CL002）— 布尔入参，执行时把 config.domain 注入 cmd 末尾（`cmd ... --domain "<domain>"`）；update 支持 `--no-domain` 清除；json 输出含 `cmd_effective`
 - 审计遗留（HTTP-SERVER-CL002 / SEC-022-1/2, OBS-3）— web 子命令名（add/update/list/show/remove/help）冲突拦截；services.json 形状校验（合法 JSON 非 dict / services 非 list → DataCorruptionError）；spec.yaml version 1.1.0→1.3.0 + version 场景输出串修正
 - `hs prompt hs-web` — 跨项目 web 服务注册推广 skill（命令速查 + 其他模块接入指南 + 真实实例 daily.checker/jaden.tech/线上站点），镜像 ~/.hermes/profiles/ops/skills/devops/hs-web/（HTTP-SERVER-CL002）
-- Test suite: 442 → 459 tests（+17：test_web domain/形状/子命令名冲突/注入）
+- Test suite: 442 → 483 tests（+41：CL002 第一批 +17，SEC-023-1 set_domain 校验 +24）
+- SEC-023-1（CL002 复核）— `hs set domain` / `Config.set_domain` 字符集校验 `[a-zA-Z0-9][a-zA-Z0-9.-]*`（拒绝空格/引号/`$`/反引号/`;`/`&` 等 shell 元字符，hs web --domain 注入 defense-in-depth）
 
 ## 1.2.0 (2026-08-25)
 

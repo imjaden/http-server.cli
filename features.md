@@ -123,7 +123,7 @@
 
 ## 测试
 
-1. 13 个测试模块，459 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
+1. 13 个测试模块，483 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
 2. `conftest.py` — autouse 数据隔离 + monkeypatch 路径注入 ✅
 3. 集成测试模式 — mock `_COMMANDS` / `ensure_storage`，set `sys.argv`，catch `SystemExit` ✅
 
