@@ -468,3 +468,136 @@ class TestWebCliRun:
             mock_run.return_value.returncode = 1
             _COMMANDS['web'](None, ['a'])
         assert 'exited with code 1' in capsys.readouterr().err
+
+
+# ── use_domain（--domain 入参, HTTP-SERVER-CL002）────────
+
+class TestServiceUseDomain:
+    """ServiceStore use_domain 字段"""
+
+    def test_add_default_false(self):
+        store = ServiceStore()
+        store.add('a', cmd='echo a')
+        assert store.get('a')['use_domain'] is False
+
+    def test_add_use_domain_true(self):
+        store = ServiceStore()
+        store.add('a', cmd='echo a', use_domain=True)
+        assert store.get('a')['use_domain'] is True
+
+    def test_update_use_domain(self):
+        store = ServiceStore()
+        store.add('a', cmd='echo a')
+        store.update('a', use_domain=True)
+        assert store.get('a')['use_domain'] is True
+        store.update('a', use_domain=False)
+        assert store.get('a')['use_domain'] is False
+
+    def test_update_use_domain_persists(self):
+        store = ServiceStore()
+        store.add('a', cmd='echo a', use_domain=True)
+        store.update('a', cmd='echo b')
+        assert store.get('a')['use_domain'] is True
+
+
+class TestServiceShapeCorruption:
+    """SEC-022-2: 合法 JSON 但错误形状 → DataCorruptionError"""
+
+    def test_json_not_dict_raises(self):
+        with open(svc_mod.SERVICES_PATH, 'w', encoding='utf-8') as f:
+            f.write('[1, 2, 3]')
+        store = ServiceStore()
+        with pytest.raises(DataCorruptionError):
+            store.list_all()
+
+    def test_json_string_raises(self):
+        with open(svc_mod.SERVICES_PATH, 'w', encoding='utf-8') as f:
+            f.write('"str"')
+        store = ServiceStore()
+        with pytest.raises(DataCorruptionError):
+            store.list_all()
+
+    def test_services_not_list_raises(self):
+        with open(svc_mod.SERVICES_PATH, 'w', encoding='utf-8') as f:
+            f.write('{"services": {}}')
+        store = ServiceStore()
+        with pytest.raises(DataCorruptionError):
+            store.list_all()
+
+    def test_legit_dict_ok(self):
+        with open(svc_mod.SERVICES_PATH, 'w', encoding='utf-8') as f:
+            f.write('{"services": []}')
+        store = ServiceStore()
+        assert store.list_all() == []
+
+
+class TestWebCliDomain:
+    """--domain / --no-domain CLI（HTTP-SERVER-CL002）"""
+
+    def test_add_domain_flag(self, capsys):
+        _COMMANDS['web'](None, ['add', 'dk', '--cmd',
+                                'dk server start --daemon --open', '--domain'])
+        svc = ServiceStore().get('dk')
+        assert svc is not None
+        assert svc['use_domain'] is True
+        assert 'Domain: on' in capsys.readouterr().out
+
+    def test_add_subcommand_name_conflict(self, capsys):
+        """SEC-022-1: web 子命令名不得作服务名"""
+        _COMMANDS['web'](None, ['add', 'show', '--cmd', 'echo a'])
+        assert 'conflicts' in capsys.readouterr().err
+        assert ServiceStore().get('show') is None
+
+    def test_add_help_subcommand_name_conflict(self, capsys):
+        _COMMANDS['web'](None, ['add', 'help', '--cmd', 'echo a'])
+        assert 'conflicts' in capsys.readouterr().err
+
+    def test_update_domain_on(self, capsys):
+        ServiceStore().add('a', cmd='echo a')
+        _COMMANDS['web'](None, ['update', 'a', '--domain'])
+        assert ServiceStore().get('a')['use_domain'] is True
+
+    def test_update_no_domain_clears(self, capsys):
+        ServiceStore().add('a', cmd='echo a', use_domain=True)
+        _COMMANDS['web'](None, ['update', 'a', '--no-domain'])
+        assert ServiceStore().get('a')['use_domain'] is False
+
+    def test_update_domain_flag_counts_as_change(self, capsys):
+        ServiceStore().add('a', cmd='echo a')
+        _COMMANDS['web'](None, ['update', 'a', '--domain'])
+        assert 'Nothing to update' not in capsys.readouterr().out
+
+
+class TestWebCliRunDomain:
+    """执行时注入 config.domain（HTTP-SERVER-CL002）"""
+
+    def test_domain_injected(self, capsys):
+        ServiceStore().add('dk', cmd='dk server start --daemon --open',
+                           use_domain=True)
+        with patch('http_server_cli.utils.url_reachable') as mock_probe, \
+             patch('http_server_cli.config.Config') as mock_cfg, \
+             patch('http_server_cli.cli.subprocess.run') as mock_run:
+            mock_cfg.return_value.domain = 'jaden.local'
+            mock_run.return_value.returncode = 0
+            _COMMANDS['web'](None, ['dk'])
+        mock_probe.assert_not_called()
+        cmd_line = mock_run.call_args.args[0]
+        assert cmd_line == 'dk server start --daemon --open --domain "jaden.local"'
+
+    def test_domain_injected_json_effective(self, capsys):
+        ServiceStore().add('dk', cmd='dk server start', use_domain=True)
+        with patch('http_server_cli.config.Config') as mock_cfg, \
+             patch('http_server_cli.cli.subprocess.run') as mock_run:
+            mock_cfg.return_value.domain = 'jaden.local'
+            mock_run.return_value.returncode = 0
+            _COMMANDS['web'](None, ['dk', '--json'])
+        result = json.loads(capsys.readouterr().out)
+        assert result['data']['cmd_effective'] == 'dk server start --domain "jaden.local"'
+
+    def test_no_domain_no_injection(self, capsys):
+        ServiceStore().add('a', cmd='echo a')
+        with patch('http_server_cli.cli.subprocess.run') as mock_run:
+            mock_run.return_value.returncode = 0
+            _COMMANDS['web'](None, ['a'])
+        cmd_line = mock_run.call_args.args[0]
+        assert cmd_line == 'echo a'
