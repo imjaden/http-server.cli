@@ -557,5 +557,47 @@ HTTP-SERVER-CL001 闭环（hs web 一级子命令：ServiceStore + CLI 全套 + 
 |:------|:------|:--------|:--------|:------|
 | SEC-022-1 | web 子命令名未拦截（记录项） | 🟢 | — | ✅ Closed (2026-08-27, PASS 100/100, pushed) |
 | SEC-022-2 | 合法 JSON 错误形状裸 traceback（记录项） | 🟢 | — | ✅ Closed (2026-08-27, PASS 100/100, pushed) |
-| OBS-3 | spec.yaml version 1.1.0 既有漂移（待确认） | 🟡 | P2 | ⏳ 待 ops 决定（docs@spec 同步，非本批） |
+| OBS-3 | spec.yaml version 1.1.0 既有漂移（待确认） | 🟡 | P2 | ✅ Closed (197c27a, CL002 docs@spec 同步) |
+
+
+## 2026-08-27 — Commit audit: HTTP-SERVER-CL002 hs web --domain 入参 + hs-web skill 推广 + CL001 遗留 (38e4ee0, 5e1e20a, 197c27a)
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（提交审计 + 功能实测 + CL001 遗留闭环）
+- **Scope**: 3 commits（38e4ee0 feat@web, 5e1e20a tests@web, 197c27a docs@web），基底 origin/main cf40dcb（3 commits 全部未 push）
+- **Commit(s)**: 38e4ee0..197c27a
+- **Verdict**: ✅ PASS
+- **Score**: 95 / 100 (Rating: A)
+- **Report**: documents/review/http-server-cli-cl002-web-domain-promo-audit-v1.0-20260827.md
+
+### Summary
+
+HTTP-SERVER-CL002 闭环（hs web --domain 入参 + hs-web skill 推广 + CL001 遗留三项）10 项审计 9 项全过 + 1 项部分通过。①--domain 功能：add `--domain`（store_true）→ use_domain=True；update `--domain`/`--no-domain`（no_domain 优先清除，cli.py:1610-1615）；执行 `use_domain=True` → `cmd_line = f"{cmd_line} --domain \"{Config().domain}\""`（cli.py:1704-1707）+ json `cmd_effective`；open/url 探测路径未受影响（cli.py:1690 仍走 url）。②SEC-022-1 闭环：`_WEB_SUBCOMMANDS = {'add','update','list','show','remove','help'}`（cli.py:1272）+ `_web_add` 冲突判断扩展 `name in _COMMANDS or name in _WEB_SUBCOMMANDS` → 拦截 + 不写入。③SEC-022-2 闭环：`_read_all` 三类形状校验（非空 JSON 语法错 / 合法 JSON 非 dict / services 非 list → DataCorruptionError，services.py:53-69），空文件仍 OK。④OBS-3 闭环：spec.yaml version 1.1.0→1.3.0（L2）+ version 场景输出串修正 `http-server v1.3.0`（L291）。⑤hs-web skill：SKILL.md frontmatter 合法，`hs prompt` 6 篇含 hs-web，镜像 ~/.hermes/profiles/ops/skills/devops/hs-web/SKILL.md 与源逐字节一致，test_prompt EXPECTED_SKILLS 6 全等。⑥文档四同步：README EN/ZH Ships 6 skills + Web 节 --domain、features.md Web 节 14 条 + AI 对接 6 篇 + 测试 459、CHANGELOG 1.3.0 扩充、__version__ = spec.yaml = `hs version` 实测 `http-server v1.3.0`。**459 passed in 1.36s**（.venv，test_web 81 例）。diff 10 文件无越界（bookmark/index 未动，版本未 bump），敏感信息 0 hits。1×🟢 记录（SEC-023-1）+ 1×🟡（SEC-023-2 注册表 `dk` 残留）。**push origin main（origin/main 推进至 197c27a）**。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| SEC-023-1 | 🟢（记录） | `--domain` 注入 `Config().domain` 到 shell=True cmd（仅双引号包裹，`"`/`$(...)`/反引号可破出），`set_domain` 无校验（`set_port` 有范围校验）；攻击面 = 用户自有 config.json，无外部输入，与 `svc['cmd']` shell=True 同类（design 2C） | cli.py:1707;config.py:set_domain | 记录 |
+| SEC-023-2 | 🟡 | services.json 第三条 `dk` 测试残留（cmd `dk server start --daemon --open`，无 use_domain，created 08:10:11），与审计项 9「两条 intact」不符；demo-cl002 已清但 dk 未清。非安全（dk 为真实命令，缺字段向后兼容），`hs web remove dk` 一条命令清理 | ~/.http-server.cli/services.json | ⏳ 待 ops 清理 |
+
+### Positives
+
+- --domain 全链路以 mock 断言（`mock_run.call_args.args[0]` 逐字断言注入串 + `mock_probe.assert_not_called()` 证探测不受影响）+ 源码逐行核验双证
+- CL001 遗留三项（SEC-022-1/2 + OBS-3）逐一闭环，且各配定向测试（冲突 2 例 / 形状 3 例 / spec version 与场景输出串）
+- SEC-022-2 形状校验覆盖三类（语法错 / 非 dict / services 非 list），空文件与 legit dict 回归不破坏
+- hs-web skill 镜像逐字节比对（非存在性检查）；`hs prompt` 列表/全文/--brief 运行时实测
+- 459 全量零回归用项目 .venv（Python 3.11.15）；版本四同步以 `hs version` 实测 v1.3.0 为准，非信 subject
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| SEC-023-1 | --domain shell 注入 defense-in-depth（记录项） | 🟢 | — | 记录 |
+| SEC-023-2 | 注册表 dk 测试残留（第三条） | 🟡 | P2 | ⏳ 待 ops 清理（`hs web remove dk`） |
+| SEC-022-1 | web 子命令名冲突（CL001 遗留） | 🟢 | — | ✅ Closed (38e4ee0) |
+| SEC-022-2 | services.json 形状校验（CL001 遗留） | 🟢 | — | ✅ Closed (38e4ee0) |
+| OBS-3 | spec.yaml version 漂移（CL001 遗留） | 🟡 | — | ✅ Closed (197c27a) |
+
+---
 
