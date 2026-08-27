@@ -39,17 +39,20 @@
 
 ## Web 服务注册（hs web）
 
-1. `hs web add <name> --cmd '<cmd>' [--url <url>] [--open cmd|url|both|none]` — 注册任意 CLI 启动命令（跨项目，如 `dk server start --daemon --open`）✅ — HTTP-SERVER-CL001
-2. `hs web update <name> [--cmd] [--url] [--open]` — 更新（`--url ''` 清除）✅
+1. `hs web add <name> --cmd '<cmd>' [--url <url>] [--open cmd|url|both|none] [--domain]` — 注册任意 CLI 启动命令（跨项目，如 `dk server start --daemon --open`）✅ — HTTP-SERVER-CL001
+2. `hs web update <name> [--cmd] [--url] [--open] [--domain|--no-domain]` — 更新（`--url ''` / `--no-domain` 清除）✅
 3. `hs web list [--json]` — 列出所有注册 ✅
 4. `hs web show <name> [--json]` — 查看详情 ✅
 5. `hs web remove <name> [--json]` — 删除 ✅
 6. `hs web <name> [--no-probe]` — 执行：url 可达→直接访问（幂等，不执行 cmd）；不可达/无 url→执行启动命令；`--no-probe` 跳过探测强制重启 ✅
 7. open 策略 — `url`（默认，web 统一开浏览器）/ `cmd`（命令自带 -o）/ `both` / `none` ✅
 8. url 可选 — 固定端口填 url（启动后 wait 就绪再 open）；动态端口不填（启动前未知端口，直接透传）✅
-9. 名称校验复用 bookmark 规则 `[a-zA-Z0-9][a-zA-Z0-9._-]*`；损坏检测同 `DataCorruptionError` ✅
-10. 全局薄壳 `~/.local/bin/web` 转发 — 达成 `web <name>` 语法 ✅
-11. 关联文档: HTTP-SERVER-CL001 draft (cache/draft/TODO-20260826.md)
+9. `--domain` 布尔 — 执行时把 config.domain 注入 cmd 末尾（`cmd ... --domain "<domain>"`，如 `dk server start --daemon --open` → 追加 `--domain "jaden.local"`）；json 输出含 `cmd_effective` ✅ — HTTP-SERVER-CL002
+10. 名称校验复用 bookmark 规则 `[a-zA-Z0-9][a-zA-Z0-9._-]*` + web 子命令名（add/update/list/show/remove/help）冲突拦截 ✅ — SEC-022-1
+11. 损坏检测 — 非空 JSON 语法错 / 合法 JSON 非 dict / services 非 list → `DataCorruptionError`（SEC-022-2）；bookmark 同规则 ✅
+12. 全局薄壳 `~/.local/bin/web` 转发 — 达成 `web <name>` 语法 ✅
+13. 推广 — skills/hs-web（命令速查 + 其他模块接入指南 + 真实实例 daily.checker/jaden.tech/线上站点），`hs prompt hs-web` 输出，镜像 ~/.hermes/profiles/ops/skills/devops/hs-web/ ✅ — HTTP-SERVER-CL002
+14. 关联文档: HTTP-SERVER-CL001 draft (cache/draft/TODO-20260826.md) / HTTP-SERVER-CL002 draft (cache/draft/TODO-20260827.md)
 
 ## HTTP 服务
 
@@ -107,9 +110,10 @@
 
 ## AI 对接
 
-1. `hs prompt [<skill>]` — 输出 skills/ 使用说明（hs-cli/hs-bookmark/hs-mcp/hs-dashboard/ai-interchange，--brief/--json）✅ — `documents/hs-ai-integration-design-v1.0-20260825.md`
+1. `hs prompt [<skill>]` — 输出 skills/ 使用说明（hs-cli/hs-bookmark/hs-mcp/hs-dashboard/ai-interchange/hs-web，--brief/--json）✅ — `documents/hs-ai-integration-design-v1.0-20260825.md`
 2. skills/ai-interchange — AI 互通数据对接方法论（三通道框架 + hs 实证 + 验收清单），供其他项目核对复用 ✅ — CL-SEC21
-3. 批次二（暂缓）— hs export / hs doctor 🚧
+3. skills/hs-web — 跨项目 web 服务注册推广（命令速查 + 其他模块接入指南 + 真实实例），`hs prompt hs-web` 输出，镜像 ~/.hermes/profiles/ops/skills/devops/hs-web/ ✅ — HTTP-SERVER-CL002
+4. 批次二（暂缓）— hs export / hs doctor 🚧
 
 ## 配置管理
 
@@ -119,7 +123,7 @@
 
 ## 测试
 
-1. 13 个测试模块，442 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
+1. 13 个测试模块，459 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
 2. `conftest.py` — autouse 数据隔离 + monkeypatch 路径注入 ✅
 3. 集成测试模式 — mock `_COMMANDS` / `ensure_storage`，set `sys.argv`，catch `SystemExit` ✅
 

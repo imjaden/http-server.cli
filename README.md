@@ -50,7 +50,7 @@ hs prompt hs-mcp --brief # condensed summary
 hs prompt --json         # machine-readable envelope
 ```
 
-Ships 5 skills: `hs-cli` / `hs-bookmark` / `hs-mcp` / `hs-dashboard` / `ai-interchange`.
+Ships 6 skills: `hs-cli` / `hs-bookmark` / `hs-mcp` / `hs-dashboard` / `ai-interchange` / `hs-web`.
 
 ### 2. Data & Actions — MCP Server
 
@@ -168,8 +168,8 @@ Register any web service startup command (cross-project) under a name:
 
 | Command | Description |
 |:--------|:------------|
-| `hs web add <name> --cmd '<cmd>' [--url <url>] [--open cmd\|url\|both\|none]` | Register a service (open defaults to `url`) |
-| `hs web update <name> [--cmd] [--url] [--open]` | Update a service (`--url ''` clears) |
+| `hs web add <name> --cmd '<cmd>' [--url <url>] [--open cmd\|url\|both\|none] [--domain]` | Register a service (open defaults to `url`) |
+| `hs web update <name> [--cmd] [--url] [--open] [--domain\|--no-domain]` | Update a service (`--url ''` / `--no-domain` clears) |
 | `hs web list [--json]` | List all registered services |
 | `hs web show <name>` / `hs web remove <name>` | Details / remove |
 | `hs web <name> [--no-probe]` | Run: URL reachable → open directly (idempotent); otherwise execute the startup command |
@@ -180,9 +180,11 @@ hs web add daily.checker --cmd 'dk server start --daemon --open' --url http://12
 hs web daily.checker     # 5001 alive → open; else start it
 hs web jaden.tech        # dynamic port: no url → transparent passthrough
 hs web jaden.tech --no-probe   # skip probe, force restart
+hs web add dk --cmd 'dk server start --daemon --open' --domain   # inject config.domain → ... --domain "jaden.local"
 ```
 
 > `services.json` (independent of bookmarks): bookmark maps a name to a static directory; `hs web` maps a name to any command.
+> Promotion: `hs prompt hs-web` — cross-project web service registration guide for other modules (daily-checker / llm-radar / html-gen / jaden.tech).
 
 ### Dashboard
 
