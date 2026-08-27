@@ -49,11 +49,22 @@ class ServiceStore:
             write_json(self._path, {'services': []})
 
     def _read_all(self) -> list:
-        """读取所有注册。损坏文件抛出 DataCorruptionError。"""
+        """读取所有注册。损坏文件抛出 DataCorruptionError。
+
+        损坏覆盖三类: ①非空文件 JSON 语法错; ②合法 JSON 但非 dict; ③services 字段非 list。
+        """
         raw = read_json(self._path)
         if not raw and os.path.getsize(self._path) > 0:
             raise DataCorruptionError(
                 f'{self._path} is corrupted. '
+                f'Please check the file or restore from backup.'
+            )
+        if not raw:
+            return []
+        if not isinstance(raw, dict) or not isinstance(raw.get('services'), list):
+            raise DataCorruptionError(
+                f'{self._path} has invalid shape '
+                f'(expected {{"services": [...]}}). '
                 f'Please check the file or restore from backup.'
             )
         return raw.get('services', [])
@@ -105,11 +116,13 @@ class ServiceStore:
     # ── CRUD ──
 
     def add(self, name: str, cmd: str, url: Optional[str] = None,
-            open_mode: str = 'url', force: bool = False) -> None:
+            open_mode: str = 'url', use_domain: bool = False,
+            force: bool = False) -> None:
         """添加注册。
 
         force=True 时覆盖同名旧条目。
         url 归一化: '' 与 None 等价（动态端口服务不填）。
+        use_domain=True 时执行注入 config.domain 到 cmd 末尾（--domain "<domain>"）。
 
         Raises:
             ValueError: name 已存在；或 cmd/open_mode 非法。
@@ -137,6 +150,7 @@ class ServiceStore:
             'cmd': cmd,
             'url': url or None,
             'open': open_mode,
+            'use_domain': bool(use_domain),
             'created_at': timestamp(),
         })
         self._write_all(services)
@@ -151,12 +165,14 @@ class ServiceStore:
         return True
 
     def update(self, name: str, cmd: Optional[str] = None,
-               url: Optional[str] = None, open_mode: Optional[str] = None) -> bool:
-        """更新注册的 cmd / url / open。返回 True 表示成功，False 表示未找到。
+               url: Optional[str] = None, open_mode: Optional[str] = None,
+               use_domain: Optional[bool] = None) -> bool:
+        """更新注册的 cmd / url / open / use_domain。返回 True 表示成功，False 表示未找到。
 
         - cmd=None: 保持原值
         - url=None: 保持原值。传空字符串 '' 清除 url。
         - open_mode=None: 保持原值。
+        - use_domain=None: 保持原值。显式 True/False 设置。
         """
         services = self._read_all()
         for s in services:
@@ -176,6 +192,8 @@ class ServiceStore:
                     if err:
                         raise ValueError(err)
                     s['open'] = open_mode
+                if use_domain is not None:
+                    s['use_domain'] = bool(use_domain)
                 self._write_all(services)
                 return True
         return False
