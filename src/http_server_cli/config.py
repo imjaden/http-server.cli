@@ -5,7 +5,11 @@
 """
 
 import os
+import re
 from http_server_cli.utils import CONFIG_PATH, read_json, write_json
+
+# SEC-023-1: 域名/绑定地址字符集——拒绝空格/引号/`$`/反引号/`;`/`&` 等 shell 元字符
+_DOMAIN_RE = re.compile(r'^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$')
 
 DEFAULT_CONFIG = {
     'port': 8080,
@@ -50,7 +54,17 @@ class Config:
         self._save()
 
     def set_domain(self, value: str) -> None:
-        """设置绑定域名，持久化"""
+        """设置绑定域名，持久化。非法值（含 shell 元字符）抛 ValueError。
+
+        字符集 [a-zA-Z0-9][a-zA-Z0-9.-]* 拒绝空格/引号/`$`/反引号/`;`/`&` 等
+        shell 元字符——hs web --domain 注入该值到 shell 命令（SEC-023-1
+        defense-in-depth；用户仍可直接手改 config.json，信任用户自行为）。
+        """
+        if not isinstance(value, str) or not _DOMAIN_RE.match(value):
+            raise ValueError(
+                'domain must match [a-zA-Z0-9][a-zA-Z0-9.-]* '
+                '(no spaces, quotes or shell metacharacters)'
+            )
         self._data['domain'] = value
         self._save()
 
