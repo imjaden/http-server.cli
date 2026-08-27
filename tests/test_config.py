@@ -97,3 +97,28 @@ class TestConfigCornerCases:
             f.write('{broken json!!!')
         c = Config()
         assert c.port == DEFAULT_CONFIG['port']
+
+class TestSetDomainValidation:
+    """SEC-023-1: set_domain 字符集校验（防 shell 元字符注入）"""
+
+    @pytest.mark.parametrize('valid', [
+        'localhost', '0.0.0.0', 'jaden.local', 'a', 'a-b.c', 'www.example.com',
+    ])
+    def test_valid_domains(self, fresh_config, valid):
+        fresh_config.set_domain(valid)
+        assert fresh_config.domain == valid
+
+    @pytest.mark.parametrize('invalid', [
+        '', ' ', 'a b', 'a"b', "a'b", 'a$b', 'a`b', 'a;b', 'a&b',
+        'a|b', 'a(b)', '-a', 'a-', '$(rm -rf /)',
+    ])
+    def test_invalid_domains_raise(self, fresh_config, invalid):
+        with pytest.raises(ValueError):
+            fresh_config.set_domain(invalid)
+
+    def test_invalid_does_not_persist(self, fresh_config):
+        fresh_config.set_domain('localhost')
+        with pytest.raises(ValueError):
+            fresh_config.set_domain('bad value')
+        assert fresh_config.domain == 'localhost'
+        assert fresh_config.to_dict()['domain'] == 'localhost'

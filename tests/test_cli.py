@@ -1036,3 +1036,27 @@ class TestManageJson:
         assert result['success'] is True
         assert result['command'] == 'dashboard-stop'
         assert result['data']['stopped'] is True
+
+
+class TestSetDomainCli:
+    """hs set domain CLI（SEC-023-1: 字符集校验）"""
+
+    def test_set_domain_valid(self, capsys):
+        _COMMANDS['set'](None, ['domain', 'jaden.local'])
+        assert 'Default domain set to jaden.local' in capsys.readouterr().out
+        from http_server_cli.config import Config
+        assert Config().domain == 'jaden.local'
+
+    def test_set_domain_invalid(self, capsys):
+        _COMMANDS['set'](None, ['domain', 'bad value'])
+        # 注: _handle_set 错误经 eprint 输出到 stdout（项目惯例，非 stderr）
+        assert 'domain must match' in capsys.readouterr().out
+        from http_server_cli.config import Config
+        assert Config().domain == 'localhost'
+
+    def test_set_domain_invalid_json(self, capsys):
+        _COMMANDS['set'](None, ['domain', 'a;b', '--json'])
+        import json
+        result = json.loads(capsys.readouterr().out)
+        assert result['success'] is False
+        assert 'domain must match' in result['error']
