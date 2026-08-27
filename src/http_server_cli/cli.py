@@ -145,7 +145,15 @@ def _handle_set(args):
                 eprint(f'Invalid port number: {value}', '❌')
     elif key == 'domain':
         old_value = config.domain
-        config.set_domain(value)
+        try:
+            config.set_domain(value)
+        except ValueError as e:
+            if json_mode:
+                from http_server_cli.utils import json_output
+                json_output(False, 'set', error=str(e))
+            else:
+                eprint(str(e), '❌')
+            return
         if json_mode:
             from http_server_cli.utils import json_output
             json_output(True, 'set', data={'key': 'domain', 'old_value': old_value, 'new_value': value})
