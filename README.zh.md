@@ -50,7 +50,7 @@ hs prompt hs-mcp --brief # 摘要
 hs prompt --json         # 机器可读信封
 ```
 
-内置 5 篇 skills：`hs-cli` / `hs-bookmark` / `hs-mcp` / `hs-dashboard` / `ai-interchange`。
+内置 6 篇 skills：`hs-cli` / `hs-bookmark` / `hs-mcp` / `hs-dashboard` / `ai-interchange` / `hs-web`。
 
 ### 2. 数据与操作 — MCP Server
 
@@ -168,8 +168,8 @@ hs kill-all                 # 一键全关
 
 | 命令 | 说明 |
 |:--------|:------------|
-| `hs web add <name> --cmd '<cmd>' [--url <url>] [--open cmd\|url\|both\|none]` | 注册服务（open 默认 url） |
-| `hs web update <name> [--cmd] [--url] [--open]` | 更新服务（`--url ''` 清除） |
+| `hs web add <name> --cmd '<cmd>' [--url <url>] [--open cmd\|url\|both\|none] [--domain]` | 注册服务（open 默认 url） |
+| `hs web update <name> [--cmd] [--url] [--open] [--domain\|--no-domain]` | 更新服务（`--url ''` / `--no-domain` 清除） |
 | `hs web list [--json]` | 列出所有注册 |
 | `hs web show <name>` / `hs web remove <name>` | 详情 / 删除 |
 | `hs web <name> [--no-probe]` | 执行：url 可达→直接打开（幂等）；否则执行启动命令 |
@@ -180,9 +180,11 @@ hs web add daily.checker --cmd 'dk server start --daemon --open' --url http://12
 hs web daily.checker     # 5001 存活→直接打开；否则启动
 hs web jaden.tech        # 动态端口：无 url → 直接透传
 hs web jaden.tech --no-probe   # 跳过探测，强制重启
+hs web add dk --cmd 'dk server start --daemon --open' --domain   # 注入 config.domain → ... --domain "jaden.local"
 ```
 
 > `services.json` 独立于 bookmarks.json：bookmark 把名称映射到静态目录；`hs web` 把名称映射到任意命令。
+> 推广：`hs prompt hs-web` — 跨项目 web 服务注册指南（daily-checker / llm-radar / html-gen / jaden.tech 等模块接入）。
 
 ### Dashboard
 
