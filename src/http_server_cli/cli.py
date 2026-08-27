@@ -82,7 +82,7 @@ _HELP = """http-server v{version} — 忘记端口，只管预览
 
 ━━━ Web 服务注册 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  hs web add <name> --cmd '<cmd>' [--url <url>] [--open cmd|url|both|none]
+  hs web add <name> --cmd '<cmd>' [--url <url>] [--open cmd|url|both|none] [--domain]
   hs web list / show <name> / remove <name> / update <name>
   hs web <name> [--no-probe]      已运行→直接访问; 未运行→执行启动命令
 
@@ -90,6 +90,7 @@ _HELP = """http-server v{version} — 忘记端口，只管预览
     hs web daily.checker        启动/访问 daily-checker 面板
     hs web jaden.tech           启动/访问 jaden.tech 站点
     hs web <name> --no-probe    跳过探测，强制重启
+    --domain                    执行时注入 config.domain（--domain "<domain>"）
 
 ━━━ 其他 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -1268,6 +1269,9 @@ def _bookmark_update(args):
 
 # ── Web 服务注册（hs web）──────────────────────────────
 
+_WEB_SUBCOMMANDS = frozenset({'add', 'update', 'list', 'show', 'remove', 'help'})
+
+
 @_register
 def _cmd_web(manager, args):
     """hs web — 跨项目 Web 服务注册管理"""
@@ -1293,11 +1297,12 @@ def _web_help():
     print('━━━ hs web ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
     print('  注册任意 web 服务启动命令，按名称快速启动/访问')
     print()
-    print("  hs web add <name> --cmd '<cmd>' [--url <url>] [--open cmd|url|both|none]")
+    print("  hs web add <name> --cmd '<cmd>' [--url <url>] [--open cmd|url|both|none] [--domain]")
     print('      --cmd  启动命令（如 dk server start --daemon --open）')
     print('      --url  服务 URL（固定端口必填；动态端口不填，启动前未知）')
     print('      --open 开浏览器策略（默认 url: web 统一开; cmd: 命令自带 -o; both: 都试; none: 不开）')
-    print('  hs web update <name> [--cmd ...] [--url ...] [--open ...]')
+    print('      --domain 执行时注入 config.domain 到 cmd 末尾（--domain "<domain>"）')
+    print('  hs web update <name> [--cmd ...] [--url ...] [--open ...] [--domain|--no-domain]')
     print('  hs web list [--json] / show <name> / remove <name>')
     print('  hs web <name> [--no-probe]   执行：已运行→直接访问；未运行→执行启动命令')
     print('      --no-probe 跳过探测，总是执行启动命令（强制重启）')
@@ -1311,6 +1316,8 @@ def _web_add(args):
     parser.add_argument('--cmd', default=None)
     parser.add_argument('--url', default=None)
     parser.add_argument('--open', dest='open_mode', default=None)
+    parser.add_argument('--domain', action='store_true',
+                        help='执行时注入 config.domain 到 cmd 末尾（--domain "<domain>"）')
     parser.add_argument('--force', action='store_true')
     parser.add_argument('--json', action='store_true')
     try:
@@ -1339,7 +1346,7 @@ def _web_add(args):
         else:
             print(f'❌ {name_err}', file=sys.stderr)
         return
-    if parsed.name in _COMMANDS:
+    if parsed.name in _COMMANDS or parsed.name in _WEB_SUBCOMMANDS:
         err = f"'{parsed.name}' conflicts with built-in command"
         if json_mode:
             json_output(False, cmd, error=err)
@@ -1366,7 +1373,8 @@ def _web_add(args):
     store = ServiceStore()
     try:
         store.add(parsed.name, parsed.cmd, url=parsed.url,
-                  open_mode=open_mode, force=parsed.force)
+                  open_mode=open_mode, use_domain=parsed.domain,
+                  force=parsed.force)
         svc = store.get(parsed.name)
         if svc is None:  # pragma: no cover - add 成功后必然存在
             return
@@ -1378,6 +1386,8 @@ def _web_add(args):
             if svc.get('url'):
                 print(f"   🌐 URL: {svc['url']}")
             print(f"   👁  Open: {svc.get('open', 'url')}")
+            if svc.get('use_domain'):
+                print('   🏷  Domain: on (inject config.domain at run)')
     except ValueError as e:
         if json_mode:
             json_output(False, cmd, error=str(e))
@@ -1430,6 +1440,8 @@ def _web_list(args):
         if svc.get('url'):
             print(f"     🌍 {svc['url']}")
         print(f"     👁  Open: {svc.get('open', 'url')}")
+        if svc.get('use_domain'):
+            print('     🏷  Domain: on')
         print()
 
 
@@ -1481,6 +1493,8 @@ def _web_show(args):
     if svc.get('url'):
         print(f"   🌍 URL: {svc['url']}")
     print(f"   👁  Open: {svc.get('open', 'url')}")
+    if svc.get('use_domain'):
+        print('   🏷  Domain: on (inject config.domain at run)')
     print(f"   🕐 Created: {svc.get('created_at', '-')}")
 
 
@@ -1534,6 +1548,8 @@ def _web_update(args):
     parser.add_argument('--cmd', default=None)
     parser.add_argument('--url', default=None)
     parser.add_argument('--open', dest='open_mode', default=None)
+    parser.add_argument('--domain', action='store_true')
+    parser.add_argument('--no-domain', dest='no_domain', action='store_true')
     parser.add_argument('--json', action='store_true')
     try:
         parsed, _ = parser.parse_known_args(args)
@@ -1564,8 +1580,9 @@ def _web_update(args):
             print(f'❌ {err}', file=sys.stderr)
         return
 
-    if parsed.cmd is None and parsed.url is None and parsed.open_mode is None:
-        err = 'Nothing to update: pass --cmd / --url / --open'
+    if (parsed.cmd is None and parsed.url is None and parsed.open_mode is None
+            and not parsed.domain and not parsed.no_domain):
+        err = 'Nothing to update: pass --cmd / --url / --open / --domain / --no-domain'
         if json_mode:
             json_output(False, cmd, error=err)
         else:
@@ -1589,9 +1606,16 @@ def _web_update(args):
                 print(f'❌ {err}', file=sys.stderr)
             return
 
+    # --no-domain 优先（清除语义，对齐 --url ''）
+    use_domain = None
+    if parsed.no_domain:
+        use_domain = False
+    elif parsed.domain:
+        use_domain = True
+
     try:
         store.update(parsed.name, cmd=parsed.cmd, url=parsed.url,
-                     open_mode=parsed.open_mode)
+                     open_mode=parsed.open_mode, use_domain=use_domain)
         updated = store.get(parsed.name)
         if updated is None:  # pragma: no cover - update 成功后必然存在
             return
@@ -1603,6 +1627,8 @@ def _web_update(args):
             if updated.get('url'):
                 print(f"   🌍 URL: {updated['url']}")
             print(f"   👁  Open: {updated.get('open', 'url')}")
+            if updated.get('use_domain'):
+                print('   🏷  Domain: on (inject config.domain at run)')
     except ValueError as e:
         if json_mode:
             json_output(False, cmd, error=str(e))
@@ -1675,7 +1701,11 @@ def _web_run(args):
             return
 
     # 执行阶段：执行启动命令（透传，cmd 需为守护/后台形式）
-    result = subprocess.run(svc['cmd'], shell=True)
+    cmd_line = svc['cmd']
+    if svc.get('use_domain'):
+        from http_server_cli.config import Config
+        cmd_line = f"{cmd_line} --domain \"{Config().domain}\""
+    result = subprocess.run(cmd_line, shell=True)
 
     # 启动后确认 + open（url/both 策略）
     if url and open_mode in ('url', 'both'):
@@ -1689,6 +1719,7 @@ def _web_run(args):
         json_output(True, cmd, data={
             'name': parsed.name,
             'cmd': svc['cmd'],
+            'cmd_effective': cmd_line,
             'url': url,
             'open': open_mode,
             'status': 'started',
