@@ -16,7 +16,8 @@ from http_server_cli.cli import _COMMANDS
 pytestmark = pytest.mark.spec("cli-interface")
 
 SKILLS_DIR = Path(__file__).resolve().parent.parent / 'skills'
-EXPECTED_SKILLS = {'hs-cli', 'hs-bookmark', 'hs-mcp', 'hs-dashboard', 'ai-interchange'}
+EXPECTED_SKILLS = {'hs-cli', 'hs-bookmark', 'hs-mcp', 'hs-dashboard',
+                   'ai-interchange', 'hs-web'}
 
 
 class TestSkillsDir:
