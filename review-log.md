@@ -593,11 +593,47 @@ HTTP-SERVER-CL002 闭环（hs web --domain 入参 + hs-web skill 推广 + CL001 
 
 | Issue | Title | Severity | Priority | Status |
 |:------|:------|:--------|:--------|:------|
-| SEC-023-1 | --domain shell 注入 defense-in-depth（记录项） | 🟢 | — | 记录 |
-| SEC-023-2 | 注册表 dk 测试残留（第三条） | 🟡 | P2 | ⏳ 待 ops 清理（`hs web remove dk`） |
+| SEC-023-1 | --domain shell 注入 defense-in-depth（记录项） | 🟢 | — | ✅ Closed (03ca74b/14e08cf/b33e2f1, CL002 复核) |
+| SEC-023-2 | 注册表 dk 测试残留（第三条） | 🟡 | P2 | ✅ Closed (2026-08-27 ops 清理, services.json 2 条 intact) |
 | SEC-022-1 | web 子命令名冲突（CL001 遗留） | 🟢 | — | ✅ Closed (38e4ee0) |
 | SEC-022-2 | services.json 形状校验（CL001 遗留） | 🟢 | — | ✅ Closed (38e4ee0) |
 | OBS-3 | spec.yaml version 漂移（CL001 遗留） | 🟡 | — | ✅ Closed (197c27a) |
+
+---
+
+## 2026-08-27 — Commit re-audit: HTTP-SERVER-CL002 复核 — SEC-023-1 set_domain 字符集校验 (03ca74b, 14e08cf, b33e2f1)
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（提交审计 + 定向测试 + SEC-023-1 闭环）
+- **Scope**: 3 commits（03ca74b feat@config, 14e08cf tests@config, b33e2f1 docs@config），基底 origin/main 09d9e3b（CL002 PASS 95/100）
+- **Commit(s)**: 03ca74b..b33e2f1
+- **Verdict**: ✅ PASS
+- **Score**: 100 / 100 (Rating: A)
+- **Report**: documents/review/http-server-cli-cl002-sec023-1-domain-validation-rereview-v1.1-20260827.md
+
+### Summary
+
+CL002 遗留 🟢 记录项 SEC-023-1 闭环（`set_domain` 字符集校验 defense-in-depth）。①校验实现：config.py:12 `_DOMAIN_RE = ^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$` + config.py:63-67 先校验后赋值（`not isinstance(value, str) or not match → raise ValueError`，非法不落盘）。②CLI 捕获：cli.py:146-159 `_handle_set` domain 分支 `try/except ValueError` → json 信封 `json_output(False, 'set', error=str(e))` / 文本 `eprint(str(e), '❌')` + `return`，不写 config；port 分支未触碰。③注入不受影响：cli.py:1715 `cmd_line = f"{cmd_line} --domain \"{Config().domain}\""` 未改，`set_domain` 是 domain 唯一写入口，config.json `jaden.local` 合法。④测试：`TestSetDomainValidation` 21 例（6 合法 + 14 非法 + 1 不持久化）+ `TestSetDomainCli` 3 例 = **24 passed**；全量 **483 passed in 1.35s** 零回归，features.md 459→483。⑤范围：仅 6 文件，`__version__ 1.3.0` 未 bump，bookmark/web 执行逻辑未动。⑥文档：CHANGELOG SEC-023-1 条目 + features 483 同步。附带确认 SEC-023-2（注册表 `dk` 残留）已由 ops 清理（services.json 现 daily.checker + jaden.tech 两条 intact）。零新发现。**push origin main（origin/main 推进至 b33e2f1）**。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| — | — | 无新发现 | — | — |
+
+### Positives
+
+- 字符集拒绝全部双引号内可破出的元字符（`"`/`$`/反引号/`\`）+ 双引号外分隔符（`;`/`&`/`|`/空格/换行/重定向），defense-in-depth 完整
+- 非法值「先校验后持久化」，不会落盘半成品；CLI json/text 双通道错误信封与 port 分支风格一致
+- 24 例定向测试覆盖广（含 `$(rm -rf /)`、反引号、引号、`;`/`&`/`|`/括号、空串、首尾横线）
+- 全量 483 零回归（.venv Python 3.11.15）；范围控制到位（仅 6 文件，版本未 bump）
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| SEC-023-1 | --domain shell 注入 defense-in-depth（记录项） | 🟢 | — | ✅ Closed (03ca74b/14e08cf/b33e2f1) |
+| SEC-023-2 | 注册表 dk 测试残留（第三条） | 🟡 | P2 | ✅ Closed (2026-08-27 ops 清理) |
 
 ---
 
