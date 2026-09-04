@@ -1311,7 +1311,7 @@ def _web_help():
     print('      --open 开浏览器策略（默认 url: web 统一开; cmd: 命令自带 -o; both: 都试; none: 不开）')
     print('      --domain 执行时注入 config.domain 到 cmd 末尾（--domain "<domain>"）')
     print('  hs web update <name> [--cmd ...] [--url ...] [--open ...] [--domain|--no-domain]')
-    print('  hs web list [--json] / show <name> / remove <name>')
+    print('  hs web list [--json|--plain] [--sort-by name|cmd+url] / show <name> / remove <name>')
     print('  hs web <name> [--no-probe]   执行：已运行→直接访问；未运行→执行启动命令')
     print('      --no-probe 跳过探测，总是执行启动命令（强制重启）')
     print('  hs web help')
@@ -1411,6 +1411,10 @@ def _web_add(args):
 def _web_list(args):
     parser = argparse.ArgumentParser(prog='hs web list', add_help=False)
     parser.add_argument('--json', action='store_true')
+    parser.add_argument('--plain', action='store_true')
+    parser.add_argument('--sort-by', dest='sort_by', default=None,
+                        choices=['name', 'cmd+url'],
+                        help='排序键（默认 name → cmd+url，a-z）')
     try:
         parsed, _ = parser.parse_known_args(args)
     except SystemExit:
@@ -1420,6 +1424,8 @@ def _web_list(args):
     from http_server_cli.utils import json_output
 
     cmd = 'web-list'
+    if parsed.json and parsed.plain:
+        parser.error('--json and --plain are mutually exclusive')
     store = ServiceStore()
     try:
         services = store.list_all()
@@ -1429,6 +1435,15 @@ def _web_list(args):
         else:
             print('❌ services file corrupted', file=sys.stderr)
         return
+
+    # 排序（大小写不敏感 a-z）：默认 name → cmd → url；cmd+url 时以 name 兜底
+    def sort_key(s):
+        name, cmd_l, url = s['name'].lower(), s['cmd'].lower(), (s.get('url') or '').lower()
+        if parsed.sort_by == 'cmd+url':
+            return (cmd_l, url, name)
+        return (name, cmd_l, url)
+
+    services.sort(key=sort_key)
 
     if parsed.json:
         json_output(True, cmd, data={
@@ -1440,16 +1455,22 @@ def _web_list(args):
     if not services:
         print('No services registered')
         return
-    print(f'📊 {len(services)} service(s):')
+    total = len(services)
+    if parsed.plain:
+        for i, svc in enumerate(services, 1):
+            print(f"{i}/{total} {svc['name']}: {svc['cmd']}")
+        return
+    print(f'📊 {total} service(s):')
     print()
-    for svc in services:
-        print(f"  🌐 {svc['name']}")
+    for i, svc in enumerate(services, 1):
+        print(f"{i}/{total} 🌐 {svc['name']}")
         print(f"     🚀 {svc['cmd']}")
         if svc.get('url'):
             print(f"     🌍 {svc['url']}")
-        print(f"     👁  Open: {svc.get('open', 'url')}")
+        line = f"     👁  Open: {svc.get('open', 'url')}"
         if svc.get('use_domain'):
-            print('     🏷  Domain: on')
+            line += ' 🏷  Domain: on'
+        print(line)
         print()
 
 

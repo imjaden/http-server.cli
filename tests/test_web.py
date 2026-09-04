@@ -294,6 +294,57 @@ class TestWebCliListShowRemoveUpdate:
         assert result['command'] == 'web-list'
         assert result['data']['count'] == 1
 
+    def test_list_text_format(self, capsys):
+        ServiceStore().add('a', cmd='echo a', url='http://x',
+                           open_mode='cmd', use_domain=True)
+        _COMMANDS['web'](None, ['list'])
+        out = capsys.readouterr().out
+        assert '1/1 🌐 a' in out
+        assert '🚀 echo a' in out
+        assert '🌍 http://x' in out
+        assert '👁  Open: cmd 🏷  Domain: on' in out
+
+    def test_list_plain(self, capsys):
+        ServiceStore().add('a', cmd='echo a', url='http://x')
+        _COMMANDS['web'](None, ['list', '--plain'])
+        out = capsys.readouterr().out
+        assert '1/1 a: echo a' in out
+        assert 'http://x' not in out
+
+    def test_list_json_and_plain_exclusive(self, capsys):
+        ServiceStore().add('a', cmd='echo a')
+        with pytest.raises(SystemExit):
+            _COMMANDS['web'](None, ['list', '--json', '--plain'])
+
+    def test_list_default_sort_by_name(self, capsys):
+        store = ServiceStore()
+        store.add('b', cmd='echo b')
+        store.add('A', cmd='echo a')  # 大小写不敏感 a-z
+        _COMMANDS['web'](None, ['list', '--plain'])
+        out = capsys.readouterr().out
+        assert out.index('A:') < out.index('b:')
+
+    def test_list_sort_by_cmd_url(self, capsys):
+        store = ServiceStore()
+        store.add('zeta', cmd='zzz')
+        store.add('alpha', cmd='mmm')
+        _COMMANDS['web'](None, ['list', '--plain', '--sort-by', 'cmd+url'])
+        out = capsys.readouterr().out
+        assert out.index('alpha') < out.index('zeta')
+
+    def test_list_json_sorted(self, capsys):
+        store = ServiceStore()
+        store.add('b', cmd='echo b')
+        store.add('a', cmd='echo a')
+        _COMMANDS['web'](None, ['list', '--json'])
+        result = json.loads(capsys.readouterr().out)
+        assert [s['name'] for s in result['data']['services']] == ['a', 'b']
+
+    def test_list_sort_by_invalid_choice(self, capsys):
+        # parse_known_args 吞掉 argparse SystemExit，静默返回（与 add 一致）
+        _COMMANDS['web'](None, ['list', '--sort-by', 'bogus'])
+        assert capsys.readouterr().out == ''
+
     def test_show(self, capsys):
         ServiceStore().add('a', cmd='echo a', url='http://x')
         _COMMANDS['web'](None, ['show', 'a'])
