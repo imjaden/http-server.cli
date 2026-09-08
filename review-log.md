@@ -637,3 +637,39 @@ CL002 遗留 🟢 记录项 SEC-023-1 闭环（`set_domain` 字符集校验 defe
 
 ---
 
+## 2026-09-08 — Commit audit: docs-consolidation 归档+索引批（P5 推广 #4 方案 A）
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（提交审计 — 纯文档归档 + 索引 + 引用修正 + 全量测试回归）
+- **Scope**: 2 个未 push commit（156087b docs@archive, 55502ac docs@sync），基底 origin/main 60381af；P5 推广 #4 方案 A（窄幅归档 + 原位保留, 非手册化）
+- **Commit(s)**: 156087b, 55502ac
+- **Verdict**: ✅ PASS
+- **Score**: 100 / 100 (Rating: A)
+- **Report**: documents/review/http-server-cli-docs-consolidation-audit-v1.0-20260908.md
+
+### Summary
+
+2 commit 纯文档归档 + 索引批, 8 项审计全过。①归档：3 份 superseded 文档（pypi-release-checklist 20260623 / pypi-release-steps 20260624 / github-ci-issues 20260704）经 R100 纯 rename 落 documents/archive/root-20260908/（0 insert/0 delete, 历史保留）, 桶内计数 = 3, 无他人文件误移, 无 vault 侧改动（vault 外部镜像, 仓库零变更）。②README 索引：定位句（Q1=A 窄幅归档决策）+ 11 主题原位保留表（CLI/书签/Web 注册/HTTP 性能/Dashboard/MCP/AI/CI-CD/review 桶/素材交接/治理面）+ 归档段用 partial stem 不嵌完整 basename（桶内清单以 git ls-files 为准）, 15/15 相对链接 resolve。③引用修正 5/5 exists：features L55 → CL001/CL002 review 实路径（web-registration-audit + cl002-web-domain-promo-audit + sec023-1-domain-validation-rereview）、L60 → dev skill range-request-support.md（~/.hermes/profiles/dev/skills/software-development/http-server-cli-dev/references/）、.hermes-project.yaml:18 handoff.doc → documents/handoff/handoff-http-server.cli-review.md（实盘文件名核实, 旧名已消失）。④引用零残留：full basename（含版本日期）× 非 archive/非历史 = 0；stem 仅 README 归档段（有意）+ rename-fix-rereview 历史报告「历史文档」类别描述（豁免合理）。⑤**490 passed in 1.36s**（.venv Python 3.11.15; 483 为旧时点基线, 零回归）。⑥git 卫生：2 commit 各只含目标文件（156087b 仅 3×R100, 55502ac 仅 3 文件）, worktree clean, review-log/.review-level 未被 dev 改, 无 -A。⑦安全面：纯文档/路径/.hermes-project 指针, 源码零改动。附带闭环 OBS-1（工作区 .hermes-project.yaml handoff.doc 改名由 55502ac 完成）。1×🟢 记录项 OBS-4（范围外：features.md:126 测试数 483 未随 60381af 同步至 490）。**push origin main**。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| — | — | 无新增发现（范围外 1×🟢 记录 OBS-4） | — | — |
+
+### Positives
+
+- 归档用 R100 纯 rename 保历史（非 delete+add），git 可追溯, 0 内容改动
+- README 归档段刻意 partial stem + git ls-files 口径, 规避「索引自引用导致零残留误报」, 且 15 个相对链接全部 resolve
+- 引用修正以实盘文件存在性逐条核验（5/5 exists + 旧 handoff 名已消失），非信描述
+- 全量 490 零回归用项目 .venv（Python 3.11.15）; diff 精确 6 条无 -A 越界, review-log/.review-level 未被 dev 触碰
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| OBS-1 | 工作区 .hermes-project.yaml handoff.doc 改名（承上批挂账） | 🟢 | — | ✅ Closed (55502ac, 本轮闭环) |
+| OBS-4 | features.md:126 测试数 483 未随 60381af 同步至 490（范围外既有漂移） | 🟢 | — | ⏳ 待 dev/ops 后续同步 |
+
+---
+

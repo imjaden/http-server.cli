@@ -152,3 +152,13 @@ review_history:
     tracking: HS-SEC-023 (closed)
     scope: "Commit re-audit: HTTP-SERVER-CL002 复核 — SEC-023-1 set_domain 字符集校验 3 commits (03ca74b, 14e08cf, b33e2f1) — config.py _DOMAIN_RE 拒绝 shell 元字符 + set domain CLI 捕获 ValueError; 24 例新测试 (21 config + 3 CLI) + 483 全量零回归; --domain 注入不受影响 (config.json jaden.local 合法); 仅 6 文件, __version__ 1.3.0 未 bump; 附带确认 SEC-023-2 dk 残留已由 ops 清理 (services.json 2 条 intact)"
     report: documents/review/http-server-cli-cl002-sec023-1-domain-validation-rereview-v1.1-20260827.md
+  - date: 2026-09-08
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: PASS
+    score: 100
+    findings_total: 0
+    findings_open: 0
+    tracking: none
+    scope: "Commit audit: docs-consolidation 归档+索引批 2 commits (156087b docs@archive, 55502ac docs@sync) — P5 推广 #4 方案 A (窄幅归档+原位保留); 3 份 superseded 文档 R100 归档 documents/archive/root-20260908/ + README 11 主题索引 + features L55/L60 引用修正 + .hermes-project.yaml handoff.doc; 引用零残留, 490 tests green (.venv py3.11.15), 源码零改动; OBS-1 闭环 (handoff.doc 改名), 范围外 1×🟢 OBS-4 (features.md:126 测试数 483 未随 60381af 同步至 490)"
+    report: documents/review/http-server-cli-docs-consolidation-audit-v1.0-20260908.md
