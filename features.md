@@ -52,12 +52,12 @@
 11. 损坏检测 — 非空 JSON 语法错 / 合法 JSON 非 dict / services 非 list → `DataCorruptionError`（SEC-022-2）；bookmark 同规则 ✅
 12. 全局薄壳 `~/.local/bin/web` 转发 — 达成 `web <name>` 语法 ✅
 13. 推广 — skills/hs-web（命令速查 + 其他模块接入指南 + 真实实例 daily.checker/jaden.tech/线上站点），`hs prompt hs-web` 输出，镜像 ~/.hermes/profiles/ops/skills/devops/hs-web/ ✅ — HTTP-SERVER-CL002
-14. 关联文档: HTTP-SERVER-CL001 draft (cache/draft/TODO-20260826.md) / HTTP-SERVER-CL002 draft (cache/draft/TODO-20260827.md)
+14. 关联文档: HTTP-SERVER-CL001 review (documents/review/http-server-cli-web-registration-audit-v1.0-20260827.md) / HTTP-SERVER-CL002 review (documents/review/http-server-cli-cl002-web-domain-promo-audit-v1.0-20260827.md, documents/review/http-server-cli-cl002-sec023-1-domain-validation-rereview-v1.1-20260827.md)
 
 ## HTTP 服务
 
 1. 零外部依赖 — 仅 Python 3.12 标准库 ✅
-2. Range 请求支持 — 206 Partial Content，视频拖动进度条可用 ✅ — `documents/../references/range-request-support.md`
+2. Range 请求支持 — 206 Partial Content，视频拖动进度条可用 ✅ — dev skill: `~/.hermes/profiles/dev/skills/software-development/http-server-cli-dev/references/range-request-support.md`
 3. MIME 类型自动识别 — 基于文件扩展名 ✅
 4. 智能首页 — 无 index.html 时自动重定向到最近修改的 html ✅
 5. 自定义首页 — `-i <file>` 指定任意首页文件（支持子目录路径如 `build/index.html`）✅

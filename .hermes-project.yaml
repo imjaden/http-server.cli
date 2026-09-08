@@ -15,5 +15,5 @@ sessions:
   title: http-server-review
 handoff:
   enabled: true
-  doc: documents/handoff/handoff-http-server-review.md
+  doc: documents/handoff/handoff-http-server.cli-review.md
   updated_at: '2026-08-23'
