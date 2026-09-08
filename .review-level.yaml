@@ -162,3 +162,12 @@ review_history:
     tracking: none
     scope: "Commit audit: docs-consolidation 归档+索引批 2 commits (156087b docs@archive, 55502ac docs@sync) — P5 推广 #4 方案 A (窄幅归档+原位保留); 3 份 superseded 文档 R100 归档 documents/archive/root-20260908/ + README 11 主题索引 + features L55/L60 引用修正 + .hermes-project.yaml handoff.doc; 引用零残留, 490 tests green (.venv py3.11.15), 源码零改动; OBS-1 闭环 (handoff.doc 改名), 范围外 1×🟢 OBS-4 (features.md:126 测试数 483 未随 60381af 同步至 490)"
     report: documents/review/http-server-cli-docs-consolidation-audit-v1.0-20260908.md
+  - date: 2026-09-08
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: PASS
+    score: 100
+    findings_total: 0
+    findings_open: 0
+    tracking: OBS-4 (closed)
+    scope: "Commit audit: docs@sync features 测试数 483→490 (09b65aa) — OBS-4 闭环; diff 精确 1 行 (features.md:126 483→490), 实测 .venv pytest 490 passed, 工作树 clean, 无 -A, 源码零改动"

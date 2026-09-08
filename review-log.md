@@ -673,3 +673,36 @@ CL002 遗留 🟢 记录项 SEC-023-1 闭环（`set_domain` 字符集校验 defe
 
 ---
 
+## 2026-09-08 — Commit audit: docs@sync features 测试数 483→490（OBS-4 闭环）
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（提交审计 — 单行计数同步 + 全量测试回归）
+- **Scope**: 1 个未 push commit（09b65aa docs@sync），基底 origin/main 65c2d26
+- **Commit(s)**: 09b65aa
+- **Verdict**: ✅ PASS
+- **Score**: 100 / 100 (Rating: A)
+
+### Summary
+
+OBS-4 闭环：features.md:126 测试数 483→490 同步（本应随 60381af feat@web 同步而遗漏，上批挂账）。①diff 精确 1 行（1 insertion / 1 deletion，features.md 483→490），无越界文件。②实测 .venv pytest **490 passed in 1.37s**，与 features.md 计数逐字一致。③源码零改动（纯文档计数），无敏感信息变更。④git 卫生：工作树 clean，commit 仅含 features.md 单文件，无 -A。**push origin main**。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| — | — | 无新增发现 | — | — |
+
+### Positives
+
+- diff 精确 1 行，计数与实测 490 passed 逐字一致
+- 纯文档同步，源码零改动，无安全面变更
+- 工作树 clean，无 -A 越界
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| OBS-4 | features.md:126 测试数 483 未随 60381af 同步至 490（范围外既有漂移） | 🟢 | — | ✅ Closed (09b65aa, 本轮闭环) |
+
+---
+
