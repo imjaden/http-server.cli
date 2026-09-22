@@ -363,13 +363,18 @@ class TestWebPortFlag:
         assert svc['use_port'] is False and svc['port'] is None
 
     def test_add_rejects_out_of_range(self, capsys):
-        cli._COMMANDS['web'](None, ['add', 'cl003bad', '--cmd', 'echo hi', '--port', '99'])
+        """CL004 D3：用法错误统一 exit 2（原为软拒绝 rc=0）。"""
+        with pytest.raises(SystemExit) as exc:
+            cli._COMMANDS['web'](None, ['add', 'cl003bad', '--cmd', 'echo hi', '--port', '99'])
+        assert exc.value.code == 2
         assert ServiceStore().get('cl003bad') is None
         assert '1024-65535' in capsys.readouterr().err
 
     def test_add_rejects_mutually_exclusive(self, capsys):
-        cli._COMMANDS['web'](None, ['add', 'cl003mx', '--cmd', 'echo hi',
-                                    '--port', '9001', '--no-port'])
+        with pytest.raises(SystemExit) as exc:
+            cli._COMMANDS['web'](None, ['add', 'cl003mx', '--cmd', 'echo hi',
+                                        '--port', '9001', '--no-port'])
+        assert exc.value.code == 2
         assert ServiceStore().get('cl003mx') is None
         assert 'mutually exclusive' in capsys.readouterr().err
 

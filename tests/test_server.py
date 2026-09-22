@@ -125,7 +125,8 @@ class TestStart:
 
         mgr.start(path=temp_project)
         captured = capsys.readouterr()
-        assert 'cleaning up before restart' in captured.out
+        # CL004 D6：stale 文案三态一律 stderr（不污染 stdout / JSON 信封）
+        assert 'cleaning up before restart' in captured.err
 
     def test_start_invalid_path(self, capsys):
         mgr = ServerManager()
