@@ -115,16 +115,58 @@ def write_json(filepath: str, data: dict) -> None:
 
 # ── 端口检测 ────────────────────────────────────────────
 
-def is_port_in_use(port: int) -> bool:
-    """检测端口是否被占用（bind 检测，同时覆盖 IPv4 和 IPv6）。
+def _listening_ports() -> Optional[set]:
+    """darwin：一次性取「真实 LISTEN」端口集合；不可用返回 None（调用方回退 socket 探测）。
 
-    分别尝试 AF_INET 和 AF_INET6 绑定，任一失败即表示端口被占。
-    覆盖场景：IPv4-only、IPv6-only、双栈监听。
+    失败与「无监听」必须区分：lsof 无匹配时 rc=1 且 stdout 为空 ⇒ 空集（合法结果）；
+    lsof 缺失/超时/权限异常 ⇒ None ⇒ 调用方回退。
     """
+    if sys.platform != 'darwin':
+        return None
+    try:
+        result = subprocess.run(
+            ['lsof', '-iTCP', '-sTCP:LISTEN', '-P', '-n'],
+            capture_output=True, text=True, timeout=5,
+            encoding='utf-8', errors='ignore',
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+    if result.returncode != 0:
+        # 无匹配 ⇒ 空集；其余（stderr 有内容）⇒ 不可用
+        return set() if not result.stdout.strip() and not result.stderr.strip() else None
+    ports: set = set()
+    for line in result.stdout.strip().split('\n')[1:]:
+        parts = line.split()
+        if len(parts) >= 9:
+            name = parts[8]
+            if ':' in name:
+                port_str = name.rsplit(':', 1)[-1].rstrip(')')
+                if port_str.isdigit():
+                    ports.add(int(port_str))
+    return ports
+
+
+def is_port_in_use(port: int) -> bool:
+    """检测端口是否被占用。
+
+    macOS（darwin）主路径：以 lsof 的 **LISTEN 集合**为准（`_listening_ports()`）。
+    原因（HTTP-SERVER-CL004 实施实测）：BSD/macOS 的 `SO_REUSEADDR` 允许「不同本地地址
+    同端口」共存——wildcard 监听时 bind('127.0.0.1', port) 仍会成功，反之亦然——故纯
+    socket 探测会漏判「绑定地址与探测地址不同」的真实监听者（实测见设计 §13 偏差表）。
+    lsof LISTEN 只反映真实监听者，天然不受 TIME_WAIT 残留影响（O1 根因）。
+
+    回退路径（非 darwin 或 lsof 不可用）：socket 探测，同时覆盖 IPv4 与 IPv6，
+    并开启 SO_REUSEADDR 使残留态端口（TIME_WAIT / FIN_WAIT_2）不再被误判为占用。
+    对**同一地址上另一进程正在 LISTEN** 的端口，两族探测均会返回 EADDRINUSE（真占用不放宽）。
+    """
+    listening = _listening_ports()
+    if listening is not None:
+        return port in listening
     import socket
     for family in (socket.AF_INET, socket.AF_INET6):
         try:
             with socket.socket(family, socket.SOCK_STREAM) as s:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 s.settimeout(0.5)
                 s.bind(('', port))
         except OSError:
@@ -132,49 +174,44 @@ def is_port_in_use(port: int) -> bool:
     return False
 
 def get_all_occupied_ports() -> set:
-    """一次性获取所有 LISTEN 状态的端口号
+    """一次性获取所有 LISTEN 状态的端口号（darwin 用 lsof；不可用/其他平台返回空集）
 
     macOS:  调用 lsof 快速批量获取（100ms 级）
     其他平台: 回退到空集（find_available_port 会逐个检测）
     """
-    if sys.platform == 'darwin':
-        try:
-            result = subprocess.run(
-                ['lsof', '-iTCP', '-sTCP:LISTEN', '-P', '-n'],
-                capture_output=True, text=True, timeout=5,
-                encoding='utf-8', errors='ignore',
-            )
-        except subprocess.TimeoutExpired:
-            return set()
-        if result.returncode != 0:
-            return set()
-        ports: set = set()
-        for line in result.stdout.strip().split('\n')[1:]:
-            parts = line.split()
-            if len(parts) >= 9:
-                name = parts[8]
-                if ':' in name:
-                    port_str = name.rsplit(':', 1)[-1].rstrip(')')
-                    if port_str.isdigit():
-                        ports.add(int(port_str))
-        return ports
-    return set()
+    return _listening_ports() or set()
 
 def find_available_port(start_port: int) -> Optional[int]:
-    """从 start_port 递增查找空闲端口，MAX_PORT 封顶"""
+    """从 start_port 递增查找空闲端口，MAX_PORT 封顶
+
+    darwin 上优先用一次 lsof 快照比对（避免逐端口探测造成 N 次 lsof 调用）；
+    lsof 不可用时回退逐端口 socket 探测。
+    """
+    occupied = _listening_ports()
     port = start_port
     while port <= MAX_PORT:
-        if not is_port_in_use(port):
+        if occupied is not None:
+            if port not in occupied:
+                return port
+        elif not is_port_in_use(port):
             return port
         port += 1
     return None
 
-def get_pid_by_lsof(port: int) -> list:
-    """通过 lsof 获取占用端口的 PID 列表（仅 macOS）"""
+def get_pid_by_lsof(port: int, listen_only: bool = False) -> list:
+    """通过 lsof 获取占用端口的 PID 列表（仅 macOS）
+
+    listen_only=True 时仅取 LISTEN 状态的监听进程（追加 -sTCP:LISTEN），
+    用于监听者归属判定（HTTP-SERVER-CL004 D11）；默认 False 保持既有行为不变。
+    """
     if sys.platform != 'darwin':
         return []
+    cmd = ['lsof', '-i', f':{port}', '-P', '-n']
+    if listen_only:
+        cmd += ['-sTCP:LISTEN']
+    cmd += ['-F', 'p']
     result = subprocess.run(
-        ['lsof', '-i', f':{port}', '-P', '-n', '-F', 'p'],
+        cmd,
         capture_output=True, text=True,
         encoding='utf-8', errors='ignore',
     )
