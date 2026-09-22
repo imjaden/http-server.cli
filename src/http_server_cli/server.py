@@ -22,6 +22,7 @@ from http_server_cli.utils import (
     find_available_port,
     is_process_alive,
     get_process_info,
+    get_pid_by_lsof,
     resolve_path,
     LOG_DIR,
     MAX_PORT,
@@ -33,6 +34,33 @@ from http_server_cli.utils import (
 )
 
 from typing import Optional
+
+# ── CLI 用法错误（退出码 2） ──────────────────────────
+
+
+class UsageError(Exception):
+    """参数取值非法（如端口越界）——由 CLI 层转换为 exit 2（D4 / D9e）。"""
+
+
+# 内置服务保留端口（D2 / D16：占用与空闲两种措辞）
+RESERVED_PORTS = {8180: 'dashboard', 8181: 'mcp'}
+
+
+def describe_port_occupant(registry: Registry, port: int) -> str:
+    """端口占用者描述：'PID 1234 / ~/path'、'PID 1234' 或 '未知服务'（D1 / A3 文案口径）。"""
+    entry = registry.find(port=port)
+    if entry:
+        pid, path = entry.get('pid'), entry.get('path')
+        if pid and path:
+            return f'PID {pid} / {format_path(path)}'
+        if pid:
+            return f'PID {pid}'
+        if path:
+            return format_path(path)
+    pids = get_pid_by_lsof(port)
+    if pids:
+        return 'PID ' + '/'.join(str(p) for p in pids[:2])
+    return '未知服务'
 
 # ── index_page 校验 ──────────────────────────────────
 
@@ -77,17 +105,24 @@ class ServerManager:
 
     def start(self, path: Optional[str] = None, open_browser: bool = False,
               daemon: bool = False, foreground: bool = False, json: bool = False,
-              url_only: bool = False, index_page: Optional[str] = None) -> Optional[bool]:
+              url_only: bool = False, index_page: Optional[str] = None,
+              port: Optional[int] = None) -> Optional[bool]:
         """
         启动 HTTP 服务。
 
-        1. 检查 registry 中该路径是否已注册且存活 → 是则直接打开浏览器
-        2. 从默认端口递增查找空闲端口
-        3. 启动 python3 -m http.server 后台进程
-        4. 写入 registry
-        5. 可选打开浏览器
-        6. daemon 模式：前台 tail -f 日志，Ctrl+C 仅停止日志查看
-        7. foreground 模式：前台运行服务，Ctrl+C 终止服务进程
+        返回值契约（D14）：True = 成功（含幂等命中 / JSON / URL / daemon 各模式）；
+                            False = 运行期失败（CLI 层据此 exit 1）；端口越界抛 UsageError（CLI 层 exit 2）。
+
+        执行顺序链（CL003 §4.1：顺序即语义，不可重排）：
+        1. 路径存在性检查 → 不存在即失败
+        2. registry 中该路径是否已注册且存活 → 是则幂等返回既有端口（忽略 port 参数）
+        3. port 参数校验：区间(1024-65535) → 保留端口(8180/8181) → 占用（fail-closed，不漂移）
+           未给 port 时保持 config.port 递增查找
+        4. 启动 python3 -m http.server 后台进程
+        5. 写入 registry / history
+        6. 可选打开浏览器
+        7. daemon 模式：前台 tail -f 日志，Ctrl+C 仅停止日志查看
+        8. foreground 模式：前台运行服务，Ctrl+C 终止服务进程
         """
         path = path or '.'
         abs_path = resolve_path(path)
@@ -118,10 +153,12 @@ class ServerManager:
                     json_output(False, 'start', error=err)
                 else:
                     eprint(err, '❌')
-                return
+                return False
 
         domain = self.config.domain
-        default_port = self.config.port
+        # CLI -p/--port 优先（一次性生效，不回写 config.json；D3）
+        requested_port = port
+        default_port = port if port is not None else self.config.port
 
         if not os.path.isdir(abs_path):
             if url_only:
@@ -131,13 +168,17 @@ class ServerManager:
                 json_output(False, 'start', error=f'Path does not exist or is not a directory: {format_path(abs_path)}')
             else:
                 eprint(f'Path does not exist or is not a directory: {format_path(abs_path)}', '❌')
-            return
+            return False
 
         # ── 检查是否已注册且存活 ──
         entry = self.registry.find(path=abs_path)
         if entry:
             port = entry['port']
             if is_process_alive(entry.get('pid')) and is_port_in_use(port):
+                # 幂等优先（D5）：命中即返回既有端口，-p 被忽略（顺序链第 2 步先于第 3 步校验）
+                if requested_port is not None and requested_port != port:
+                    print(f'ℹ️ 已运行在 {port}（-p {requested_port} 未生效；如需换端口请先 hs kill {port}）',
+                          file=sys.stderr)
                 started_at = entry.get('started_at', '-')
                 duration = format_duration(started_at)
                 stats = get_process_stats(entry.get('pid'))
@@ -155,6 +196,7 @@ class ServerManager:
                         url += f'/{index_page}'
                     json_output(True, 'start', data={
                         'url': url,
+                        'port': port,
                         'path': abs_path,
                         'pid': entry.get('pid'),
                         'started_at': started_at,
@@ -182,7 +224,7 @@ class ServerManager:
                     elif entry.get('index_page') and entry.get('index_page') != 'index.html':
                         url += f'/{entry["index_page"]}'
                     webbrowser.open(url)
-                return
+                return True
 
             else:
                 if url_only:
@@ -191,8 +233,43 @@ class ServerManager:
                     eprint('Found stale registry entry, cleaning up before restart', '🔄')
                 self.registry.remove(path=abs_path)
 
+        # ── -p/--port 校验（顺序链第 3 步：仅在第 2 步幂等未命中时执行）──
+        if requested_port is not None:
+            # 3a 区间（D4 / D15：直绑上限 65535；自动漂移扫描另有 MAX_PORT=10000 上限，口径不同）
+            if requested_port < 1024 or requested_port > 65535:
+                msg = 'Port must be between 1024-65535'
+                if json:
+                    json_output(False, 'start', error=msg)
+                else:
+                    print(f'❌ {msg}', file=sys.stderr)
+                raise UsageError(msg)
+            # 3b 保留端口（D2 / D16：占用态与空闲态两种措辞）
+            if requested_port in RESERVED_PORTS:
+                role = RESERVED_PORTS[requested_port]
+                if is_port_in_use(requested_port):
+                    msg = (f'{requested_port} 为内置服务保留端口（{role} 正在使用，'
+                           f'{describe_port_occupant(self.registry, requested_port)}），请换端口')
+                else:
+                    msg = (f'{requested_port} 为内置服务保留端口（dashboard=8180 / mcp=8181），'
+                           f'如需启动请用 hs dashboard -p {requested_port}')
+                if json:
+                    json_output(False, 'start', error=msg)
+                else:
+                    print(f'⚠️ {msg}', file=sys.stderr)
+                return False
+            # 3c 占用（D1：fail-closed，不漂移）
+            if is_port_in_use(requested_port):
+                msg = (f'端口 {requested_port} 已被占用'
+                       f'（{describe_port_occupant(self.registry, requested_port)}）')
+                if json:
+                    json_output(False, 'start', error=msg)
+                else:
+                    print(f'⚠️ {msg}', file=sys.stderr)
+                    print(f'    💡 换端口: hs . -p <port>；或关闭: hs kill {requested_port}', file=sys.stderr)
+                return False
+
         # ── 查找可用端口 ──
-        port = find_available_port(default_port)
+        port = requested_port if requested_port is not None else find_available_port(default_port)
         if port is None:
             if url_only:
                 print(f'❌ Ports {default_port}-{MAX_PORT} all in use, cannot start', file=sys.stderr)
@@ -201,8 +278,8 @@ class ServerManager:
                 json_output(False, 'start', error=f'Ports {default_port}-{MAX_PORT} all in use, cannot start')
             else:
                 eprint(f'Ports {default_port}-{MAX_PORT} all in use, cannot start', '❌')
-            return
-        if not json and not url_only and port != default_port:
+            return False
+        if not json and not url_only and requested_port is None and port != default_port:
             eprint(f'Port {default_port} in use, auto-assigned port {port}', '🔀')
 
         # ── 启动后台进程 ──
@@ -226,7 +303,7 @@ class ServerManager:
                 json_output(False, 'start', error=f'Permission denied writing log or starting process: {e}')
             else:
                 eprint(f'Permission denied writing log or starting process: {e}', '❌')
-            return
+            return False
         except FileNotFoundError as e:
             if url_only:
                 print(f'❌ Python interpreter not found: {e}', file=sys.stderr)
@@ -235,7 +312,7 @@ class ServerManager:
                 json_output(False, 'start', error=f'Python interpreter not found: {e}')
             else:
                 eprint(f'Python interpreter not found: {e}', '❌')
-            return
+            return False
         except OSError as e:
             if url_only:
                 print(f'❌ System error (port/resource unavailable): {e}', file=sys.stderr)
@@ -244,7 +321,7 @@ class ServerManager:
                 json_output(False, 'start', error=f'System error (port/resource unavailable): {e}')
             else:
                 eprint(f'System error (port/resource unavailable): {e}', '❌')
-            return
+            return False
         except Exception as e:
             if url_only:
                 print(f'❌ Start failed: {e}', file=sys.stderr)
@@ -253,7 +330,7 @@ class ServerManager:
                 json_output(False, 'start', error=f'Start failed: {e}')
             else:
                 eprint(f'Start failed: {e}', '❌')
-            return
+            return False
 
         # ── 注册 ──
         started_at = timestamp()
@@ -285,6 +362,7 @@ class ServerManager:
                 url += f'/{index}'
             json_output(True, 'start', data={
                 'url': url,
+                'port': port,
                 'path': abs_path,
                 'pid': proc.pid,
                 'started_at': started_at,
@@ -312,7 +390,7 @@ class ServerManager:
                 eprint('Browser opened', '🌐')
 
         if json:
-            return  # JSON mode skips interactive behavior
+            return True  # JSON mode skips interactive behavior
 
         if url_only:
             return True  # URL mode skips interactive behavior
@@ -342,6 +420,8 @@ class ServerManager:
                     pass
                 self.registry.remove(port=port)
                 eprint(f'Service closed', '✅')
+
+        return True
 
     # ── list ───────────────────────────────────────────
 
@@ -514,14 +594,17 @@ class ServerManager:
 
     # ── kill ───────────────────────────────────────────
 
-    def kill(self, arg: str, json: bool = False) -> None:
-        """Stop specified service (by port or path)"""
+    def kill(self, arg: str, json: bool = False) -> bool:
+        """Stop specified service (by port or path)
+
+        返回值（D14）：True = 已处理（含进程已消失仅清登记）；False = 运行期失败（CLI 层据此 exit 1）。
+        """
         if not arg:
             if json:
                 json_output(False, 'kill', error='Please specify a port or path: kill <port|path>')
             else:
                 eprint('Please specify a port or path: kill <port|path>', '⚠️')
-            return
+            return False
 
         domain = self.config.domain
 
@@ -533,7 +616,7 @@ class ServerManager:
                     json_output(False, 'kill', error=f'Port {port} not registered')
                 else:
                     eprint(f'Port {port} not registered', 'ℹ️')
-                return
+                return False
         else:
             abs_path = resolve_path(arg)
             # html 文件路径 → 取其所在目录（registry 存的是目录路径）
@@ -545,7 +628,7 @@ class ServerManager:
                     json_output(False, 'kill', error=f'Path {arg} not registered')
                 else:
                     eprint(f'Path {arg} not registered', 'ℹ️')
-                return
+                return False
             port = entry['port']
 
         pid = entry.get('pid')
@@ -582,7 +665,7 @@ class ServerManager:
                     json_output(False, 'kill', error=f'No permission to kill process group PID: {pid}, manually run kill {pid}')
                 else:
                     eprint(f'No permission to kill process group PID: {pid}, manually run kill {pid}', '⚠️')
-                return
+                return False
         else:
             if not json:
                 eprint(f'Process {pid} no longer exists', 'ℹ️')
@@ -614,6 +697,7 @@ class ServerManager:
                 'killed': killed,
                 'log_removed': log_removed,
             })
+        return True
 
     # ── kill_all ───────────────────────────────────────
 

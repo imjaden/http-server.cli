@@ -113,19 +113,32 @@ class ServiceStore:
             return 'url must start with http:// or https://'
         return None
 
+    @staticmethod
+    def validate_port(port: Optional[int]) -> Optional[str]:
+        """校验端口区间（1024-65535，与 hs set port / hs start -p 同口径）。返回错误消息或 None。"""
+        if port is None:
+            return None
+        if isinstance(port, bool) or not isinstance(port, int):
+            return 'port must be an integer'
+        if port < 1024 or port > 65535:
+            return 'Port must be between 1024-65535'
+        return None
+
     # ── CRUD ──
 
     def add(self, name: str, cmd: str, url: Optional[str] = None,
             open_mode: str = 'url', use_domain: bool = False,
+            use_port: bool = False, port: Optional[int] = None,
             force: bool = False) -> None:
         """添加注册。
 
         force=True 时覆盖同名旧条目。
         url 归一化: '' 与 None 等价（动态端口服务不填）。
         use_domain=True 时执行注入 config.domain 到 cmd 末尾（--domain "<domain>"）。
+        use_port=True 时执行注入 --port <port> 到 cmd 末尾（D9b；use_port=False 时端口值不保留）。
 
         Raises:
-            ValueError: name 已存在；或 cmd/open_mode 非法。
+            ValueError: name 已存在；或 cmd/open_mode/port 非法。
         """
         err = self.validate_name(name)
         if err:
@@ -137,6 +150,9 @@ class ServiceStore:
         if err:
             raise ValueError(err)
         err = self.validate_url(url)
+        if err:
+            raise ValueError(err)
+        err = self.validate_port(port)
         if err:
             raise ValueError(err)
 
@@ -151,6 +167,8 @@ class ServiceStore:
             'url': url or None,
             'open': open_mode,
             'use_domain': bool(use_domain),
+            'use_port': bool(use_port),
+            'port': port if use_port else None,
             'created_at': timestamp(),
         })
         self._write_all(services)
@@ -166,13 +184,17 @@ class ServiceStore:
 
     def update(self, name: str, cmd: Optional[str] = None,
                url: Optional[str] = None, open_mode: Optional[str] = None,
-               use_domain: Optional[bool] = None) -> bool:
-        """更新注册的 cmd / url / open / use_domain。返回 True 表示成功，False 表示未找到。
+               use_domain: Optional[bool] = None,
+               use_port: Optional[bool] = None,
+               port: Optional[int] = None) -> bool:
+        """更新注册的 cmd / url / open / use_domain / use_port / port。返回 True 表示成功，False 表示未找到。
 
         - cmd=None: 保持原值
         - url=None: 保持原值。传空字符串 '' 清除 url。
         - open_mode=None: 保持原值。
         - use_domain=None: 保持原值。显式 True/False 设置。
+        - use_port=None: 保持原值。False（--no-port）同时清空 port 值（D9b）。
+        - port=None: 保持原值。传整数则设置 port 并自动 use_port=True。
         """
         services = self._read_all()
         for s in services:
@@ -194,6 +216,16 @@ class ServiceStore:
                     s['open'] = open_mode
                 if use_domain is not None:
                     s['use_domain'] = bool(use_domain)
+                if use_port is not None:
+                    s['use_port'] = bool(use_port)
+                    if not use_port:
+                        s['port'] = None  # --no-port 同清两字段（D9b / F-9）
+                if port is not None:
+                    err = self.validate_port(port)
+                    if err:
+                        raise ValueError(err)
+                    s['port'] = port
+                    s['use_port'] = True
                 self._write_all(services)
                 return True
         return False

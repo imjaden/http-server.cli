@@ -12,9 +12,63 @@ import webbrowser
 
 from http_server_cli import __version__
 from http_server_cli.config import Config
-from http_server_cli.server import ServerManager
+from http_server_cli.server import ServerManager, UsageError
 from http_server_cli.utils import eprint, ensure_storage
 import glob
+
+# ── 统一解析入口（D6 / D9e） ──────────────────────────
+
+# 未识别参数的近形引导（typo → 正确用法）
+_UNKNOWN_HINTS = (
+    (('-p', '--port', '--prot', '--portt', '--prt', '--post'), '指定端口: hs . -p <port>'),
+    (('-i', '--index', '--idx', '--indx'), '指定首页: hs . -i <file>'),
+    (('-d', '--daemon', '--demon', '--deamon'), '后台运行: hs . -d（前台 tail 日志，Ctrl+C 仅退出 tail）'),
+    (('-o', '--open', '--opne'), '启动后打开浏览器: hs . -o'),
+    (('-f', '--foreground', '--fg'), '前台运行: hs . -f'),
+    (('--json', '--jsonn'), 'JSON 输出: hs . --json'),
+    (('--url', '--urll'), '仅输出 URL: hs . --url'),
+)
+
+
+def _warn_unknown_args(unknown, *, allow=(), allow_html: bool = False,
+                       allow_positional: bool = False) -> list:
+    """未识别参数告警（D6）：仅 stderr，stdout / JSON 信封零污染，退出码不变。
+
+    allow            显式豁免的 token
+    allow_html       豁免 *.html / *.htm（hs start 多文件通配的既有语义）
+    allow_positional 豁免非 '-' 开头的 token（hs search 关键词等）
+    """
+    if not unknown:
+        return []
+    rest = [t for t in unknown
+            if t not in allow
+            and not (allow_html and str(t).lower().endswith(('.html', '.htm')))
+            and not (allow_positional and not str(t).startswith('-'))]
+    if not rest:
+        return []
+    print(f'⚠️ 未识别参数（已忽略）: {" ".join(rest)}', file=sys.stderr)
+    for tokens, hint in _UNKNOWN_HINTS:
+        if any(t in tokens for t in rest):
+            print(f'    💡 {hint}', file=sys.stderr)
+            break
+    return rest
+
+
+def _parse_known_args(parser, args, *, allow=(), allow_html: bool = False,
+                      allow_positional: bool = False):
+    """统一解析入口（D6 / D9e）：
+
+    · 参数错误（非法值 / 缺值）不再静默成功 → exit 2（P4：消灭「假成功」）
+    · 未识别参数告警到 stderr，不污染 stdout / JSON
+    """
+    try:
+        parsed, unknown = parser.parse_known_args(args)
+    except SystemExit as e:  # argparse 的报错路径（argparse 已打印具体错误）
+        code = e.code if isinstance(e.code, int) and e.code else 2
+        sys.exit(code)
+    _warn_unknown_args(unknown, allow=allow, allow_html=allow_html,
+                       allow_positional=allow_positional)
+    return parsed, unknown
 
 # ── 帮助文本 ──────────────────────────────────────────
 
@@ -27,16 +81,17 @@ _HELP = """http-server v{version} — 忘记端口，只管预览
   hs -o                    当前目录启动 + 打开浏览器
   hs ~/my-site -o          指定目录启动 + 打开浏览器
   hs . -i app.html         指定首页文件
-  hs . -d                  后台运行（不占用终端）
+  hs . -p 8099             指定端口（1024-65535；被占用即失败退出，不自动漂移）
+  hs . -d                  后台运行 + 前台 tail 日志（Ctrl+C 仅退出 tail，服务仍在后台）
   hs . --url               仅返回服务 URL（与 --json 互斥）
   hs                       默认等于 hs .（当前目录启动）
 
-  快捷方式: hs start [path]  启动服务;  -o 打开浏览器  -d 后台  -i <file> 首页
+  快捷方式: hs start [path]  启动服务;  -o 打开浏览器  -d 后台（前台 tail 日志）  -i <file> 首页  -p <port> 指定端口
 
 ━━━ 服务管理 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   hs list                  列出所有运行中的服务（端口/路径/PID/CPU/内存）
-  hs list --port           仅打印端口号清单
+  hs list --port           仅打印端口号清单（布尔开关；指定启动端口用 hs start -p <N>）
   hs list --path           仅打印路径清单
   hs list --short          打印"端口:路径"清单
   hs status 8080           查询端口 8080 状态
@@ -56,6 +111,8 @@ _HELP = """http-server v{version} — 忘记端口，只管预览
   hs dashboard --json      一次性查询服务列表
   hs dashboard stop        停止仪表盘
   hs dashboard status      查看仪表盘状态
+  hs dashboard restart     重启仪表盘（未运行时提示 not running，不启动）
+  hs dashboard restart -p 8290   用指定端口重启（未给 -p 则沿用当前端口）
   hs mcp                   启动 MCP Server（后台运行 SSE，AI Agent 集成）
   hs mcp stop              停止 MCP 服务
   hs mcp status            查看 MCP 状态
@@ -178,18 +235,18 @@ def _register(func):
 @_register
 def _cmd_start(manager, args):
     import os
-    parser = argparse.ArgumentParser(prog='hs start', add_help=False)
+    # allow_abbrev=False：避免 --prot 之类近形被当作 --port 缩写而静默生效（D6 告警需可命中）
+    parser = argparse.ArgumentParser(prog='hs start', add_help=False, allow_abbrev=False)
     parser.add_argument('path', nargs='?', default='.')
     parser.add_argument('-o', '--open', action='store_true')
     parser.add_argument('-d', '--daemon', action='store_true')
     parser.add_argument('-f', '--foreground', action='store_true')
     parser.add_argument('-i', '--index', nargs='*', default=None, help='首页文件名（默认 index.html）')
+    parser.add_argument('-p', '--port', type=int, default=None,
+                        help='指定端口（1024-65535，一次性覆盖 config.port；被占用即失败退出）')
     parser.add_argument('--json', action='store_true')
     parser.add_argument('--url', action='store_true')
-    try:
-        parsed, unknown = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, unknown = _parse_known_args(parser, args, allow_html=True)
     # ── --url 与 --json 互斥 ──
     # 注: CLI 层互斥错误也走 stderr，保证 "$(hs . --url 2>/dev/null)" 不受污染
     if parsed.url and parsed.json:
@@ -217,18 +274,25 @@ def _cmd_start(manager, args):
             existing = [f for f in all_html if os.path.exists(f)]
             if existing:
                 path = max(existing, key=os.path.getmtime)
-    result = manager.start(
-        path=path,
-        open_browser=parsed.open,
-        daemon=parsed.daemon,
-        foreground=parsed.foreground,
-        json=parsed.json if not parsed.url else False,
-        url_only=parsed.url,
-        index_page=index_page,
-    )
+    try:
+        result = manager.start(
+            path=path,
+            open_browser=parsed.open,
+            daemon=parsed.daemon,
+            foreground=parsed.foreground,
+            json=parsed.json if not parsed.url else False,
+            url_only=parsed.url,
+            index_page=index_page,
+            port=parsed.port,
+        )
+    except UsageError:
+        sys.exit(2)  # 端口越界等用法错误（D4 / D9e）
     # --url 模式根据返回值设置退出码
     if parsed.url:
         sys.exit(0 if result else 1)
+    # D14：运行期失败（路径不存在 / 端口不可用 / 启动失败）→ exit 1，不再「假成功」
+    if result is False:
+        sys.exit(1)
 
 @_register
 def _cmd_list(manager, args):
@@ -237,10 +301,7 @@ def _cmd_list(manager, args):
     parser.add_argument('--port', action='store_true')
     parser.add_argument('--path', action='store_true')
     parser.add_argument('--short', action='store_true')
-    try:
-        parsed, _ = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, _ = _parse_known_args(parser, args)
     _list_servers(manager, json=parsed.json, port_only=parsed.port,
                   path_only=parsed.path, short=parsed.short)
 
@@ -366,10 +427,7 @@ def _cmd_status(manager, args):
     parser = argparse.ArgumentParser(prog='hs status', add_help=False)
     parser.add_argument('--json', action='store_true')
     parser.add_argument('arg', nargs='?', default=None)
-    try:
-        parsed, _ = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, _ = _parse_known_args(parser, args)
     arg = parsed.arg
     # bookmark 名称解析：非 digit → 查 bookmark
     if arg and not arg.isdigit():
@@ -384,10 +442,7 @@ def _cmd_kill(manager, args):
     parser = argparse.ArgumentParser(prog='hs kill', add_help=False)
     parser.add_argument('arg', nargs='?', default=None)
     parser.add_argument('--json', action='store_true')
-    try:
-        parsed, unknown = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, unknown = _parse_known_args(parser, args, allow_html=True)
     arg = parsed.arg
     # 通配符展开处理：收集 Shell 展开的 html 文件，取最近者
     if arg and arg.lower().endswith(('.html', '.htm')):
@@ -397,7 +452,7 @@ def _cmd_kill(manager, args):
             if existing:
                 arg = max(existing, key=os.path.getmtime)
     if arg is None:
-        manager.kill('', json=parsed.json)
+        ok = manager.kill('', json=parsed.json)
     else:
         # bookmark 名称解析：非 digit 且非 html 文件 → 查 bookmark
         if arg and not arg.isdigit() and not arg.lower().endswith(('.html', '.htm')):
@@ -405,16 +460,16 @@ def _cmd_kill(manager, args):
             bm = BookmarkStore().get(arg)
             if bm:
                 arg = bm['path']
-        manager.kill(arg, json=parsed.json)
+        ok = manager.kill(arg, json=parsed.json)
+    if not ok:
+        # D14：运行期失败不再返回 0（对齐 Unix `kill <不存在进程>` 语义）
+        sys.exit(1)
 
 @_register
 def _cmd_kill_all(manager, args):
     parser = argparse.ArgumentParser(prog='hs kill-all', add_help=False)
     parser.add_argument('--json', action='store_true')
-    try:
-        parsed, _ = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, _ = _parse_known_args(parser, args)
     manager.kill_all(json=parsed.json)
 
 @_register
@@ -425,10 +480,7 @@ def _cmd_killall(manager, args):
 def _cmd_config(manager, args):
     parser = argparse.ArgumentParser(prog='hs config', add_help=False)
     parser.add_argument('--json', action='store_true')
-    try:
-        parsed, _ = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, _ = _parse_known_args(parser, args)
     Config().show(json=parsed.json)
 
 @_register
@@ -436,10 +488,7 @@ def _cmd_history(manager, args):
     """显示所有历史记录（过滤掉系统临时目录条目）"""
     parser = argparse.ArgumentParser(prog='hs history', add_help=False)
     parser.add_argument('--json', action='store_true')
-    try:
-        parsed, _ = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, _ = _parse_known_args(parser, args)
     from http_server_cli.history import HistoryStore
     from http_server_cli.utils import json_output, eprint
     history = HistoryStore()
@@ -496,10 +545,7 @@ def _cmd_search(manager, args):
     parser = argparse.ArgumentParser(prog='hs search', add_help=False)
     parser.add_argument('keyword', nargs='?', default=None)
     parser.add_argument('--json', action='store_true')
-    try:
-        parsed, _ = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, _ = _parse_known_args(parser, args, allow_positional=True)
     if not parsed.keyword:
         from http_server_cli.utils import eprint
         eprint('Usage: hs search <keyword>', '⚠️')
@@ -567,7 +613,16 @@ def _cmd_dashboard(manager, args):
     # 子命令优先
     sub = args[0] if args else None
     if sub in ('help', 'stop', 'status', 'restart'):
-        _manage_dashboard(sub, json_mode=('--json' in args))
+        # D9a：restart 支持 -p/--port 透传；其余子命令只接 --json
+        sp = argparse.ArgumentParser(prog=f'hs dashboard {sub}', add_help=False)
+        if sub == 'restart':
+            sp.add_argument('-p', '--port', type=int, default=None)
+        parsed_sub, _ = _parse_known_args(sp, args[1:], allow=('--json',))
+        sub_port = getattr(parsed_sub, 'port', None)
+        if sub_port is not None and not (1024 <= sub_port <= 65535):
+            eprint('Port must be between 1024-65535', '⚠️')
+            sys.exit(2)
+        _manage_dashboard(sub, json_mode=('--json' in args), port=sub_port)
         return
 
     parser = argparse.ArgumentParser(prog='hs dashboard', add_help=False)
@@ -575,18 +630,19 @@ def _cmd_dashboard(manager, args):
     parser.add_argument('-o', '--open', action='store_true')
     parser.add_argument('-d', '--daemon', action='store_true')
     parser.add_argument('--json', action='store_true')
-    try:
-        parsed, _ = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, _ = _parse_known_args(parser, args)
     from http_server_cli.dashboard import serve
     auto_daemon = parsed.daemon or parsed.open
     serve(port=parsed.port, open_browser=parsed.open,
           json_output_mode=parsed.json, daemon=auto_daemon)
 
 
-def _manage_dashboard(subcmd: str, json_mode: bool = False) -> None:
-    """管理 dashboard 服务：stop / status / restart / help"""
+def _manage_dashboard(subcmd: str, json_mode: bool = False, port=None) -> None:
+    """管理 dashboard 服务：stop / status / restart / help
+
+    port 形参仅 restart 使用（D9a：--port N 优先，未给则沿用 entry['port']，不再硬编码 8180）。
+    """
+    requested_port = port
     from http_server_cli.registry_managed import ManagedRegistry
     from http_server_cli.utils import eprint, format_duration, get_process_stats, is_process_alive, is_port_in_use, json_output
     import os, signal, time
@@ -675,10 +731,18 @@ def _manage_dashboard(subcmd: str, json_mode: bool = False) -> None:
 
     if subcmd == 'restart':
         from http_server_cli.dashboard import serve
-        serve(port=8180, open_browser=False, daemon=True)
+        if requested_port is not None:
+            if requested_port == 8181:
+                eprint('8181 为 mcp 保留端口；dashboard 请用 8180 或其他端口', '⚠️')
+                sys.exit(1)
+            if requested_port != 8180 and is_port_in_use(requested_port):
+                eprint(f'端口 {requested_port} 已被占用，请换端口（或先 hs kill {requested_port}）', '⚠️')
+                sys.exit(1)
+        restart_port = requested_port if requested_port is not None else (entry.get('port') or 8180)
+        serve(port=restart_port, open_browser=False, daemon=True)
         if json_mode:
             json_output(True, 'dashboard-restart', data={
-                'name': 'dashboard', 'port': port, 'restarted': True,
+                'name': 'dashboard', 'port': restart_port, 'restarted': True,
             })
 
 
@@ -811,10 +875,7 @@ def _cmd_mcp(manager, args):
     parser.add_argument('--transport', choices=['stdio', 'sse'], default='sse')
     parser.add_argument('--port', type=int, default=8181)
     parser.add_argument('--config', action='store_true')
-    try:
-        parsed, _ = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, _ = _parse_known_args(parser, args)
     if parsed.config:
         # 输出 mcpServers 接入配置片段（AI 工具一行接入）
         from http_server_cli.utils import json_output
@@ -962,10 +1023,7 @@ def _bookmark_add(args):
     parser.add_argument('-i', '--index', default=None)
     parser.add_argument('--force', action='store_true')
     parser.add_argument('--json', action='store_true')
-    try:
-        parsed, _ = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, _ = _parse_known_args(parser, args)
 
     from http_server_cli.bookmark import BookmarkStore, DataCorruptionError
     from http_server_cli.server import _validate_index_page
@@ -1046,10 +1104,7 @@ def _bookmark_add(args):
 def _bookmark_list(args):
     parser = argparse.ArgumentParser(prog='hs bookmark list', add_help=False)
     parser.add_argument('--json', action='store_true')
-    try:
-        parsed, _ = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, _ = _parse_known_args(parser, args)
 
     from http_server_cli.bookmark import BookmarkStore, DataCorruptionError
     from http_server_cli.utils import format_path, json_output
@@ -1089,10 +1144,7 @@ def _bookmark_show(args):
     parser = argparse.ArgumentParser(prog='hs bookmark show', add_help=False)
     parser.add_argument('name', nargs='?', default=None)
     parser.add_argument('--json', action='store_true')
-    try:
-        parsed, _ = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, _ = _parse_known_args(parser, args)
 
     from http_server_cli.bookmark import BookmarkStore, DataCorruptionError
     from http_server_cli.utils import format_path, json_output
@@ -1144,10 +1196,7 @@ def _bookmark_remove(args):
     parser = argparse.ArgumentParser(prog='hs bookmark remove', add_help=False)
     parser.add_argument('name', nargs='?', default=None)
     parser.add_argument('--json', action='store_true')
-    try:
-        parsed, _ = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, _ = _parse_known_args(parser, args)
 
     from http_server_cli.bookmark import BookmarkStore, DataCorruptionError
     from http_server_cli.utils import json_output
@@ -1190,10 +1239,7 @@ def _bookmark_update(args):
     parser.add_argument('path', nargs='?', default=None)
     parser.add_argument('-i', '--index', default=None)
     parser.add_argument('--json', action='store_true')
-    try:
-        parsed, _ = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, _ = _parse_known_args(parser, args)
 
     from http_server_cli.bookmark import BookmarkStore, DataCorruptionError
     from http_server_cli.server import _validate_index_page
@@ -1305,12 +1351,14 @@ def _web_help():
     print('━━━ hs web ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
     print('  注册任意 web 服务启动命令，按名称快速启动/访问')
     print()
-    print("  hs web add <name> --cmd '<cmd>' [--url <url>] [--open cmd|url|both|none] [--domain]")
+    print("  hs web add <name> --cmd '<cmd>' [--url <url>] [--open cmd|url|both|none] [--domain] [--port <N>]")
     print('      --cmd  启动命令（如 dk server start --daemon --open）')
     print('      --url  服务 URL（固定端口必填；动态端口不填，启动前未知）')
     print('      --open 开浏览器策略（默认 url: web 统一开; cmd: 命令自带 -o; both: 都试; none: 不开）')
     print('      --domain 执行时注入 config.domain 到 cmd 末尾（--domain "<domain>"）')
-    print('  hs web update <name> [--cmd ...] [--url ...] [--open ...] [--domain|--no-domain]')
+    print('      --port 执行时注入 --port <N> 到 cmd 末尾（1024-65535；与 --domain 同时开启时顺序为 domain 先 port 后）')
+    print('      --no-port 清除端口注入')
+    print('  hs web update <name> [--cmd ...] [--url ...] [--open ...] [--domain|--no-domain] [--port <N>|--no-port]')
     print('  hs web list [--json|--plain] [--sort-by name|cmd+url] / show <name> / remove <name>')
     print('  hs web <name> [--no-probe]   执行：已运行→直接访问；未运行→执行启动命令')
     print('      --no-probe 跳过探测，总是执行启动命令（强制重启）')
@@ -1326,12 +1374,13 @@ def _web_add(args):
     parser.add_argument('--open', dest='open_mode', default=None)
     parser.add_argument('--domain', action='store_true',
                         help='执行时注入 config.domain 到 cmd 末尾（--domain "<domain>"）')
+    parser.add_argument('--port', type=int, default=None,
+                        help='执行时注入 --port <N> 到 cmd 末尾（1024-65535，D9b）')
+    parser.add_argument('--no-port', dest='no_port', action='store_true',
+                        help='不注入端口（清除既有 port 配置）')
     parser.add_argument('--force', action='store_true')
     parser.add_argument('--json', action='store_true')
-    try:
-        parsed, _ = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, _ = _parse_known_args(parser, args)
 
     from http_server_cli.services import ServiceStore, DataCorruptionError
     from http_server_cli.utils import json_output
@@ -1377,11 +1426,27 @@ def _web_add(args):
         else:
             print(f'❌ {err}', file=sys.stderr)
         return
+    if parsed.no_port and parsed.port is not None:
+        err = '--port and --no-port are mutually exclusive'
+        if json_mode:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
+        return
+    err = ServiceStore.validate_port(parsed.port)
+    if err:
+        if json_mode:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
+        return
 
     store = ServiceStore()
     try:
         store.add(parsed.name, parsed.cmd, url=parsed.url,
                   open_mode=open_mode, use_domain=parsed.domain,
+                  use_port=parsed.port is not None and not parsed.no_port,
+                  port=parsed.port,
                   force=parsed.force)
         svc = store.get(parsed.name)
         if svc is None:  # pragma: no cover - add 成功后必然存在
@@ -1396,6 +1461,8 @@ def _web_add(args):
             print(f"   👁  Open: {svc.get('open', 'url')}")
             if svc.get('use_domain'):
                 print('   🏷  Domain: on (inject config.domain at run)')
+            if svc.get('use_port'):
+                print(f"   🔌 Port: on (inject --port {svc.get('port')} at run)")
     except ValueError as e:
         if json_mode:
             json_output(False, cmd, error=str(e))
@@ -1415,10 +1482,7 @@ def _web_list(args):
     parser.add_argument('--sort-by', dest='sort_by', default=None,
                         choices=['name', 'cmd+url'],
                         help='排序键（默认 name → cmd+url，a-z）')
-    try:
-        parsed, _ = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, _ = _parse_known_args(parser, args)
 
     from http_server_cli.services import ServiceStore, DataCorruptionError
     from http_server_cli.utils import json_output
@@ -1470,6 +1534,8 @@ def _web_list(args):
         line = f"     👁  Open: {svc.get('open', 'url')}"
         if svc.get('use_domain'):
             line += ' 🏷  Domain: on'
+        if svc.get('use_port'):
+            line += f" 🔌 Port: {svc.get('port')}"
         print(line)
         print()
 
@@ -1478,10 +1544,7 @@ def _web_show(args):
     parser = argparse.ArgumentParser(prog='hs web show', add_help=False)
     parser.add_argument('name', nargs='?', default=None)
     parser.add_argument('--json', action='store_true')
-    try:
-        parsed, _ = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, _ = _parse_known_args(parser, args)
 
     from http_server_cli.services import ServiceStore, DataCorruptionError
     from http_server_cli.utils import json_output
@@ -1524,6 +1587,8 @@ def _web_show(args):
     print(f"   👁  Open: {svc.get('open', 'url')}")
     if svc.get('use_domain'):
         print('   🏷  Domain: on (inject config.domain at run)')
+    if svc.get('use_port'):
+        print(f"   🔌 Port: on (inject --port {svc.get('port')} at run)")
     print(f"   🕐 Created: {svc.get('created_at', '-')}")
 
 
@@ -1531,10 +1596,7 @@ def _web_remove(args):
     parser = argparse.ArgumentParser(prog='hs web remove', add_help=False)
     parser.add_argument('name', nargs='?', default=None)
     parser.add_argument('--json', action='store_true')
-    try:
-        parsed, _ = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, _ = _parse_known_args(parser, args)
 
     from http_server_cli.services import ServiceStore, DataCorruptionError
     from http_server_cli.utils import json_output
@@ -1579,11 +1641,12 @@ def _web_update(args):
     parser.add_argument('--open', dest='open_mode', default=None)
     parser.add_argument('--domain', action='store_true')
     parser.add_argument('--no-domain', dest='no_domain', action='store_true')
+    parser.add_argument('--port', type=int, default=None,
+                        help='执行时注入 --port <N> 到 cmd 末尾（1024-65535，D9b）')
+    parser.add_argument('--no-port', dest='no_port', action='store_true',
+                        help='不注入端口（同时清除 port 值）')
     parser.add_argument('--json', action='store_true')
-    try:
-        parsed, _ = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, _ = _parse_known_args(parser, args)
 
     from http_server_cli.services import ServiceStore, DataCorruptionError
     from http_server_cli.utils import json_output
@@ -1610,8 +1673,10 @@ def _web_update(args):
         return
 
     if (parsed.cmd is None and parsed.url is None and parsed.open_mode is None
-            and not parsed.domain and not parsed.no_domain):
-        err = 'Nothing to update: pass --cmd / --url / --open / --domain / --no-domain'
+            and not parsed.domain and not parsed.no_domain
+            and parsed.port is None and not parsed.no_port):
+        err = ('Nothing to update: pass --cmd / --url / --open / --domain / --no-domain '
+               '/ --port / --no-port')
         if json_mode:
             json_output(False, cmd, error=err)
         else:
@@ -1634,6 +1699,20 @@ def _web_update(args):
             else:
                 print(f'❌ {err}', file=sys.stderr)
             return
+    if parsed.no_port and parsed.port is not None:
+        err = '--port and --no-port are mutually exclusive'
+        if json_mode:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
+        return
+    err = ServiceStore.validate_port(parsed.port)
+    if err:
+        if json_mode:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
+        return
 
     # --no-domain 优先（清除语义，对齐 --url ''）
     use_domain = None
@@ -1642,9 +1721,17 @@ def _web_update(args):
     elif parsed.domain:
         use_domain = True
 
+    # --no-port 优先（清除：use_port=False 且 port 同清，D9b / F-9）
+    use_port = None
+    if parsed.no_port:
+        use_port = False
+    elif parsed.port is not None:
+        use_port = True
+
     try:
         store.update(parsed.name, cmd=parsed.cmd, url=parsed.url,
-                     open_mode=parsed.open_mode, use_domain=use_domain)
+                     open_mode=parsed.open_mode, use_domain=use_domain,
+                     use_port=use_port, port=parsed.port)
         updated = store.get(parsed.name)
         if updated is None:  # pragma: no cover - update 成功后必然存在
             return
@@ -1658,6 +1745,8 @@ def _web_update(args):
             print(f"   👁  Open: {updated.get('open', 'url')}")
             if updated.get('use_domain'):
                 print('   🏷  Domain: on (inject config.domain at run)')
+            if updated.get('use_port'):
+                print(f"   🔌 Port: on (inject --port {updated.get('port')} at run)")
     except ValueError as e:
         if json_mode:
             json_output(False, cmd, error=str(e))
@@ -1675,10 +1764,7 @@ def _web_run(args):
     parser.add_argument('name', nargs='?', default=None)
     parser.add_argument('--no-probe', action='store_true')
     parser.add_argument('--json', action='store_true')
-    try:
-        parsed, _ = parser.parse_known_args(args)
-    except SystemExit:
-        return
+    parsed, _ = _parse_known_args(parser, args)
 
     from http_server_cli.services import ServiceStore, DataCorruptionError
     from http_server_cli.utils import (
@@ -1734,6 +1820,9 @@ def _web_run(args):
     if svc.get('use_domain'):
         from http_server_cli.config import Config
         cmd_line = f"{cmd_line} --domain \"{Config().domain}\""
+    # D9b：固定顺序 domain 先、port 后
+    if svc.get('use_port') and svc.get('port') is not None:
+        cmd_line = f"{cmd_line} --port {svc['port']}"
     result = subprocess.run(cmd_line, shell=True)
 
     # 启动后确认 + open（url/both 策略）
@@ -1810,10 +1899,20 @@ def main():
                 or os.path.exists(cmd) or glob.glob(cmd)):
             parsed.args = [parsed.command] + parsed.args
             cmd = 'start'
+        # ➌ 取值型 flag 的值被 argparse 误判为 positional（D8）：
+        #     hs -p 8089 → command='8089'/unknown=['-p']；hs -i a.html -p 8089 → command='a.html'/unknown=['-i']
+        #     按原顺序重组回 start 参数；有意不含 -o/-d/-f（布尔 flag 无「值泄漏」场景）
+        elif unknown and any(t in ('-p', '--port', '-i', '--index') for t in unknown):
+            parsed.args = unknown + [parsed.command] + parsed.args
+            cmd = 'start'
         else:
             eprint(f'Unknown command: {cmd}', '❌')
             _cmd_help(None, [])
             sys.exit(1)
+
+    # 未识别参数告警（D6）：start 由子命令层负责（其 unknown 承载多 html 文件通配语义）
+    if cmd in _COMMANDS and cmd != 'start' and unknown:
+        _warn_unknown_args(unknown, allow=('-h', '--help', '-v', '--version'))
 
     ensure_storage()
     manager = ServerManager()
