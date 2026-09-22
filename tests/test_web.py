@@ -341,8 +341,10 @@ class TestWebCliListShowRemoveUpdate:
         assert [s['name'] for s in result['data']['services']] == ['a', 'b']
 
     def test_list_sort_by_invalid_choice(self, capsys):
-        # parse_known_args 吞掉 argparse SystemExit，静默返回（与 add 一致）
-        _COMMANDS['web'](None, ['list', '--sort-by', 'bogus'])
+        # D9e / P4：参数错误不再静默成功 → exit 2（argparse 错误只走 stderr，stdout 保持干净）
+        with pytest.raises(SystemExit) as exc_info:
+            _COMMANDS['web'](None, ['list', '--sort-by', 'bogus'])
+        assert exc_info.value.code == 2
         assert capsys.readouterr().out == ''
 
     def test_show(self, capsys):
