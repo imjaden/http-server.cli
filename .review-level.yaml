@@ -202,3 +202,57 @@ review_history:
     tracking: HTTP-SERVER-CL003 (AUD-1 🟡 随 O1 另批; AUD-2/AUD-3 🟢 记录)
     scope: "Implementation audit: HTTP-SERVER-CL003 -p/--port + 退出码三态 + dashboard/web 端口面 (commits 3919da7/484e0ec/8f041cd/231452e) — 535 tests green, 四同步实测核对(非 commit subject), 数据目录审计前后无污染; 1×🟡 AUD-1 顶层 -i<CWD存在文件>+-p 边界, 2×🟢 AUD-2 web 软拒绝 rc=0 / AUD-3 stale-entry 留孤儿(O1 同源)"
     report: documents/review/http-server-cli-cl003-audit-v1.0-20260922.md
+  - date: 2026-09-22
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: CONDITIONAL_PASS
+    score: 90
+    findings_total: 9
+    findings_open: 9
+    tracking: HTTP-SERVER-CL004 (F-1~F-2, R-1~R-7)
+    scope: "Design doc review: http-server-port-residual-design-v1.0-20260922.md (commit 6edb021) — 端口探测假占用根因 + -i 泄漏 + web 退出码 + stale 孤儿; 根因 P1-P4 实测成立, D1-D8 核心正确, 2 必改(F-1 D6 文案通道自相矛盾/F-2 A4 孤儿检测口径)+7 记录(R-1~R-7), 回 ops 设计 v1.1 后 rereview"
+    report: documents/review/http-server-cli-cl004-design-review-v1.0-20260922.md
+    resolved_by: "rereview v1.1 (2026-09-22) — CONDITIONAL_PASS 93/100: F-1 闭合, F-2 部分闭合(A4 补强 3 子点待 v1.2), 回 ops 设计 v1.2"
+  - date: 2026-09-22
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: CONDITIONAL_PASS
+    score: 93
+    findings_total: 3
+    findings_open: 3
+    tracking: HTTP-SERVER-CL004 (F-2 残留, R-8~R-9)
+    scope: "Design doc rereview: http-server-port-residual-design-v1.1-20260922.md (commit 3b0d37a) — F-1 闭合/R-1~R-7 落实; F-2 方向修正但 A4 判据残留 1 必改(3 子点: registry.json 路径+禁 hs list --json / 逐端口枚举范围 / pid 同一性断言), 2 记录(R-8 A11 dead-entry 手法 / R-9 R-7 lsof LISTEN 过滤口径), 回 ops 设计 v1.2"
+    report: documents/review/http-server-cli-cl004-design-rereview-v1.0-20260922.md
+    resolved_by: "rereview v1.2 (2026-09-22) — CONDITIONAL_PASS 95/100: F-2(a)(b)(c) 闭合、R-8/R-9 落实; 新 🟡 F-3 路径解析口径声明待 v1.3"
+  - date: 2026-09-22
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: CONDITIONAL_PASS
+    score: 95
+    findings_total: 4
+    findings_open: 1
+    tracking: HTTP-SERVER-CL004 (F-3; 待确认 1~3)
+    scope: "Design doc rereview: http-server-port-residual-design-v1.2-20260922.md (commit 6017695) — F-2(a)(b)(c) 全闭合/R-8·R-9 落实; 新 🟡 F-3 A4/A10/A11 <tmpdir> 未声明解析后 abs_path 口径(macOS /var→/private/var 符号链接), 3 🟢 待确认(子串匹配/反证概率/采集时序), 回 ops 设计 v1.3"
+    report: documents/review/http-server-cli-cl004-design-rereview-v1.0-20260922-round2.md
+    resolved_by: "rereview v1.3 (2026-09-22) — CONDITIONAL_PASS 96/100: F-3 闭合、待确认 2/3 得当; 待确认 1 部分闭合(harness token 匹配闭合, 生产 §4.4 ⊙2 仍 in → 新 🟡 F-4 待 v1.4)"
+  - date: 2026-09-22
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: CONDITIONAL_PASS
+    score: 96
+    findings_total: 4
+    findings_open: 1
+    tracking: HTTP-SERVER-CL004 (F-4; R-10~R-12)
+    scope: "Design doc rereview: http-server-port-residual-design-v1.3-20260922.md (commit c7e2afb) — F-3 闭合(§8 头注口径声明+A4/A5/A11 三模板一致, 恒False 实证 equal=False + resolve 幂等坐实 A11 可命中); 待确认 2/3 得当; 待确认 1 部分闭合(§8 token 匹配闭合 harness, §4.4 ⊙2 仍 in → 新 🟡 F-4 生产 kill 门自相矛盾/误杀边界, 回 ops 设计 v1.4); 3 🟢 记录 R-10/R-11/R-12"
+    report: documents/review/http-server-cli-cl004-design-rereview-v1.0-20260922-round3.md
+    resolved_by: "rereview v1.4 (2026-09-22) — PASS 100/100, F-4 闭合 + R-10/R-11/R-12 落实"
+  - date: 2026-09-22
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: PASS
+    score: 100
+    findings_total: 0
+    findings_open: 0
+    tracking: HTTP-SERVER-CL004 (F-4/R-10~R-12 closed; R-13 🟢 记录)
+    scope: "Design doc rereview: http-server-port-residual-design-v1.4-20260922.md (commit f3db2d0) — F-4 闭合(§4.4 ⊙2 kill 门改 §8 同口径 token 精确匹配, abs_path in parts 列表成员判定=完全相等, 源码 get_process_info/utils.py:205 + abs_path=resolve_path/server.py:128 + runner 双 token/server.py:291-292 坐实, 全文零残留 in 子串); R-10/R-11/R-12 落实(反证端口判定/pid 集合稳定/§0.3 补 A5); v1.4 增量无新必改, 1×🟢 措辞级 R-13; PASS 100/100, pushed"
+    report: documents/review/http-server-cli-cl004-design-rereview-v1.0-20260922-round4.md

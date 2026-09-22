@@ -844,4 +844,226 @@ OBS-4 闭环：features.md:126 测试数 483→490 同步（本应随 60381af fe
 | AUD-2 | web 软拒绝 rc=0 口径 | 🟢 | — | 记录 |
 | AUD-3 | stale-entry 清理留孤儿（O1 同源） | 🟢 | — | 记录（并入 O1） |
 
+---
+
+## 2026-09-22 — Design doc review: HTTP-SERVER-CL004 端口探测假占用根因 + CL003 遗留三项（-i 泄漏/web 退出码/stale 孤儿）
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（设计评审 — 只审设计文档与现状事实，不审实现）
+- **Scope**: 1 个未 push commit（6edb021 docs@design），基底 origin/main c58f222（ahead 1）；被审对象 documents/http-server-port-residual-design-v1.0-20260922.md（242 行）
+- **Commit(s)**: 6edb021
+- **Verdict**: ⏳ CONDITIONAL PASS
+- **Score**: 90 / 100 (Rating A-)
+- **Report**: documents/review/http-server-cli-cl004-design-review-v1.0-20260922.md
+
+### Summary
+
+设计 v1.0 四项根因（P1–P4）全部源码 + 独立实测双证成立：P1 `is_port_in_use` 裸 bind 无 SO_REUSEADDR（socket 级反例实测：TIME_WAIT 裸 bind FAIL(48)/SO_REUSEADDR OK，真 LISTEN 两者均 FAIL(48) ⇒ 不放宽真占用）；P2 main() ➋路径快捷方式先于➌重组（`hs -i index.html(CWD存在) -p <port> <dir>` 实测「未识别参数(忽略 <dir>) + -i 被当 path」vs `-i no-such` 形态 -i 保留/path=tmp）；P3 web 校验失败 rc=0（`--port 99`/`--port 9001 --no-port` 均 exit 0 实测）；P4 stale 只删登记不 kill（同目录并发两次 `hs <dir> -d --url` 5 次尝试 4 次复现孤儿，含「registry 0 条可见 + 1 listener」完全隐形形态）。八项决策（D1–D8）核心正确：D1 反例实测、D2 五形态推演无破坏、D3 落点可落地（`_cmd_web` 直调无 try/except，`sys.exit(2)` 穿透）、D4/D5 三态边界大体覆盖、D7 并入未发布 1.4.0 合理、D8 四同步方向正确。基线：535 passed 零回归、`hs version` v1.4.0、工作树 clean。
+
+2 处必改 + 7 处记录，均非方向性冲突、非阻断。按治理规范：不提交、不 push，回 ops 出设计 v1.1 修订后 rereview。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| F-1 | 🟡 | D6「两者均不污染 stdout（其余沿用现状）」自相矛盾：json/默认 模式 stale 文案经 eprint 写 stdout 污染 JSON 信封（实测 JSONDecodeError） | 设计 D6/§4.4 | ⏳ 待 ops 修复 |
+| F-2 | 🟡 | §8 A4 孤儿检测口径不足：「该路径 1 条 + ps 同名」无法捕获「registry 0 条可见 + 1 listener」隐形孤儿（list --json 按 _alive 过滤死 pid） | 设计 §8 A4 | ⏳ 待 ops 修复 |
+| R-1 | 🟢 | CHANGELOG 1.4.0 `### Notes`（L26）「假占用 本批不修（O1）」须随 `### Fixed` 同步删除/更新 | 设计 §6/§9 | 记录 |
+| R-2 | 🟢 | spec.yaml 仅补 P1/P4 场景，P3（web 退出码）/P2（分支序）未入 spec | 设计 §6/§9 | 记录 |
+| R-3 | 🟢 | §7 T2「留 TIME_WAIT」未指定关闭方向（需服务端主动 close） | 设计 §7 T2 | 记录 |
+| R-4 | 🟢 | §4.4 伪码 killpg(pid) 未定 SIGTERM→SIGKILL 升级 + getpgid 取值（prose/伪码不一致） | 设计 §4.4 | 记录 |
+| R-5 | 🟢 | D4 宽限后 kill 前应再判 is_port_in_use（避免 kill 刚就绪慢绑定 runner） | 设计 §4.4 | 记录 |
+| R-6 | 🟢 | pid 复用边界（signal-0 无法区分复用 pid，killpg 理论误杀） | 设计 §4.4 | 记录 |
+| R-7 | 🟢 | ② 宽限轮询仅端口级判定，未验证监听者 pid | 设计 §4.4 | 记录 |
+
+### Positives
+
+- P1 用 socket 级反例实测（TIME_WAIT vs 真 LISTEN × 裸 bind vs SO_REUSEADDR）证明 D1 只放宽残留态、不放宽真占用，判据非恒真
+- P4 用并发两次 `hs <dir> -d --url` 5 次尝试独立复现孤儿，并发现设计 §1 未覆盖的「完全隐形孤儿」形态（registry 0 条可见 + 1 listener）
+- D2 五形态逐形态推演（含 `-p`/`-i`/路径/`-o`/无路径），确认无破坏性快捷方式回归；D3 落点核到 `_cmd_web` 分派无 try/except 包裹
+- D1 调用点全量 grep（server/registry/registry_managed/dashboard/cli/mcp 共 12 处），与设计「调用方不变」清单无遗漏
+- 基线 535 passed 零回归 + 版本三处 1.4.0 + 真实数据目录审计前后无 cl004 残留
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| F-1 | D6 文案通道自相矛盾（json 污染） | 🟡 | P1 | ⏳ 待 ops 修复 |
+| F-2 | A4 孤儿检测口径不足 | 🟡 | P1 | ⏳ 待 ops 修复 |
+| R-1~R-7 | 记录项（7 条） | 🟢 | P2 | ⏳ 记录，同批勘误 |
+
+---
+
+## 2026-09-22 — Design doc rereview: HTTP-SERVER-CL004 设计 v1.1（F-1/F-2 复审 + R-1~R-7 处置）
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（设计复审 — 只审设计文档与现状事实，不审实现）
+- **Scope**: 1 个未 push commit（3b0d37a docs@design 设计 v1.1），被审对象 documents/http-server-port-residual-design-v1.1-20260922.md（304 行）
+- **Commit(s)**: 3b0d37a
+- **Verdict**: ⏳ CONDITIONAL PASS
+- **Score**: 93 / 100 (Rating A)
+- **Report**: documents/review/http-server-cli-cl004-design-rereview-v1.0-20260922.md
+
+### Summary
+
+设计 v1.1 闭合 F-1：D6 重写为「stale/宽限/kill 三态一律 `print(..., file=sys.stderr)`」并删净「其余沿用现状」（grep 确认仅 §0/D6 行提及旧文）；污染点坐实（`server.py:229-234` json/默认走 `eprint`→stdout，`utils.py:33-38` eprint 实写 stdout）；§4.4 L171 伪码唯一文案出口为 stderr；幂等路径（①）标注「不变（既有三态输出）」且实测 `server.py:174-227` 无新 stdout 污染，§4.5 通道表三态一致。R-1~R-7 逐条源码核对到位：R-4 对齐 `server.py:645-651`（getpgid→SIGTERM→0.5s→SIGKILL）、R-6 依赖的 `get_process_info`（`utils.py:205`）+ runner 命令行双 token（`server.py:292`）实存、R-7 监听者核验落点明确、R-1（CHANGELOG L26「本批不修/另批处理」）/R-2（spec cli-interface）/R-3（T2 服务端主动 close）均落实。
+
+F-2 方向已修正（lsof LISTEN 端口级判据 + 删除 `ps` 判据 + 修前反证非恒真），但 A4 判据残留 1 处必改（3 子点）：① 显式写 registry.json 绝对路径 `~/.http-server.cli/registry.json` 并禁 `hs list --json`（`cli.py:321` 按 `_alive` 过滤死 pid 条目，且 §8 A10 仍用过滤视图不自洽）；② 明确「逐端口」枚举范围（可见孤儿 listener 落另一端口，须全量 LISTEN 端口 × registry pid 交叉比对）；③ 补 pid 同一性断言（lsof LISTEN pid == registry 条目 pid），消除「1 dead-pid entry + 1 orphan listener」计数相等(1==1)假阴性。另 2 处 🟢 记录（R-8 A11 dead-entry 手法未写明 / R-9 R-7 与 A4 的 lsof LISTEN 过滤口径差异）。
+
+按治理规范：不提交、不 push，回 ops 出设计 v1.2 补强 A4 后再次 rereview。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| F-2 残留 | 🟡 | A4 判据仍需补强三处：显式 registry.json 路径+禁 hs list --json / 明确逐端口枚举范围 / 补 pid 同一性断言（消除 1==1 计数假阴性） | 设计 §8 A4 | ⏳ 待 ops v1.2 |
+| R-8 | 🟢 | A11「构造 dead entry」手法未写明，不可复跑（应给 registry.json 写死 pid entry 的 recipe） | 设计 §8 A11 / §7 T11 | 记录 |
+| R-9 | 🟢 | R-7 用 get_pid_by_lsof（无 -sTCP:LISTEN）与 A4 的 -sTCP:LISTEN 口径不一致 | 设计 §4.4 ② | 记录 |
+
+### Positives
+
+- F-1 闭环证据链完整：eprint 通道坐实（`utils.py:33-38`）+ 污染点代码定位（`server.py:229-234`）+ D6 重写 + §4.4 L171 stderr + 幂等路径未误改，逐态可执行
+- R-1~R-7 七项全部源码核对到位（R-4 对齐 `server.py:645-651`、R-6 依赖函数/命令行双 token 实存），非仅文案声明
+- F-2 方向正确：lsof LISTEN 端口级判据 + 删除 `ps` 同名判据 + 修前反证非恒真，捕获「可见/隐形」两种形态的机制成立
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| F-2 残留 | A4 判据补强三处（path/逐端口/pid 同一性） | 🟡 | P1 | ⏳ 待 ops v1.2 |
+| R-8 | A11 dead-entry 手法 recipe | 🟢 | P2 | 记录 |
+| R-9 | R-7 lsof LISTEN 过滤口径 | 🟢 | P2 | 记录 |
+
+---
+
+## 2026-09-22 — Design doc rereview: HTTP-SERVER-CL004 设计 v1.2（F-2(a)(b)(c) 闭合 + R-8/R-9 落实）
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（设计复审 — 只审设计文档与现状事实，不审实现）
+- **Scope**: 1 个未 push commit（6017695 docs@design 设计 v1.2），被审对象 documents/http-server-port-residual-design-v1.2-20260922.md（325 行）
+- **Commit(s)**: 6017695
+- **Verdict**: ⏳ CONDITIONAL PASS
+- **Score**: 95 / 100 (Rating A)
+- **Report**: documents/review/http-server-cli-cl004-design-rereview-v1.0-20260922-round2.md
+
+### Summary
+
+设计 v1.2 逐点闭合上轮 F-2 残留三子点，R-8/R-9 落实到位。F-2(a)：§8 头注写明 `~/.http-server.cli/registry.json`（utils.py:23 REGISTRY_PATH，实测 DATA_DIR 一致）+ 显式禁 `hs list --json` + A10 改原始 `json.load` 读文件 + A5 连带从「hs list --json path 一致」改「读 registry.json」——全文 grep `hs list|list --json|_alive` 12 处逐条核验，仅修订表/规则/A10 提及，§7/A9/§12 零残留。F-2(b)：`lsof -nP -iTCP -sTCP:LISTEN -F p` 实测 23 pid（跨全端口，含孤儿另一端口）；归属规则双 token（runner.py + abs_path，server.py:291-292）唯一定位，`hs list` 不 spawn runner、判定用 per-pid `ps -o args=` 非 grep 管道 ⇒ 无恒真/恒假风险。F-2(c)：`len(R)==1` 前置（显式）+ `O == R_pids == {该条目 pid}` 同一性，`∅==∅` 恒真排除；可见形态（O={A,B}⊋{B}=R_pids）/隐形形态（R_pids=∅，O={A}≠∅）反证推演均成立。R-8：A11 recipe 四步可复跑，`started_at` 非必需（registry.py:26-40 加载仅 read_json+servers 兜底，stale 路径不读 started_at）。R-9：`get_pid_by_lsof(port, listen_only=True)` 追加 `-sTCP:LISTEN` 实测 rc=0 有效，N9 成立（调用点 server.py:60/520 均不传第二参，默认 False 不变），T13 覆盖差异。
+
+新增 1 🟡 必改 F-3：A4③/A10/A11 的 `<tmpdir>` 未声明「解析后 abs_path」口径。macOS `/var`→`/private/var`、`/tmp`→`/private/tmp` 符号链接使 `mkdtemp()` 返回 `/var/folders/...`（实测 equal: False vs realpath），而 server.py:128 `abs_path=resolve_path(path)`（Path.resolve()）+ registry.add(path=abs_path)+runner 命令行均用解析路径 ⇒ `path == <tmpdir>`（原始）恒 False（A4 假失败）、A11 注入 `"path":"<tmpdir>"` 永不命中（find(path=abs_path) 不匹配，stale 不触发）。单行口径声明即可收口。
+
+按治理规范：不提交、不 push，回 ops 出设计 v1.3 补强 F-3 后收口。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| F-3 | 🟡 | A4③/A10/A11 的 `<tmpdir>` 未声明解析后 abs_path 口径（macOS /var→/private/var 符号链接 ⇒ path==<tmpdir> 恒 False、A11 注入永不命中） | 设计 §8 A4③/A10/A11 + 头注归属规则 | ⏳ 待 ops v1.3 |
+| 待确认 1 | 🟢 | 归属规则 `abs_path in command` 子串匹配对前缀/嵌套路径（/tmp/foo vs /tmp/foobar）过度包含（harness 假失败；生产 ⊙2 理论误杀边界） | 设计 §8 归属规则 / §4.4 ⊙2 | 待确认 |
+| 待确认 2 | 🟢 | A4 修前反证依赖 <100ms 双启动复现竞态（5 次 4 次），1/5 未复现时反证假失败 | 设计 §8 A4 修前反证 | 待确认 |
+| 待确认 3 | 🟢 | A4 采集 O/L 前需等 runner 达 LISTEN（--url 在 registry.add 后立即返回） | 设计 §8 A4 | 待确认 |
+
+### Positives
+
+- F-2(a)(b)(c) 逐点以源码 + 实测双证闭合（registry 路径 utils.py:23 / lsof 全量 23 pid / 归属规则 server.py:291-292 / len(R)==1 前置 + 反证推演），非仅文案声明
+- R-8/R-9 均实证：registry 加载逻辑坐实 started_at 非必需；`-sTCP:LISTEN` 写法实测 rc=0；N9 调用点 grep 复核（server.py:60/520）
+- A5 连带清除 `hs list --json` 过滤视图（超出 F-2(a) 点名范围，bonus 一致性）
+- §0.2 已闭合标注与上轮结论逐项一致；v1.2 增量无方向性冲突/自相矛盾/恒真断言，D11 与 N9 自洽
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| F-2(a)(b)(c) | A4 判据补强三处（path/逐端口/pid 同一性） | 🟡 | P1 | ✅ Closed（v1.2 逐点闭合） |
+| R-8 | A11 dead-entry 手法 recipe | 🟢 | P2 | ✅ Closed（v1.2 落实） |
+| R-9 | R-7 lsof LISTEN 过滤口径 | 🟢 | P2 | ✅ Closed（v1.2 D11 + T13 落实） |
+| F-3 | A4/A10/A11 路径解析口径声明 | 🟡 | P1 | ✅ Closed（v1.3 §8 头注口径声明 + A4/A5/A11 三模板一致） |
+| 待确认 2 | 反证样本口径（幂等命中剔除） | 🟢 | P2 | ✅ Closed（v1.3 可判，处置得当） |
+| 待确认 3 | 采集前等 runner 达 LISTEN | 🟢 | P2 | ✅ Closed（v1.3 ≤2.0s 就绪等待，超时诚实弃样） |
+| 待确认 1 | 子串匹配过度包含 | 🟢 | P2 | ⏳ 部分闭合 → v1.4（§8 token 匹配闭合 harness；§4.4 ⊙2 仍 `in`，转 F-4） |
+
+---
+
+## 2026-09-22 — Design doc rereview: HTTP-SERVER-CL004 设计 v1.3（F-3 闭合 + 3 待确认处置）
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（设计复审 — 只审设计文档与现状事实，不审实现）
+- **Scope**: 1 个未 push commit（c7e2afb docs@design 设计 v1.3），被审对象 documents/http-server-port-residual-design-v1.3-20260922.md（335 行）
+- **Commit(s)**: c7e2afb
+- **Verdict**: ⏳ CONDITIONAL PASS
+- **Score**: 96 / 100 (Rating: A)
+- **Report**: documents/review/http-server-cli-cl004-design-rereview-v1.0-20260922-round3.md
+
+### Summary
+
+设计 v1.3 闭合上轮唯一必改 F-3：§8 头注（L267）新增「路径口径（F-3，强制）」声明 `<tmpdir>` 一律指 `resolve_path(<tmpdir>)`（`Path.resolve()`）+ 命令模板；A4（L276）/A5（L277）/A11（L283）三处命令模板逐处改用 `$TD`（解析后）。口径与源码实际写入值逐字核对一致：`utils.py:285-287 resolve_path = str(Path(...).resolve())`、`server.py:128 abs_path = resolve_path(path)`、`server.py:337-341 registry.add(path=abs_path)`、`server.py:291-292` runner 命令行含 `abs_path`、`server.py:174 find(path=abs_path)`。「恒 False」论断经实证坐实：`mkdtemp()=/var/folders/…` vs `resolve()=/private/var/folders/…` **equal: False**（`/var→private/var`、`/tmp→private/tmp` 均 symlink）；`resolve_path` 幂等性实测（`resolve(resolved)==resolved` True）保证 A11 注入 `$TD`（解析后）可命中 `find(path=abs_path)`。全文 grep `<tmpdir>/<TD>` 8 处：仅 A3（L275）为裸 `<tmpdir>` 但属输入路径（断言仅核端口，`hs` 内部自 resolve）、L27/L28 为 §0.2 历史留档，无残留裸 `<tmpdir>` 用于路径匹配；§10/§12 零命中。
+
+3 项 🟢 待确认处置：待确认 2（反证样本口径「同端口同 pid ⇒ 非反证样本」可判、不足如实记录）✅ 得当；待确认 3（就绪等待 ≤2.0s = 20–40× 实测 ~50–100ms 启动、超时诚实弃样不掩盖）✅ 得当；待确认 1 **部分闭合**——§8 归属规则（L269）已改 token 精确匹配（`basename(token)==runner.py` + token `== abs_path`，显式禁 `in`，`basename` 覆盖绝对路径 token），但 **§4.4 ⊙2（L179）生产 kill 门仍用 `'runner.py' in command and abs_path in command` 子串匹配**，与 §8「禁用 `in`」自相矛盾、生产理论误杀边界（`/tmp/foo` vs `/tmp/foobar`）未闭环。
+
+按治理规范：不提交、不 push，回 ops 出设计 v1.4 对齐 §4.4 ⊙2 后收口。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| F-4 | 🟡 | §4.4 ⊙2 生产 kill 门仍用 `in` 子串匹配，与 §8「禁用 in 子串判断」自相矛盾；`/tmp/foo` vs `/tmp/foobar` 嵌套路径误杀另一目录 runner | 设计 §4.4 L179 | ⏳ 待 ops v1.4 |
+| R-10 | 🟢 | 待确认 2「同端口同 pid」判定略强（修前签名为漂移新端口，`--url` 比对同端口即可判别，无需显式读 pid） | 设计 §8 A4 | 记录 |
+| R-11 | 🟢 | 待确认 3 就绪等待「单数 LISTEN」时序（修前双 runner 下先 LISTEN 即采集，反证 `O != R_pids` 仍成立，仅展示不干净） | 设计 §8 A4 | 记录 |
+| R-12 | 🟢 | §0.3 F-3 行落点未列 A5（正文 A5 用「TD 同上 F-3 口径」正确，落点表列举遗漏） | 设计 §0.3 | 记录 |
+
+### Positives
+
+- F-3 以源码逐字核对 + 独立实测双证闭合（`resolve_path` 实现 / registry.add path=abs_path / runner 命令行 abs_path / `find` 解析路径匹配四层一致 + `equal:False` 实测 + resolve 幂等性坐实 A11 可命中），非凭设计自述
+- 全文 `<tmpdir>` 残留用 grep 全量 8 处逐条核验（区分「输入路径」「历史留档」「路径匹配」三类），无遗漏
+- 待确认 1 harness 侧闭合到位：token 精确匹配 + `basename` 覆盖 runner.py 绝对路径 token，`/tmp/foo` vs `/tmp/foobar` 过度包含消除
+- 待确认 2/3 处置均有明确可判口径（同端口同 pid / ≤2.0s×10 + 超时诚实弃样），不引入假通过
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| F-3 | A4/A10/A11 路径解析口径声明 | 🟡 | P1 | ✅ Closed（v1.3） |
+| F-4 | §4.4 ⊙2 `in` 残留（待确认 1 生产侧未闭环） | 🟡 | P1 | ✅ Closed（v1.4） |
+| R-10 | 同端口同 pid 判定略强 | 🟢 | P2 | ✅ Closed（v1.4 落实） |
+| R-11 | 单数 LISTEN 时序展示 | 🟢 | P2 | ✅ Closed（v1.4 落实） |
+| R-12 | §0.3 F-3 落点未列 A5 | 🟢 | P2 | ✅ Closed（v1.4 落实） |
+
+---
+
+## 2026-09-22 — Design doc rereview: HTTP-SERVER-CL004 设计 v1.4（F-4 闭合 + R-10/R-11/R-12 落实，收口）
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（设计复审 — 只审设计文档与现状事实，不审实现）
+- **Scope**: 1 个未 push commit（f3db2d0 docs@design 设计 v1.4），被审对象 documents/http-server-port-residual-design-v1.4-20260922.md（347 行）
+- **Commit(s)**: f3db2d0
+- **Verdict**: ✅ PASS
+- **Score**: 100 / 100 (Rating: A)
+- **Report**: documents/review/http-server-cli-cl004-design-rereview-v1.0-20260922-round4.md
+
+### Summary
+
+设计 v1.4 收口：闭合上轮唯一必改 F-4——§4.4 ⊙2 生产 kill 门由 `in` 子串匹配改为与 §8 同口径 token 精确匹配（`parts = (info or {}).get('command','').split()`；`is_ours = bool(info) and any(os.path.basename(t)=='runner.py' for t in parts) and abs_path in parts`，`abs_path in parts` 为列表成员判定 = 完全相等非子串）。四子点经源码 + 语义独立复核全过：`get_process_info` 返回 `{'command'}`（utils.py:205-222）、`abs_path=resolve_path(path)`（server.py:128）、runner 命令行含 `runner_path`+`abs_path` 双 token（server.py:287/291-292）三处坐实；`os.path.basename` 唯一命中 runner_path、`abs_path in parts` 唯一命中 abs_path，无恒真/恒假；全文 grep 零残留 `in` 子串式归属判断（3 命中全为历史引用/迭代器语法/列表成员判定）。嵌套路径 `/tmp/foo` vs `/tmp/foobar` 误杀边界消除。R-10（反证样本判据简化为「以端口判定幂等命中」）、R-11（就绪等待改「pid 集合稳定：连续两次 O 一致」）、R-12（§0.3 F-3 落点补 A5）三项 🟢 全部落实。v1.4 增量无新必改，仅 1 处 🟢 措辞级记录 R-13（§0.4 落点表简写 `command.split()` vs §4.4 正文 `(info or {}).get('command','').split()`，正文为权威且更精确）。**push origin main**。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| — | — | 无新增必改（1×🟢 措辞级记录 R-13） | — | — |
+
+### Positives
+
+- F-4 以源码逐字核对 + 语义独立复核双证闭合（get_process_info / abs_path=resolve_path / runner 双 token 三处坐实 + `in` 列表成员语义 + 零残留 grep），非凭设计自述
+- R-10/R-11/R-12 逐项核实落点（§8 A4 反证口径 / 就绪等待 / §0.3 F-3 行），与正文一致
+- v1.4 增量无方向性冲突/恒真断言/规格缺失；§4.4 ⊙2 伪码 null-safe（`(info or {})` 守卫），优于 round-3 建议的 `cmd.split()`
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| F-4 | §4.4 ⊙2 `in` 残留（待确认 1 生产侧未闭环） | 🟡 | P1 | ✅ Closed（v1.4 token 精确匹配） |
+| R-10 | 反证样本判据以端口判定幂等命中 | 🟢 | P2 | ✅ Closed（v1.4 落实） |
+| R-11 | 就绪等待 pid 集合稳定 | 🟢 | P2 | ✅ Closed（v1.4 落实） |
+| R-12 | §0.3 F-3 落点补 A5 | 🟢 | P2 | ✅ Closed（v1.4 落实） |
+| R-13 | §0.4 落点表简写 vs §4.4 正文（措辞级） | 🟢 | — | 记录（非阻断） |
+
 
