@@ -62,6 +62,40 @@ def describe_port_occupant(registry: Registry, port: int) -> str:
         return 'PID ' + '/'.join(str(p) for p in pids[:2])
     return '未知服务'
 
+
+# ── stale 判定：启动宽限与归属校验（HTTP-SERVER-CL004 D4/D5/R-4/R-6/R-7） ──
+
+START_GRACE_INTERVAL = 0.2   # 宽限轮询间隔（秒）
+START_GRACE_ATTEMPTS = 5     # 宽限轮询次数（总上限 ≤ 1.0s）
+
+
+def _is_our_runner(pid, abs_path) -> bool:
+    """归属校验：进程命令行是否属于该目录的本工具 runner（防 pid 复用误杀）。
+
+    与设计 §8 归属规则**同口径的 token 精确匹配**（F-4）：
+    命令行按空白切分后，(1) 存在 token 其 basename == 'runner.py'；
+    (2) 存在 token 与 abs_path **完全相等**（列表成员判定，非子串 `in`）。
+    """
+    info = get_process_info(pid)
+    if not info:
+        return False
+    parts = (info.get('command') or '').split()
+    return (any(os.path.basename(t) == 'runner.py' for t in parts)
+            and abs_path in parts)
+
+
+def _terminate_runner(pid) -> bool:
+    """终止本工具服务的进程组（R-4：对齐 kill() 语义 SIGTERM → 0.5s → SIGKILL）。"""
+    try:
+        pgid = os.getpgid(pid)
+        os.killpg(pgid, signal.SIGTERM)
+        time.sleep(0.5)
+        if is_process_alive(pid):
+            os.killpg(pgid, signal.SIGKILL)
+        return True
+    except (ProcessLookupError, PermissionError, OSError):
+        return False
+
 # ── index_page 校验 ──────────────────────────────────
 
 # raw string 中 \u4e00 原样传给 re 引擎，re 支持 \uXXXX Unicode 转义
@@ -174,7 +208,36 @@ class ServerManager:
         entry = self.registry.find(path=abs_path)
         if entry:
             port = entry['port']
-            if is_process_alive(entry.get('pid')) and is_port_in_use(port):
+            entry_pid = entry.get('pid')
+            ready = False
+            others_own_port = False
+
+            # ① 幂等判定（零等待，顺序链第 2 步；CL003 F-1 语义不回退）
+            if is_process_alive(entry_pid) and is_port_in_use(port):
+                ready = True
+            # ② 「启动中」宽限（D4/D5）：pid 活但端口尚未监听 → 轮询 ≤1.0s
+            elif is_process_alive(entry_pid):
+                for _ in range(START_GRACE_ATTEMPTS):
+                    if not is_process_alive(entry_pid):
+                        break
+                    if is_port_in_use(port):
+                        listeners = get_pid_by_lsof(port, listen_only=True)
+                        if (not listeners) or entry_pid in listeners:
+                            ready = True
+                        else:
+                            others_own_port = True   # R-7：端口被他人占用
+                        break
+                    time.sleep(START_GRACE_INTERVAL)
+                # R-5：宽限结束、kill 之前再判一次（防慢绑定刚就绪的 runner 被误杀）
+                if (not ready and not others_own_port
+                        and is_process_alive(entry_pid) and is_port_in_use(port)):
+                    listeners = get_pid_by_lsof(port, listen_only=True)
+                    if (not listeners) or entry_pid in listeners:
+                        ready = True
+                    else:
+                        others_own_port = True
+
+            if ready:
                 # 幂等优先（D5）：命中即返回既有端口，-p 被忽略（顺序链第 2 步先于第 3 步校验）
                 if requested_port is not None and requested_port != port:
                     print(f'ℹ️ 已运行在 {port}（-p {requested_port} 未生效；如需换端口请先 hs kill {port}）',
@@ -227,10 +290,21 @@ class ServerManager:
                 return True
 
             else:
-                if url_only:
-                    print('🔄 Found stale registry entry, cleaning up before restart', file=sys.stderr)
-                else:
-                    eprint('Found stale registry entry, cleaning up before restart', '🔄')
+                # ③ stale 清理（D4/AUD-3）：进程已死 → 仅删登记；进程仍活（宽限后仍未监听）→
+                #    归属校验通过则**先终止进程组**再删登记，杜绝「登记已删但进程在跑」的孤儿。
+                #    文案三态（url/json/默认）一律 stderr（D6），不污染 stdout / JSON 信封。
+                stale_msg = 'Found stale registry entry, cleaning up before restart'
+                if others_own_port:
+                    stale_msg += '（端口已被其他进程占用）'
+                elif is_process_alive(entry_pid):
+                    if _is_our_runner(entry_pid, abs_path):
+                        _terminate_runner(entry_pid)
+                        stale_msg = (f'Found stale registry entry (pid {entry_pid}, 已终止), '
+                                     'cleaning up before restart')
+                    else:
+                        stale_msg = ('Found stale registry entry, cleaning up before restart'
+                                     '（登记 pid 非本工具服务，仅清理登记）')
+                print(f'🔄 {stale_msg}', file=sys.stderr)
                 self.registry.remove(path=abs_path)
 
         # ── -p/--port 校验（顺序链第 3 步：仅在第 2 步幂等未命中时执行）──
