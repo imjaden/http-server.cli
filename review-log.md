@@ -706,3 +706,99 @@ OBS-4 闭环：features.md:126 测试数 483→490 同步（本应随 60381af fe
 
 ---
 
+## 2026-09-22 — Design doc review: HTTP-SERVER-CL003 端口参数 + 未识别参数告警 + 周边端口面 (7f3376d)
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（设计评审 — 只审设计文档与现状事实，不审实现）
+- **Scope**: 1 个未 push commit（7f3376d docs@design），基底 origin/main 1ff81e6（ahead 1）
+- **Commit(s)**: 7f3376d
+- **Verdict**: ⏳ CONDITIONAL PASS
+- **Score**: 82 / 100 (Rating B+)
+- **Report**: documents/review/http-server-cli-cl003-design-review-v1.0-20260922.md
+
+### Summary
+
+设计 v1.0 的根因定位（P1–P4）、决策定案（D1–D13）、接口设计、测试清单均经源码 + 实测逐条核对，实质正确。数据验证：P4 假成功实测 `hs dashboard -p abc` exit=0；P2 `allow_reuse_address=1`；D8 `hs -p 8089` → `Unknown command: 8089` exit=1；`parse_known_args` 站点实测 **22** 处（与设计一致）；测试基线 **490 collected**（`def test_`=472，features.md:126=490）；`hs version` = v1.3.1。D1–D13 无互相矛盾，用户「全采推荐」完整覆盖。
+
+存在 5 处必改（F-1~F-5）+ 9 处非阻断（F-6~F-14），均为设计文档一致性/完备性修订，无决策重选。核心：F-1 校验顺序链未定义（幂等检查 server.py:137 先于 -p 保留/占用校验，否则 `-p 8099` 已在运行会被误判「占用」、`-p 8180` 已在别端口运行会误报「保留端口」）；F-2 §4.3 dashboard restart 现状「未运行回 8180」与 cli.py:610-616/678 事实不符（现状为「not running」+ 硬编码 8180）；F-3 A14 四同步 grep 无法落地（pyproject 无版本字面量、漏 spec.yaml/features）；F-4 spec.yaml 补 capability 遗漏 json-output（port 字段）+ dashboard（restart --port）；F-5 §4.6 退出码表隐含「路径不存在 0→1」变更（实测 exit 0）未在风险表/CHANGELOG 标注。按治理规范：回 ops 出设计 v1.1，修复后走 rereview。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| F-1 | 🟡 | 校验顺序链未定义：幂等检查(server.py:137) 应先于 -p 保留/占用校验(195)，否则「-p 等于运行端口」误判占用、「-p 保留端口」误报保留 | 设计 §4.1 | ⏳ 待 ops 修复 |
+| F-2 | 🟡 | dashboard restart 现状描述失实：未运行 → not running（cli.py:610-616）非「回 8180」；已运行 → 硬编码 8180（cli.py:678）非 entry['port'] | 设计 §4.3 | ⏳ 待 ops 修复 |
+| F-3 | 🟡 | A14 四同步 grep 无法落地：pyproject version 为 dynamic 无字面量；漏 spec.yaml version 字段 + features.md | 设计 §8 A14 | ⏳ 待 ops 修复 |
+| F-4 | 🟡 | spec.yaml 补 capability 遗漏 json-output（start --json 增 port 字段）+ dashboard（restart --port） | 设计 §5/§9 item 4 | ⏳ 待 ops 修复 |
+| F-5 | 🟡 | 退出码表内部不一致：exit 1 列「路径不存在」但触发仅 D1/D2；隐含路径不存在 0→1 变更（实测 exit 0）未标注 | 设计 §4.6 | ⏳ 待 ops 修复 |
+| F-6 | 🟢 | -p 占用检查继承 O1 假占用缺陷（刚释放端口假拒绝）未标注 | 设计 §11 | 记录 |
+| F-7 | 🟢 | http-server-ops --usage-file 命名范式已满足且属跨仓，§9 item 8 冗余 | 设计 §9 item 8 | 记录 |
+| F-8 | 🟢 | O3 枚举不完整：hs-cli-design-v1.0:506 亦含「不占用终端」 | 设计 §10 O3 | 记录 |
+| F-9 | 🟢 | services.py 存储字段未完全明确（use_port bool + port int 两字段） | 设计 §4.4/§5 | 记录 |
+| F-10 | 🟢 | D8「等价于 1781-1785 推广」不精确：`hs -p 8089` 时 command='8089'（端口值泄漏），需重组 args | 设计 §4.1 D8 | 记录 |
+| F-11 | 🟢 | §5 影响矩阵 web 行号漂移（_web_add=1321、_web_update=1574） | 设计 §5 | 记录 |
+| F-12 | 🟢 | 版本链既有 1.3.1 漂移（CHANGELOG/spec 停 1.3.0） | __init__.py:28 / CHANGELOG / spec.yaml:2 | 记录 |
+| F-13 | 🟢 | D4 区间 1024-65535 与 MAX_PORT=10000（find_available_port 上限）差异未注明 | 设计 §4.1 / utils.py:29 | 记录 |
+| F-14 | 🟢 | `-p 8180` 且 dashboard 实际占用时报「保留端口」非「已被占用」（可选优化） | 设计 §4.1 | 记录 |
+
+### Positives
+
+- 根因定位 P1–P4 全部源码 + 实测双证（exit=0 / allow_reuse_address=1 / Unknown command:8089），非凭描述
+- D1–D13 无互相矛盾，fail-closed / 幂等优先 / CLI>config 不回写 / 保留端口硬拦四原则边界清晰
+- §7 十三条测试覆盖全部分支 + 未给 -p 的 +1 漂移回归保护 + conftest 隔离，A1–A13 均为「命令 + 可观测 + 非恒真」
+- 未识别参数告警 22 站点实测计数与设计一致，白名单覆盖 html 通配/kill·status 位置参数/search 关键词/web --cmd，stderr-only 零污染论证充分
+- 范围控制 N1–N6 与 D1–D13 自洽，O1 另批理由充分（广波及非必要前置），遗留率 1/6=0.17 成立
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| F-1 | 校验顺序链未定义 | 🟡 | P1 | ⏳ 待 ops 修复 |
+| F-2 | dashboard restart 现状描述失实 | 🟡 | P1 | ⏳ 待 ops 修复 |
+| F-3 | A14 四同步 grep 无法落地 | 🟡 | P1 | ⏳ 待 ops 修复 |
+| F-4 | spec capability 遗漏 json-output/dashboard | 🟡 | P1 | ⏳ 待 ops 修复 |
+| F-5 | 退出码表不一致 + 路径不存在 0→1 未标注 | 🟡 | P1 | ⏳ 待 ops 修复 |
+| F-6~F-14 | 记录项（9 条） | 🟢 | P2 | ⏳ 记录，同批勘误 |
+
+---
+
+## 2026-09-22 — Design doc rereview: HTTP-SERVER-CL003 端口参数 + 未识别参数告警 + 周边端口面 v1.1
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（设计评审 rereview — 只审设计文档与现状事实，不审实现）
+- **Scope**: 2 个未 push commit（7d2b88c docs@design v1.1 修订 + 076d30b docs@design v1.1 勘误），基底 origin/main 1ff81e6（HEAD 076d30b，ahead 3）；被审对象 documents/http-server-port-flag-design-v1.1-20260922.md（389 行）
+- **Commit(s)**: 7d2b88c, 076d30b（另有 7f3376d v1.0 承上轮）
+- **Verdict**: ✅ PASS
+- **Score**: 96 / 100 (Rating: A)
+- **Report**: documents/review/http-server-cli-cl003-design-rereview-v1.1-20260922.md
+
+### Summary
+
+设计 v1.1 对上轮 5 必改（F-1~F-5）+ 9 记录（F-6~F-14）+ 3 待确认（1/2/3）全部闭合/处置/定案，逐条源码 + 实测核对。F-1 执行顺序链（路径→幂等→-p 校验→启动）成文且与 server.py:126-134/137-185/187-192/195-206 一致，两个反例说明到位；F-2 §4.3 勘误与 cli.py:610-616/678 逐字相符；F-3 A14 改 hs version + grep __init__.py/CHANGELOG + grep ^version: spec.yaml（删 pyproject dynamic）；F-4 五 capability 与 spec.yaml:34/143/268/600/712 逐行吻合；F-5 三态表自洽 + D14 改 1 + §11 风险 + A15 + CHANGELOG Changed 三处落地。§4.7 start() 返回契约失败点 121/134/204/229/238/247/256 逐字吻合、成功出口 json 314-315/daemon-foreground 之后/url 281 成文、两调用方 cli.py:220 与 dashboard.py:401（后者不看返回值）grep 核实仅此两处。数据复核：src/ 零变更（diff origin/main..HEAD 仅 v1.1 文档 +389 行）、parse_known_args 22、pytest 490 collected、kill 59999 实测 exit 0、版本链 1.3.1/1.3.0/1.3.0 漂移成立。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| R-1 | 🟡 | D14「服务未找到（hs kill 未注册端口）改 1」有声明+断言(A15)+CHANGELOG(§9)+风险(§11)+Step3 作用域，但无函数级实现落点：§4.7 仅 start() 返回契约、§5 无 kill 退出码行、§7 无 kill 退出码单测（现状 server.py kill() 返回 None、cli.py _cmd_kill:383-408 无 sys.exit） | 设计 §4.7/§5/§7 | 建议折入 Step 3 fix@cli |
+| R-2 | 🟢 | §4.7 成功出口枚举遗漏 server.py:185（非 url/json 幂等命中 return None → 应 return True）；合同「含幂等命中」+ §7 测试 7 已隐含 | 设计 §4.7 | 记录 |
+| R-3 | 🟢 | §5 _web_list/_web_show 标注 1420-1527，实 def 起于 1411（1420 为 except 行），9 行偏差系沿用 F-11 建议值 | 设计 §5 | 记录 |
+
+### Positives
+
+- F-1~F-5 全部闭合，每项以源码行号逐字核对（幂等 137-185 先于 find_available_port 194-206；dashboard 678 硬编码 8180；spec 五 capability 逐行命中），非凭描述
+- 记录项 F-6~F-14 九条全部处置到位（§4.1 重组规则四形态实测表、§4.4 use_port/port 双字段、§6/§10 documents/ 统一豁免）
+- §4.7 返回契约失败点七处逐字吻合（url_only 六处已 return False 无需改的判定也正确），两调用方 grep 复核「仅两处」属实
+- 待确认 1/2/3 → D14/D15/D16 一一对应且各有落点（§4.6/A15/§9/§11 + §4.1 差异段/测试 4 + §4.1 双态/测试 3/A16）
+- 数据复核以 diff --stat + grep -c + pytest collect + 实测 kill/status 双证，非仅引用上轮
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| F-1~F-14 | HTTP-SERVER-CL003 设计 v1.0 发现（5 必改 + 9 记录） | 🟡/🟢 | P1/P2 | ✅ Closed（v1.1 全闭合/处置） |
+| R-1 | kill 退出码函数级实现落点缺失 | 🟡 | P2 | ⏳ 建议折入 Step 3 |
+| R-2 | §4.7 line 185 成功出口枚举遗漏 | 🟢 | — | 记录 |
+| R-3 | §5 _web_list 起始行 9 行偏差 | 🟢 | — | 记录 |
+
+

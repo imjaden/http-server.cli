@@ -171,3 +171,24 @@ review_history:
     findings_open: 0
     tracking: OBS-4 (closed)
     scope: "Commit audit: docs@sync features 测试数 483→490 (09b65aa) — OBS-4 闭环; diff 精确 1 行 (features.md:126 483→490), 实测 .venv pytest 490 passed, 工作树 clean, 无 -A, 源码零改动"
+  - date: 2026-09-22
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: CONDITIONAL_PASS
+    score: 82
+    findings_total: 14
+    findings_open: 14
+    tracking: HTTP-SERVER-CL003 (F-1~F-14)
+    scope: "Design doc review: http-server-port-flag-design-v1.0-20260922.md (commit 7f3376d) — -p/--port + 未识别参数告警 + 周边端口面; 根因 P1-P4 实测成立, 5 必改(F-1~F-5)+9 记录(F-6~F-14), 回 ops 设计 v1.1 后 rereview"
+    report: documents/review/http-server-cli-cl003-design-review-v1.0-20260922.md
+    resolved_by: "rereview v1.1 (2026-09-22) — PASS 96/100, F-1~F-14 全闭合, 待确认 1/2/3 → D14/D15/D16 定案"
+  - date: 2026-09-22
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: PASS
+    score: 96
+    findings_total: 3
+    findings_open: 0
+    tracking: HTTP-SERVER-CL003 (R-1~R-3, 非阻断)
+    scope: "Design doc rereview: http-server-port-flag-design-v1.1-20260922.md (commits 7d2b88c, 076d30b) — F-1~F-14 全闭合, D14/D15/D16 定案落点齐备; 剩余 1×🟡 R-1(kill 退出码函数级落点缺失, 折入 Step3) + 2×🟢 R-2/R-3"
+    report: documents/review/http-server-cli-cl003-design-rereview-v1.1-20260922.md
