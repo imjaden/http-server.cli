@@ -1066,4 +1066,41 @@ F-2 方向已修正（lsof LISTEN 端口级判据 + 删除 `ps` 判据 + 修前�
 | R-12 | §0.3 F-3 落点补 A5 | 🟢 | P2 | ✅ Closed（v1.4 落实） |
 | R-13 | §0.4 落点表简写 vs §4.4 正文（措辞级） | 🟢 | — | 记录（非阻断） |
 
+---
+
+## 2026-09-22 — Implementation audit: HTTP-SERVER-CL004 实现审计 v1.0（D1′ 偏差复核 + 四同步实测）
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（实现审计 — 代码↔设计一致性 / 偏差正当性 / 回归 / 文档同步真实性）
+- **Scope**: 6 笔未 push commit（36b1e91 fix@cli 探测 / 2651511 fix@cli 归位+退出码 / 4ecf537 fix@cli stale 三态 / 6f8392f tests@cli / 275ae93 docs@sync + 设计 §13 / 127db13 test@verify ops harness）
+- **Commit(s)**: 36b1e91, 2651511, 4ecf537, 6f8392f, 275ae93, 127db13
+- **Verdict**: ✅ PASS
+- **Score**: 99 / 100 (Rating: A)
+- **Report**: documents/review/http-server-cli-cl004-audit-v1.0-20260922.md
+
+### Summary
+
+CL004 合并单一批（探测根因 O1 + CL003 遗留 AUD-1/2/3）实现审计：18 项逐条「实证命令 + 实测输出 + 判定」。关键偏差 D1′（探测主路径由「纯 socket + SO_REUSEADDR」改为「darwin 以 lsof LISTEN 为准 + socket 回退」）经独立最小实验复核成立——实测 3×3 探测矩阵与设计 §13.1 逐格一致（macOS SO_REUSEADDR 允许「不同本地地址同端口」共存，纯 socket 会漏判 127.0.0.1/LAN 绑定真监听；lsof LISTEN 全地址命中）⇒ 偏差正当且比原设计更强。stale 三态 + ≤1.0s 宽限 + 归属校验（token 精确匹配 runner.py+abs_path，禁 in 子串）+ 文案通道三态 stderr 以 pid 同一性实测成立（A4 双击 registry 单条、listener_pids==registry_pids），R-6/R-7 不 kill 他人。全量 557 passed 零回归、CL003 harness 31/31、ops A1–A11 独立复跑 13/13、真实数据目录审计前后 registry/services sha256 逐字节一致（残留 0、无主 runner listener 0）。非阻断 1×🟢 AUD-1（features.md 模块数 18→16）+ 2×🟢 记录（§13.3 D3 行号漂移 3 行 / 回退 socket 在 darwin 的文档化降级漏判）。**push origin main（仅 github，无 gitee 镜像）**。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| AUD-1 | 🟢 | features.md 测试模块数「18」实测为 16（基线 15 + 本批 1）；测试用例数 557 正确 | features.md:133 | 记录（建议下次 docs@sync 改 16） |
+| OBS-1 | 🟢 | 设计 §13.3 D3 对照行号 cli.py:1705-1718 实测 1702-1715（漂移 3 行，非实质） | 设计 §13.3 | 记录 |
+| OBS-2 | 🟢 | lsof 不可用回退 socket+SO_REUSEADDR 在 darwin 仍跨地址漏判（§13.1 已声明降级） | utils.py:165-174 | 记录 |
+
+### Positives
+
+- D1′ 偏差独立复核：自建最小 socket 实验（端口 55148/55149/55150）复现 §13.1 矩阵 3 场景逐格一致 + lsof 全命中，非采信设计自述
+- R-6/R-7 防误杀：_is_our_runner 与 harness listen_pids 同口径 token 精确匹配，test_t12a/t12b 断言不 kill 他人；A4 双击 pid 同一性判据（非计数）
+- 数据目录无污染：审计前后 registry.json/services.json sha256 逐字节一致，比「条数不变」更严的判据
+- 未越界：eprint()/hs set port/hs list --port/8180-8181 硬拦/CL003 -p 校验链零变更（N5 落实）
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| AUD-1 | features.md 模块数 18→16（文档同步失真） | 🟢 | P2 | 记录（非阻断） |
+
 

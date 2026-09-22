@@ -256,3 +256,13 @@ review_history:
     tracking: HTTP-SERVER-CL004 (F-4/R-10~R-12 closed; R-13 🟢 记录)
     scope: "Design doc rereview: http-server-port-residual-design-v1.4-20260922.md (commit f3db2d0) — F-4 闭合(§4.4 ⊙2 kill 门改 §8 同口径 token 精确匹配, abs_path in parts 列表成员判定=完全相等, 源码 get_process_info/utils.py:205 + abs_path=resolve_path/server.py:128 + runner 双 token/server.py:291-292 坐实, 全文零残留 in 子串); R-10/R-11/R-12 落实(反证端口判定/pid 集合稳定/§0.3 补 A5); v1.4 增量无新必改, 1×🟢 措辞级 R-13; PASS 100/100, pushed"
     report: documents/review/http-server-cli-cl004-design-rereview-v1.0-20260922-round4.md
+  - date: 2026-09-22
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: PASS
+    score: 99
+    findings_total: 3
+    findings_open: 0
+    tracking: HTTP-SERVER-CL004 (AUD-1 🟢 记录; OBS-1/OBS-2 🟢 记录)
+    scope: "Implementation audit: HTTP-SERVER-CL004 实现审计 v1.0 (commits 36b1e91/2651511/4ecf537/6f8392f/275ae93/127db13) — D1' 探测口径偏差独立复核成立(lsof LISTEN 为准 + socket 回退, 3x3 矩阵逐格一致, 纯 socket 在 macOS 漏判 127.0.0.1/LAN 绑定真监听); stale 三态+宽限+归属校验 token 精确匹配+文案三态 stderr 以 pid 同一性实测; 557 passed 零回归 + CL003 31/31 + ops A1-A11 独立复跑 13/13; 四同步实测核对; 数据目录 sha256 前后逐字节一致无污染; 1x🟢 AUD-1(features.md 模块数 18→16)+2x🟢 记录; PASS 99/100"
+    report: documents/review/http-server-cli-cl004-audit-v1.0-20260922.md
