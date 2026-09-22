@@ -378,14 +378,14 @@ if entry:
 | 决策 | 实施位置 | 说明 |
 |:--|:--|:--|
 | D2 分支序 | `cli.py:1897-1912` | ➋ 取值型 flag 重组 前置于 ➌ 路径快捷方式；触发位不变（`-o/-d/-f` 不在内） |
-| D3 退出码 | `cli.py:1429-1442` / `1705-1718` | 互斥 + `validate_port` 失败 → `sys.exit(2)`（json 模式先输出 error 信封） |
-| D4/D5 三态与宽限 | `server.py:210-300` | ①幂等（零等待）→ ②宽限 `START_GRACE_INTERVAL=0.2 × START_GRACE_ATTEMPTS=5` → ③stale（先终止再清登记）；模块级常量便于测试替换 |
-| D6 文案通道 | `server.py:293-306` | stale/终止/他人占用三类文案统一 `print(..., file=sys.stderr)`；json/默认不再经 `eprint` 写 stdout |
-| D11 lsof 参数 | `utils.py:get_pid_by_lsof(port, listen_only=False)` | `listen_only=True` 追加 `-sTCP:LISTEN`；R-7 核验与 A4 判据同口径；既有调用点不传参 ⇒ 行为不变 |
-| R-4 | `server.py:_terminate_runner` | `getpgid` → `SIGTERM` → 0.5s → `SIGKILL`，异常 best-effort |
+| D3 退出码 | `cli.py:1430-1442` / `1703-1715` | 互斥 + `validate_port` 失败 → `sys.exit(2)`（json 模式先输出 error 信封） |
+| D4/D5 三态与宽限 | `server.py:210-307`（宽限轮询 220-230；stale 清理 296-307） | ①幂等（零等待）→ ②宽限 `START_GRACE_INTERVAL=0.2 × START_GRACE_ATTEMPTS=5` → ③stale（先终止再清登记）；模块级常量便于测试替换 |
+| D6 文案通道 | `server.py:244`（宽限）/ `307`（stale）两处新增 stderr；既有 318/332/341 | stale/终止/他人占用三类文案统一 `print(..., file=sys.stderr)`；json/默认不再经 `eprint` 写 stdout |
+| D11 lsof 参数 | `utils.py:201`（`get_pid_by_lsof(port, listen_only=False)`） | `listen_only=True` 追加 `-sTCP:LISTEN`；R-7 核验与 A4 判据同口径；既有调用点不传参 ⇒ 行为不变 |
+| R-4 | `server.py:87-97`（`_terminate_runner`） | `getpgid` → `SIGTERM` → 0.5s → `SIGKILL`，异常 best-effort |
 | R-5 | `server.py:231-238` | 宽限结束、终止前再判一次端口，防慢绑定刚就绪被误杀 |
-| R-6 | `server.py:_is_our_runner` | 命令行 token 精确匹配（`basename(token) == 'runner.py'` 且 `abs_path` 为某个完整 token），不匹配则只清登记并 stderr 说明 |
-| R-7 | `server.py:222-229` | 宽限内以 `get_pid_by_lsof(port, listen_only=True)` 核监听者；非登记 pid 占用 ⇒ 判「端口已被其他进程占用」，不 kill 他人 |
+| R-6 | `server.py:72-85`（`_is_our_runner`） | 命令行 token 精确匹配（`basename(token) == 'runner.py'` 且 `abs_path` 为某个完整 token），不匹配则只清登记并 stderr 说明 |
+| R-7 | `server.py:222-232` | 宽限内以 `get_pid_by_lsof(port, listen_only=True)` 核监听者；非登记 pid 占用 ⇒ 判「端口已被其他进程占用」，不 kill 他人 |
 
 ### 13.4 测试与回归
 
