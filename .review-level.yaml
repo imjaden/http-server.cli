@@ -192,3 +192,13 @@ review_history:
     tracking: HTTP-SERVER-CL003 (R-1~R-3, 非阻断)
     scope: "Design doc rereview: http-server-port-flag-design-v1.1-20260922.md (commits 7d2b88c, 076d30b) — F-1~F-14 全闭合, D14/D15/D16 定案落点齐备; 剩余 1×🟡 R-1(kill 退出码函数级落点缺失, 折入 Step3) + 2×🟢 R-2/R-3"
     report: documents/review/http-server-cli-cl003-design-rereview-v1.1-20260922.md
+  - date: 2026-09-22
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: PASS
+    score: 95
+    findings_total: 3
+    findings_open: 1
+    tracking: HTTP-SERVER-CL003 (AUD-1 🟡 随 O1 另批; AUD-2/AUD-3 🟢 记录)
+    scope: "Implementation audit: HTTP-SERVER-CL003 -p/--port + 退出码三态 + dashboard/web 端口面 (commits 3919da7/484e0ec/8f041cd/231452e) — 535 tests green, 四同步实测核对(非 commit subject), 数据目录审计前后无污染; 1×🟡 AUD-1 顶层 -i<CWD存在文件>+-p 边界, 2×🟢 AUD-2 web 软拒绝 rc=0 / AUD-3 stale-entry 留孤儿(O1 同源)"
+    report: documents/review/http-server-cli-cl003-audit-v1.0-20260922.md

@@ -801,4 +801,47 @@ OBS-4 闭环：features.md:126 测试数 483→490 同步（本应随 60381af fe
 | R-2 | §4.7 line 185 成功出口枚举遗漏 | 🟢 | — | 记录 |
 | R-3 | §5 _web_list 起始行 9 行偏差 | 🟢 | — | 记录 |
 
+---
+
+## 2026-09-22 — Implementation audit: HTTP-SERVER-CL003 端口参数面实现（-p/--port + 退出码三态 + dashboard/web 端口面）
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（实现审计 — 审代码与设计一致性 / 回归风险 / 文档同步真实性）
+- **Scope**: 4 个未 push commit（3919da7 feat@cli / 484e0ec tests@cli / 8f041cd docs@sync / 231452e verify@ops），基底 origin/main d410738；被审对象 src/{cli.py,server.py,services.py} + tests/test_port_flag.py(45 新增) + test_web.py(1 更新) + 四同步（README×2/skills/features/CHANGELOG/__init__/spec.yaml）+ ops 核查产物
+- **Commit(s)**: 3919da7, 484e0ec, 8f041cd, 231452e
+- **Verdict**: ✅ PASS
+- **Score**: 95 / 100 (Rating: A)
+- **Report**: documents/review/http-server-cli-cl003-audit-v1.0-20260922.md
+
+### Summary
+
+实现忠实落地设计 v1.1 全部 D 项，逐项以「实证命令 + 实测输出」独立复算（不采信 ops 31/31）。`-p` 面：绑定 8099 且不回写 config；顺序链两反例（幂等先于 -p 校验）实测成立；fail-closed 三态（占用 rc=1 + 占用者 PID/路径、保留端口双态 rc=1、区间/非法值 rc=2、-p 20000 直绑越 MAX_PORT）；退出码三态（路径不存在 1 / kill 未注册 1 / status 未注册 0）；解析报错 exit 2（P4 消灭假成功）；未识别参数仅 stderr 零污染；--json 信封 data.port 新建/幂等两路径；dashboard restart --port 透传 + 无 port 沿用 entry；web --port/--no-port 字段 + cmd_effective + 注入顺序 domain 先 port 后。四同步以实测为准（hs version v1.4.0 + __init__/CHANGELOG/spec 三处 1.4.0 + README 非 v1.2.x）；A12「不占用终端」src/skills/README 0 命中（documents/ 豁免）。全量 535 passed 零回归；utils.py 零变更（is_port_in_use 裸 bind / find_available_port MAX_PORT=10000 / eprint 写 stdout 均保持）；真实数据目录审计前后 registry 11/services 11 无污染（仅 8085 last_access_at 自然漂移）。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| AUD-1 | 🟡 | 顶层 `hs -i <在 CWD 存在的文件> -p <port> <dir>`：main()「路径快捷方式」分支(os.path.exists(cmd))先于 D8 重组分支触发 ⇒ -i(在 unknown)被丢、<file>当 path、<dir>被当「未识别参数」忽略 ⇒ 服务落 CWD 而非 <dir>（端口仍正确）。设计 D8 显式收窄「非存在路径/globs」，实现与设计一致，非偏差；但设计 §4.1 表/单测(no-such)/ops A8-2(仅断言端口)均未捕获此边界 | cli.py:1898-1907 | 记录，建议随 O1 另批 |
+| AUD-2 | 🟢 | `hs web add/update --port 99` / `--port 9001 --no-port` 拒绝时 rc=0（软拒绝），与 `hs start -p 99` rc=2 口径不一致（设计 §4.4 未对 web 子命令强制退出码，属既有 web 校验风格） | cli.py:1429-1442,1702-1715 | 记录 |
+| AUD-3 | 🟢 | 「stale registry entry」清理只 registry.remove 不 kill 进程：启动后 bind 前(~50ms) is_port_in_use=False ⇒ 幂等检查误判 stale ⇒ 留孤儿（无登记，hs kill 不可达）。既有行为，O1 同源；审计自测复现并已清理 PID 37510 | server.py:175-234（既有） | 记录，建议并入 O1 |
+
+### Positives
+
+- 逐项「实证命令 + 实测输出」独立复算 19 项，未采信 ops 31/31（含 fail-closed 三态各用独立目录、顺序链两反例、--json 新建/幂等两路径、dashboard restart 三种形态、web --port 系列拒绝路径）
+- 执行顺序链源码核对：幂等分支(server.py:173-234)严格先于 -p 校验块(:236-269)，F-1 两反例实测成立
+- 返回契约逐分支核对：server.start 失败路径显式 False、成功出口显式 True、kill 未注册/空参 False，cli 侧 exit 1 落点正确
+- 22 处 parse_known_args 全部经 _parse_known_args helper，唯一 except SystemExit 在 helper 内转 exit 2（P4 无残留）
+- 四同步以实测为准（非 commit subject）：hs version + 三处 grep + README 版本示例 + spec yaml.safe_load
+- 真实数据目录审计前后两次快照对照，cl003 残留 0；审计临时服务/条目/孤儿进程全部清理
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| F-1~F-14 | HTTP-SERVER-CL003 设计 v1.0 发现 | 🟡/🟢 | P1/P2 | ✅ Closed（v1.1 全闭合） |
+| R-1~R-3 | 设计 rereview 记录（kill 落点/行号） | 🟡/🟢 | P2 | ✅ Closed（折入 Step 3） |
+| AUD-1 | 顶层 -i <CWD 存在文件> + -p 边界缺陷 | 🟡 | P2 | ⏳ 建议随 O1 另批 |
+| AUD-2 | web 软拒绝 rc=0 口径 | 🟢 | — | 记录 |
+| AUD-3 | stale-entry 清理留孤儿（O1 同源） | 🟢 | — | 记录（并入 O1） |
+
 
