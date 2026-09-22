@@ -126,7 +126,7 @@ hs kill-all                 # Kill all
 | `hs /path/to/file.html [-o]` | HTML file path → auto-extract directory + set index |
 | `hs /path/snapshots/*.html [-o]` | Path glob → most recent file |
 | `hs start [path] [-o] [-d] [-f] [-i <file>] [-p <port>]` | Full form of `hs .` |
-| `hs . -p 8099 [-o]` | Pin the port (1024-65535; exits 1 if busy — no auto-drift) |
+| `hs . -p 8099 [-o]` | Pin the port (1024-65535; exits 1 if busy — no auto-drift). A just-released port (TIME_WAIT residual) is reusable immediately |
 
 ### View
 

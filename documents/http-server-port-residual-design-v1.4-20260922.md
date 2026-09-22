@@ -345,3 +345,75 @@ if entry:
 | Step 5 实现审计 | review 侧报告 + review-log + `.review-level.yaml`；PASS → push | PASS / CONDITIONAL 回修 |
 | Step 6 收尾 | 复盘 md + 清单 + 四件套 + 观察项登记（O1–O5） | `hm loop artifacts HTTP-SERVER-CL004` 齐全 |
 | Step 7 发布 | `release-pypi.sh` 1.4.0（CL003+CL004 同批） | **待用户放行** |
+
+---
+
+## 13 实施记录与偏差（Step 3 回填）
+
+### 13.1 ⚠️ 实施偏差 D1′（重要）：探测主路径改为「lsof LISTEN 为准 + socket 回退」
+
+**偏差内容**：设计 D1 原定为「探测 socket 开 `SO_REUSEADDR`」（纯 socket，N3 明确不把主路径改为 lsof）。实测证明该修法在 macOS 上**不成立**，故实施为：**darwin 以 lsof 的 LISTEN 集合为准；非 darwin 或 lsof 不可用时回退 socket 探测（开 `SO_REUSEADDR`）**。
+
+**反例与证据（Step 3 实测，可复跑）**：
+
+| # | 场景 | 裸 bind | REUSE bind('') | REUSE bind(127.0.0.1) | lsof LISTEN |
+|:--|:--|:--|:--|:--|:--|
+| 1 | 监听 wildcard `0.0.0.0:P` | 失败（判占用✓） | 失败（✓） | **成功（漏判✗）** | 命中（✓） |
+| 2 | 监听 `127.0.0.1:P` | 失败（✓） | **成功（漏判✗）** | 失败（✓） | 命中（✓） |
+| 3 | 监听 LAN `192.168.31.178:P` | 失败（✓） | **成功（漏判✗）** | **成功（漏判✗）** | 命中（✓） |
+| 4 | 残留态 TIME_WAIT（无监听者） | 失败（误判✗） | 成功（✓） | 成功（✓） | 未命中（✓） |
+
+- 根因：BSD/macOS 的 `SO_REUSEADDR` 允许「**不同本地地址**同端口」共存，故纯 socket 探测只能识别「绑定地址与探测地址完全一致」的监听者；设计 v1.0 评审的 D1 反例实验（真 LISTEN 端口两态均 FAIL）用的是 **wildcard 监听 + wildcard 探测**（同地址）情形，结论在该情形下成立、不能外推。
+- 触发发现：`tests/test_dashboard.py::test_foreground_starts_server`（dashboard 仅监听 `127.0.0.1`）在纯 socket 修法下由 PASS 变 FAIL（`is_port_in_use` 漏判）——即 D1 原口径会**放宽真占用**，违反 §2.1 目标 1。
+- 影响评估：改为 lsof 后 **A2 断言（真监听仍判占用）在所有绑定地址上成立**（比原设计更强）；残留态仍不判占用（O1 根因依旧消除）；lsof 已在 macOS 路径上被 `get_all_occupied_ports()` / `get_pid_by_lsof()` 使用，非新依赖。
+- 回退与降级：lsof 缺失/超时/权限异常（`_listening_ports()` 返回 `None`）→ socket 兜底；`lsof` 无匹配（rc=1 且 stdout/stderr 皆空）与「不可用」已区分处理。
+- 测试固化：`tests/test_port_probe.py` T1b（仅监听 127.0.0.1 → 判占用）、T1c（LAN 地址绑定 → 判占用）、T14（lsof 不可用时回退且仍不误判残留态）。
+
+### 13.2 附带优化：`find_available_port` 用 LISTEN 快照
+
+逐端口调用 `is_port_in_use` 在 darwin 上会退化为 N 次 lsof 调用（漂移扫描最坏 10000 次）。实施为「一次快照 + 集合比对」，lsof 不可用时仍逐端口 socket 探测（语义等价，规避最坏耗时）。
+
+### 13.3 其余按设计实施（逐条对照）
+
+| 决策 | 实施位置 | 说明 |
+|:--|:--|:--|
+| D2 分支序 | `cli.py:1897-1912` | ➋ 取值型 flag 重组 前置于 ➌ 路径快捷方式；触发位不变（`-o/-d/-f` 不在内） |
+| D3 退出码 | `cli.py:1429-1442` / `1705-1718` | 互斥 + `validate_port` 失败 → `sys.exit(2)`（json 模式先输出 error 信封） |
+| D4/D5 三态与宽限 | `server.py:210-300` | ①幂等（零等待）→ ②宽限 `START_GRACE_INTERVAL=0.2 × START_GRACE_ATTEMPTS=5` → ③stale（先终止再清登记）；模块级常量便于测试替换 |
+| D6 文案通道 | `server.py:293-306` | stale/终止/他人占用三类文案统一 `print(..., file=sys.stderr)`；json/默认不再经 `eprint` 写 stdout |
+| D11 lsof 参数 | `utils.py:get_pid_by_lsof(port, listen_only=False)` | `listen_only=True` 追加 `-sTCP:LISTEN`；R-7 核验与 A4 判据同口径；既有调用点不传参 ⇒ 行为不变 |
+| R-4 | `server.py:_terminate_runner` | `getpgid` → `SIGTERM` → 0.5s → `SIGKILL`，异常 best-effort |
+| R-5 | `server.py:231-238` | 宽限结束、终止前再判一次端口，防慢绑定刚就绪被误杀 |
+| R-6 | `server.py:_is_our_runner` | 命令行 token 精确匹配（`basename(token) == 'runner.py'` 且 `abs_path` 为某个完整 token），不匹配则只清登记并 stderr 说明 |
+| R-7 | `server.py:222-229` | 宽限内以 `get_pid_by_lsof(port, listen_only=True)` 核监听者；非登记 pid 占用 ⇒ 判「端口已被其他进程占用」，不 kill 他人 |
+
+### 13.4 测试与回归
+
+- 新增 `tests/test_port_probe.py`：**22 例**（T1 / T1b / T1c / T14 / T2 / T3 / T4×4 / T5 / T6 / T6b / T7 / T7b / T8 / T9 / T10 / T11 / T12a / T12b / T13）。
+- 旧行为测试同步（因 CL004 有意变更）：`tests/test_port_flag.py` 两处 web 校验由「rc=0 软拒绝」改为断言 `SystemExit(2)`；`tests/test_server.py::test_start_cleans_stale_entry` 断言改为 `captured.err`（D6）。
+- 全量：`PYTHONPATH=src python3 -m pytest tests/ -q` → **557 passed**（基线 535 + 22），0 failed。
+
+### 13.5 真机冒烟（真实 `hs` CLI，2026-09-22）
+
+| 场景 | 实测结果 |
+|:--|:--|
+| 残留态端口 + `-p`（构造 TIME_WAIT 后直接指定该端口） | rc=0，URL 端口 = 指定端口（不再假拒绝） |
+| 同目录 100ms 内连续两次启动 | registry 该 path 仅 1 条；LISTEN pid 集合 == registry pid（无孤儿） |
+| `hs -i index.html -p <N> -d --url <dir>`（CWD 存在同名文件） | 服务落 `<dir>` 且 `index_page=index.html`（修复前落 CWD） |
+| `hs <dir> --json`（注入死条目触发 stale） | stdout 首个非空字符 `{` 且 `json.loads` 通过；stale 文案在 stderr |
+| `hs web add --port 99` / `--port 9001 --no-port` | 均 rc=2，未创建条目 |
+| 核查后残留 | registry 无临时目录条目；无孤儿 runner listener（临时目录已清理） |
+
+### 13.6 Step 3 commit 清单
+
+1. `fix@cli:` 端口探测（D1′ + D11 + find_available_port 快照）
+2. `fix@cli:` 顶层 flag 归位 + web 用法错误退出码（D2/D3）
+3. `fix@cli:` stale 三态、宽限、归属校验与文案通道（D4/D5/D6/R-4~R-7）
+4. `tests@cli:` `tests/test_port_probe.py` + 旧行为测试同步
+5. `docs@sync:` CHANGELOG（Fixed + Notes 修订）/ features / spec.yaml / README ×2 / 本 §13
+
+### 13.7 观察项更新
+
+- O1（`eprint` 名不副实）本批未改（N5），CL004 新文案已全部直写 stderr。
+- O3（web 其余 error 分支退出码仍 0）本批未改（N7），留档待评估。
+- O4/O5（pid 复用、无启动锁）以归属校验 + 宽限缓解，根治需启动锁（另批候选）。

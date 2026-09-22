@@ -13,6 +13,16 @@
 - `hs start --json` 信封增 `data.port`（HTTP-SERVER-CL003，additive）
 - 未识别参数显式告警（HTTP-SERVER-CL003）— 全命令统一 stderr 提示「未识别参数（已忽略）」+ 近形引导（stdout / JSON 信封零污染，退出码不变）
 
+### Fixed
+- 端口探测「假占用」（HTTP-SERVER-CL004）— `is_port_in_use` 不再被残留态端口（`TIME_WAIT` / `FIN_WAIT_2`，如刚 `hs kill` 的服务）误判为占用：
+  - `hs start` 未给 `-p` 时不再无提示漂移到下一端口（修复前实测：8084 被 kill 后 3 秒重启落到 8085）
+  - `hs . -p <N>` 对刚释放的端口不再假拒绝；`registry._alive` / dashboard / mcp 端口判定同源修复
+  - 实现：macOS 以 lsof 的 LISTEN 集合为准（只反映真实监听者，天然不受残留连接影响）；非 macOS 或 lsof 不可用时回退 socket 探测（开 `SO_REUSEADDR`）
+- 顶层 `-i` 值泄漏走「路径快捷方式」（HTTP-SERVER-CL004）— `hs -i <CWD 存在的文件> -p <N> <dir>` 此前被当作目录快捷方式处理，导致 `-i` 被丢弃、`<dir>` 被当未识别参数忽略、服务落到当前目录；现取值型 flag（`-p/--port/-i/--index`）在场时优先按参数形态重组（`-o/-d/-f` 不受影响）
+- `hs web add/update` 用法错误软拒绝（HTTP-SERVER-CL004）— `--port` 越界与 `--port/--no-port` 互斥此前打印错误却退出 0，现统一退出 2（对齐 CL003 退出码三态）
+- 启动竞态下的孤儿 `runner` 进程（HTTP-SERVER-CL004）— 同目录 100ms 内连续两次 `hs <dir>` 时，后一次会把「已 `Popen` 但尚未 LISTEN」的前一次判为 stale 并删登记，导致进程仍在跑却无登记；现引入 ≤1.0s 启动宽限 + 归属校验（命令行 token 精确匹配 `runner.py` 与该目录，防 pid 复用误杀），判 stale 时先终止该进程组再清登记；宽限内若端口被其他进程占用则不误杀
+- stale 提示污染 `--json` 输出（HTTP-SERVER-CL004）— stale 文案此前经 `eprint` 写入 stdout，`hs <dir> --json` 触发 stale 时 JSON 信封被污染（`JSONDecodeError`）；现 stale/宽限/终止三类文案在 url / json / 默认三态一律写入 stderr
+
 ### Changed
 - **退出码语义收敛为三态**（HTTP-SERVER-CL003）：`0` 成功（含幂等命中）· `1` 运行期失败（路径不存在 / 端口不可用 / `hs kill <未注册端口>`）· `2` 用法错误（非法取值 / 越界 / 互斥参数）。此前「路径不存在」与 `hs kill <未注册端口>` 均返回 0（假成功），围绕 hs 写脚本时请改判退出码
   - `hs status <未注册端口>` 仍为 0（查询本身成功）
@@ -23,7 +33,7 @@
 ### Notes
 - 1.3.1（2026-09-04）为展示名 patch 发布，**未单列 CHANGELOG 条目**（版本链承认既有漂移，F-12）
 - `hs list --port` 语义不变（布尔开关，仅打印端口号）；指定启动端口请用 `hs start -p <N>`
-- 端口探测「假占用」（`is_port_in_use` 裸 bind 无 SO_REUSEADDR）为已知观察项，**本批不修**，另批处理（O1）
+- 端口探测「假占用」（`is_port_in_use` 裸 bind 无 SO_REUSEADDR，CL003 观察项 O1）**已在 1.4.0 内修复**（见 `### Fixed` 第一条）；实现口径由「纯 socket 探测」调整为「macOS 以 lsof LISTEN 为准 + socket 回退」（CL004 实施偏差，理由见设计件 §13）
 
 ## 1.3.0 (2026-08-27)
 

@@ -50,9 +50,10 @@
 9. `--domain` 布尔 — 执行时把 config.domain 注入 cmd 末尾（`cmd ... --domain "<domain>"`，如 `dk server start --daemon --open` → 追加 `--domain "jaden.local"`）；json 输出含 `cmd_effective` ✅ — HTTP-SERVER-CL002
 10. 名称校验复用 bookmark 规则 `[a-zA-Z0-9][a-zA-Z0-9._-]*` + web 子命令名（add/update/list/show/remove/help）冲突拦截 ✅ — SEC-022-1
 11. 损坏检测 — 非空 JSON 语法错 / 合法 JSON 非 dict / services 非 list → `DataCorruptionError`（SEC-022-2）；bookmark 同规则 ✅
-12. 全局薄壳 `~/.local/bin/web` 转发 — 达成 `web <name>` 语法 ✅
-13. 推广 — skills/hs-web（命令速查 + 其他模块接入指南 + 真实实例 daily.checker/jaden.tech/线上站点），`hs prompt hs-web` 输出，镜像 ~/.hermes/profiles/ops/skills/devops/hs-web/ ✅ — HTTP-SERVER-CL002
-14. 关联文档: HTTP-SERVER-CL001 review (documents/review/http-server-cli-web-registration-audit-v1.0-20260827.md) / HTTP-SERVER-CL002 review (documents/review/http-server-cli-cl002-web-domain-promo-audit-v1.0-20260827.md, documents/review/http-server-cli-cl002-sec023-1-domain-validation-rereview-v1.1-20260827.md)
+12. `hs web add/update --port <N> | --no-port` — 端口注入声明（执行期在 `--domain` 之后追加 `--port <N>`）；用法错误（越界 / 互斥）退出 2 ✅ — HTTP-SERVER-CL003 + CL004
+13. 全局薄壳 `~/.local/bin/web` 转发 — 达成 `web <name>` 语法 ✅
+14. 推广 — skills/hs-web（命令速查 + 其他模块接入指南 + 真实实例 daily.checker/jaden.tech/线上站点），`hs prompt hs-web` 输出，镜像 ~/.hermes/profiles/ops/skills/devops/hs-web/ ✅ — HTTP-SERVER-CL002
+15. 关联文档: HTTP-SERVER-CL001 review (documents/review/http-server-cli-web-registration-audit-v1.0-20260827.md) / HTTP-SERVER-CL002 review (documents/review/http-server-cli-cl002-web-domain-promo-audit-v1.0-20260827.md, documents/review/http-server-cli-cl002-sec023-1-domain-validation-rereview-v1.1-20260827.md)
 
 ## HTTP 服务
 
@@ -67,7 +68,7 @@
 
 1. 自动端口分配 — 默认 8080，冲突自动递增 ✅
 2. 指定端口 — `hs start -p <port>`（CLI 优先于 config.port 且一次性不回写；被占用 / 保留端口 8180/8181 fail-closed 不漂移）✅ — HTTP-SERVER-CL003
-3. 端口检测 — IPv4 + IPv6 双栈 bind 检测（macOS 兼容）✅ — `documents/ports-detect-design-v1.1-20250716.md`
+3. 端口检测 — macOS 以 lsof LISTEN 集合为准（真实监听者，含 127.0.0.1 / LAN 绑定）；非 macOS 或 lsof 不可用时回退 IPv4 + IPv6 双栈 bind 探测（开 `SO_REUSEADDR`，残留态 `TIME_WAIT` 不误判）✅ — HTTP-SERVER-CL004（原 `documents/ports-detect-design-v1.1-20250716.md`）
 4. 进程资源监控 — CPU%、内存 MB、运行时长 ✅
 5. 进程组管理 — daemon 模式 `os.killpg` 防孤儿进程 ✅
 6. 原子写入 — 防多进程并发脏读 ✅
@@ -77,6 +78,8 @@
 10. 退出码三态 — 0 成功（含幂等）/ 1 运行期失败（路径不存在、端口不可用、`hs kill` 未注册端口）/ 2 用法错误 ✅ — HTTP-SERVER-CL003
 11. 未识别参数告警 — stderr 提示「未识别参数（已忽略）」+ 近形引导（stdout / JSON 信封零污染）✅ — HTTP-SERVER-CL003
 12. 顶层 `-p` 归位 — `hs -p 8099 [path]` 不再误报 `Unknown command` ✅ — HTTP-SERVER-CL003
+13. 顶层取值型 flag 归位 — `hs -i <CWD 存在的文件> -p <N> <dir>` 按参数形态优先重组（`-i` 与 `<dir>` 均保留；`-o/-d/-f` 不受影响）✅ — HTTP-SERVER-CL004
+14. 启动竞态防护 — 同目录并发启动 ≤1.0s 宽限 + 归属校验（token 精确匹配 `runner.py` + 目录）；判 stale 先终止进程组再清登记，防孤儿进程与误杀；stale 文案三态一律 stderr ✅ — HTTP-SERVER-CL004
 
 ## 数据持久化
 
@@ -127,7 +130,7 @@
 
 ## 测试
 
-1. 14 个测试模块，535 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
+1. 18 个测试模块，557 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
 2. `conftest.py` — autouse 数据隔离 + monkeypatch 路径注入 ✅
 3. 集成测试模式 — mock `_COMMANDS` / `ensure_storage`，set `sys.argv`，catch `SystemExit` ✅
 

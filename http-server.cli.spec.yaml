@@ -166,6 +166,40 @@ specs:
             when: 执行 hs start .（新建）后再次执行（幂等命中）
             then: 两次均为退出码 0
 
+      - id: lifecycle-06
+        name: 启动竞态防护（宽限 + 归属校验）
+        description: 同目录并发启动时以 ≤1.0s 宽限识别「启动中」，判 stale 时先终止本工具进程组再清登记；stale 文案三态一律 stderr（HTTP-SERVER-CL004 / D4 / D6）
+        priority: MUST
+        scenarios:
+          - name: 同目录 100ms 内连续两次启动
+            given: 无该目录的服务在运行
+            when: 先后（间隔 <100ms）执行两次 hs <dir> -d --url
+            then:
+              - 两次输出同一 URL（第二次幂等命中，不判 stale）
+              - registry 中该 path 仅 1 条
+              - 该端口 LISTEN 的 runner 进程集合与 registry 条目的 pid 一致（无孤儿进程）
+
+          - name: 判定 stale 时不留下孤儿
+            given: registry 中存在该目录条目，pid 存活但端口始终未监听（启动失败）
+            when: 执行 hs <dir>
+            then:
+              - 归属校验通过时先终止该进程组，再移除 registry 条目
+              - stderr 输出 stale 提示（含 pid 与已终止说明）
+
+          - name: 归属校验拦截误杀
+            given: registry 登记的 pid 已被系统复用给无关进程（命令行不含 runner.py）
+            when: 执行 hs <dir>
+            then:
+              - 不终止该进程，仅移除 registry 条目
+              - stderr 说明「登记 pid 非本工具服务，仅清理登记」
+
+          - name: stale 文案不污染 stdout
+            given: registry 中存在死 pid 条目
+            when: 执行 hs <dir> --json
+            then:
+              - stdout 首个非空字符为 { 且可被 json 解析
+              - stale 文案出现在 stderr
+
   # ── 端口分配 ───────────────────────────────────────
 
   port-allocation:
@@ -247,6 +281,29 @@ specs:
             then:
               - 返回既有端口（-p 被忽略，stderr 注记）
               - 不报「已被占用」/「保留端口」，退出码 0
+
+      - id: port-05
+        name: 端口探测语义（真实监听者 vs 残留态）
+        description: 真实 LISTEN 端口一律判占用（含仅绑定 127.0.0.1 / LAN 地址的服务）；残留态端口（TIME_WAIT/FIN_WAIT_2）不判占用（HTTP-SERVER-CL004 / D1）
+        priority: MUST
+        scenarios:
+          - name: 残留态端口不判占用
+            given: 端口刚被 hs kill，连接处于 TIME_WAIT（无进程监听）
+            when: 执行 hs <dir> -p <该端口>
+            then:
+              - 服务正常绑定该端口（不漂移、不报「已被占用」）
+
+          - name: 真实监听端口仍判占用
+            given: 端口 8080 上有进程处于 LISTEN（含仅绑定 127.0.0.1 的服务）
+            when: 执行 hs <dir> -p 8080
+            then:
+              - stderr 输出占用者（PID 或端口占用者描述）
+              - 不启动服务，退出码 1
+
+          - name: 自动漂移不再被残留态触发
+            given: config.port 对应端口仅剩 TIME_WAIT 残留（无监听者）
+            when: 执行 hs <dir>
+            then: 服务绑定 config.port 本身（不递增到下一端口）
 
   # ── Registry ───────────────────────────────────────
 
@@ -405,6 +462,38 @@ specs:
             given: Shell 展开出多份 html 文件参数
             when: 执行 hs a.html b.html
             then: 不误报未识别参数（沿用取最近修改文件语义）
+
+      - id: cli-05
+        name: 取值型 flag 优先归位与 web 用法错误退出码
+        description: 取值型 flag（-p/--port/-i/--index）在场时其重组分支先于路径快捷方式；hs web add/update 的用法错误统一 exit 2（HTTP-SERVER-CL004 / D2 / D3）
+        priority: MUST
+        scenarios:
+          - name: -i 的值在 CWD 存在
+            given: 当前目录存在 index.html，目标目录 /tmp/site 存在
+            when: 执行 hs -i index.html -p 8095 /tmp/site
+            then:
+              - 重组为 start 参数（-i index.html -p 8095 /tmp/site）
+              - 服务落在 /tmp/site（不回退到当前目录），-i 生效
+              - registry 该条 path 为解析后的 /tmp/site
+
+          - name: 无 flag 时的路径快捷方式不受影响
+            given: 当前目录存在 index.html
+            when: 执行 hs index.html
+            then: 仍按路径快捷方式启动（等价 hs start index.html）
+
+          - name: web 端口越界
+            given: 端口取值需在 1024-65535
+            when: 执行 hs web add demo --cmd true --port 99
+            then:
+              - stderr 输出 Port must be between 1024-65535
+              - 不创建条目，退出码 2（修前为 0，属「软拒绝」）
+
+          - name: web 端口互斥
+            given: --port 与 --no-port 语义互斥
+            when: 执行 hs web update demo --port 9001 --no-port
+            then:
+              - stderr 输出 --port and --no-port are mutually exclusive
+              - 退出码 2
 
   # ── 智能首页跳转 ───────────────────────────────────
 

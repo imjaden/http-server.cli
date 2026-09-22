@@ -126,7 +126,7 @@ hs kill-all                 # 一键全关
 | `hs /path/to/file.html [-o]` | HTML 文件 → 自动提取目录 + 设 index |
 | `hs /path/snapshots/*.html [-o]` | 路径通配符 → 取最近文件 |
 | `hs start [path] [-o] [-d] [-f] [-i <file>] [-p <port>]` | `hs .` 的完整形式 |
-| `hs . -p 8099 [-o]` | 指定端口（1024-65535；被占用即失败退出 1，不自动漂移） |
+| `hs . -p 8099 [-o]` | 指定端口（1024-65535；被占用即失败退出 1，不自动漂移）。刚释放的端口（TIME_WAIT 残留）可直接复用 |
 
 ### 查看
 
