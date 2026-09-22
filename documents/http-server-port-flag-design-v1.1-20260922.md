@@ -233,6 +233,8 @@ hs dashboard restart --port N        # 用 N 启动（受 D2 保留端口规则�
 
 **行为变更声明（F-5/D14，必须落地到 CHANGELOG `### Changed` + §11 风险表 + A15）**：
 - `hs <不存在路径>` / `hs kill <未注册端口>` 等「运行期失败」此前返回 **0**（假成功），本批起返回 **1**；
+- `kill` 的口径依据：实测现状 `hs kill 59999` → `ℹ️ Port 59999 not registered` + **exit 0**（未执行任何操作却报成功），
+  改 1 对齐 Unix `kill <不存在进程>` 语义；**`hs status <未注册端口>` 为查询命令，保持 exit 0**（查询本身成功，无目标不等于失败）；
 - 与 `--url` 模式已有语义对齐（cli.py:230-231 `sys.exit(0 if result else 1)`），消除同族不一致。
 
 ### 4.7 `ServerManager.start()` 返回契约（D14 的实现前提）
