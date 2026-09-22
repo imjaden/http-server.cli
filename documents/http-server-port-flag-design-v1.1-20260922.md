@@ -383,7 +383,33 @@ hs dashboard restart --port N        # 用 N 启动（受 D2 保留端口规则�
 
 | 步 | 产物 | 门禁 |
 |:--|:-----|:-----|
-| Step 3 dev | `feat@cli:`（-p 面 + 顺序链 + 校验 + 双态提示）／`feat@cli:`（未知参数 helper + 顶层重组）／`fix@cli:`（退出码 2/1 + 返回契约）／`feat@cli:`（dashboard restart + web --port）／`tests@cli:`／`docs@sync:`（help + README 双页 + 5 capability 四同步） | 本地全量 pytest 零回归 |
+| Step 3 dev | 实际 3 笔（见 §13.2）：`feat@cli:`（①②③④ 源码：-p 面 + 顺序链 + 校验 + 双态提示 + 未识别参数 helper + 顶层重组 + 退出码 + dashboard/web 端口面）／`tests@cli:`（45 新增 + 1 更新）／`docs@sync:`（_HELP + README 双页 + skills/hs-cli + features.md + CHANGELOG + `__version__` + spec.yaml 5 capability） | 本地全量 pytest 零回归 |
 | Step 4 ops 核查 | harness（A1–A17）+ 核查报告 `documents/review/http-server-cli-cl003-ops-verify-v1.0-20260922.md` | 全部断言 PASS |
 | Step 5 实现审计 | review 侧报告 + review-log + `.review-level.yaml`；PASS → push（github only） | PASS / CONDITIONAL 回修 |
 | Step 6 收尾 | 复盘 md + 清单 + 四件套 + O1/O2 登记 | `hm loop artifacts` 齐全 |
+
+## 13 实施记录与偏差（Step 3 回填）
+
+### 13.1 消息通道口径（R-2 落地）
+- 本批新增的三类文本统一走 **stderr**：`-p` 区间/保留端口/占用 fail-closed 文案、幂等命中注记（`-i` 忽略提示）、未识别参数告警。
+- 仓库既有 `eprint()`（`utils.py`）**实际写 stdout**（函数内无 `file=` 参数，名字有误导性），故新代码不复用 `eprint`，改用 `print(..., file=sys.stderr)`；`--url` 模式的既有错误行同为此风格（`server.py` 早期分支）。
+- 影响：A3 / A4 / A6 / A9 的「stderr 含 …」断言成立；stdout 与 `--json` 信封保持零污染。
+
+### 13.2 commit 分组（设计 §12 原列 6 组 → 实际 3 笔）
+| 实际 commit | 覆盖 | 未按 6 组拆的原因 |
+|:--|:--|:--|
+| `feat@cli:`（1 笔） | ①②③④ 全部源码（cli.py / server.py / services.py）+ `_HELP` 文案 | cli.py 一个文件同时承载 `-p` parser、未知参数 helper、退出码、dashboard/web 端口面与 help 文案，hunk 级暂存只为对齐分组、收益低；commit body 按 ①②③④ 分节标注落点 |
+| `tests@cli:`（1 笔） | `tests/test_port_flag.py`（45 用例）+ `tests/test_web.py`（1 用例更新） | 同批特性测试 |
+| `docs@sync:`（1 笔） | README ×2 / skills/hs-cli / features.md / CHANGELOG / `__version__` + `__release_date__` / spec.yaml（5 capability + version 1.4.0）/ 本文档 §12 + §13 | 四同步一次到位 |
+
+### 13.3 实测校准（ops harness 注意）
+1. **幂等优先会掩盖 fail-closed 断言**：同一路径第二次调用（含带 `-p`）即命中幂等分支 ⇒ A3/A4/A5 类用例**必须各用不同路径**（实测：用同一路径连跑，`-p 8080`/`-p 8180`/`-p 99` 全部被幂等分支吞掉，只打印「已运行在 8099」）。
+2. **registry 的 path 为 realpath**：macOS `/tmp` → `/private/tmp`，`hs list --json` 与断言比较需用 `os.path.realpath()`（实测 `list --json` 输出 `path=/private/tmp/cl003demo`）。
+3. **`-p` 直绑越过 `MAX_PORT`**：`-p 20000` 成功（D15），仅自动漂移扫描受 `MAX_PORT=10000` 约束。
+4. **A16 双态提示需制造占用**：空闲态文案为「如需启动请用 `hs dashboard -p 8180`」；占用态（dashboard 在 8180 运行）文案为「正在使用，PID …」。
+5. 顶层归位实测：`hs -p 8099 -d --url <path>` 与 `hs <path> -p 8099 -d --url` 等价（归位后按原顺序交付 start）。
+
+### 13.4 同步产物
+- spec.yaml：`port-04`（6 场景）/ `lifecycle-05`（4 场景）/ `cli-04`（4 场景）/ `dash-05`（4 场景）/ `json-03`（2 场景），`version: 1.4.0`。
+- 测试：`PYTHONPATH=src python3 -m pytest tests/ -q` → **535 passed**（490 基线 + 45 新增；`test_web.py::test_list_sort_by_invalid_choice` 按 D9e 更新为 exit 2）。
+- 版本：`__version__ = 1.4.0` / `__release_date__ = 2026-09-22` / CHANGELOG `## 1.4.0` / features.md 14 模块 535 用例。

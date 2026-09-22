@@ -91,7 +91,7 @@ pip install http-server-cli
 
 Verify:
 ```
-hs version     # → http-server v1.2.x
+hs version     # → http-server v1.4.x
 hs -o        # Start in current directory + open browser
 ```
 
@@ -125,14 +125,15 @@ hs kill-all                 # Kill all
 | `hs . -i './snapshots/*.html' [-o]` | Glob → most recently modified file |
 | `hs /path/to/file.html [-o]` | HTML file path → auto-extract directory + set index |
 | `hs /path/snapshots/*.html [-o]` | Path glob → most recent file |
-| `hs start [path] [-o] [-d] [-f] [-i <file>]` | Full form of `hs .` |
+| `hs start [path] [-o] [-d] [-f] [-i <file>] [-p <port>]` | Full form of `hs .` |
+| `hs . -p 8099 [-o]` | Pin the port (1024-65535; exits 1 if busy — no auto-drift) |
 
 ### View
 
 | Command | Description |
 |:--------|:------------|
 | `hs list` | List running servers (alive only) |
-| `hs list --port` | Ports only |
+| `hs list --port` | Ports only (boolean flag; to pin a start port use `hs start -p <N>`) |
 | `hs list --path` | Paths only |
 | `hs list --short` | `port:path` format |
 | `hs list --json` | JSON output |

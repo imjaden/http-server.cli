@@ -27,12 +27,15 @@ pip install --upgrade http-server-cli
 hs -o                    当前目录启动 + 打开浏览器
 hs ~/my-site -o          指定目录启动 + 打开浏览器
 hs . -i app.html         指定首页文件
-hs . -d                  后台运行（不占用终端）
+hs . -p 8099             指定端口（1024-65535；被占用即失败退出，不漂移）
+hs . -d                  分离运行 + 前台 tail 日志（Ctrl+C 只停 tail；非阻塞用 --url/--json）
 hs . --url               仅返回服务 URL（与 --json 互斥）
 hs                       默认等于 hs .（当前目录启动）
-hs start [path]          显式启动（-o 打开浏览器 / -d 后台 / -i <file> 首页）
+hs start [path]          显式启动（-o 打开浏览器 / -d 分离 / -f 前台 / -i <file> 首页 / -p <port> 端口）
 hs /path/*.html          通配符解析最近修改的 HTML
 ```
+
+> 未识别参数（如 `--prot`）会打印 stderr 告警而非静默忽略；退出码 `1`=运行期失败 / `2`=用法错误。
 
 ### 服务管理
 

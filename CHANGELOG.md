@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.4.0 (2026-09-22)
+
+### Added
+- `hs start -p/--port <N>`（HTTP-SERVER-CL003）— 指定启动端口，CLI 优先于 `config.port`（一次性，不回写配置）
+  - fail-closed：端口被占用即报占用者（PID/路径）+ 换端口提示并退出 1，不再静默漂移
+  - 保留端口 8180（dashboard）/ 8181（mcp）硬拦 + 双态提示（被占用报「正在使用，PID …」；空闲提示 `hs dashboard -p 8180`）
+  - 区间 1024-65535（越界退出 2）；`-p` 直绑不受自动漂移上限 `MAX_PORT=10000` 约束
+  - 已运行路径 + `-p` → 幂等命中（忽略 `-p`，stderr 注记；换端口先 `hs kill <port>`）
+- `hs web add/update --port <N> | --no-port`（HTTP-SERVER-CL003）— 注册命令可声明端口注入，执行时在 `--domain` 之后追加 `--port <N>`；`services.json` 增 `use_port`/`port` 字段（旧数据缺字段按未启用兼容）
+- `hs dashboard restart --port <N>`（HTTP-SERVER-CL003）— 指定端口重启面板；未给则沿用当前 entry 端口（修 1.3.x 硬编码 8180）
+- `hs start --json` 信封增 `data.port`（HTTP-SERVER-CL003，additive）
+- 未识别参数显式告警（HTTP-SERVER-CL003）— 全命令统一 stderr 提示「未识别参数（已忽略）」+ 近形引导（stdout / JSON 信封零污染，退出码不变）
+
+### Changed
+- **退出码语义收敛为三态**（HTTP-SERVER-CL003）：`0` 成功（含幂等命中）· `1` 运行期失败（路径不存在 / 端口不可用 / `hs kill <未注册端口>`）· `2` 用法错误（非法取值 / 越界 / 互斥参数）。此前「路径不存在」与 `hs kill <未注册端口>` 均返回 0（假成功），围绕 hs 写脚本时请改判退出码
+  - `hs status <未注册端口>` 仍为 0（查询本身成功）
+  - argparse 报错不再被吞掉：`hs dashboard -p abc` 等此前打印错误却退出 0，现退出 2
+- 顶层 `-p` 归位（HTTP-SERVER-CL003）：`hs -p 8099 [path]` 不再误报 `Unknown command: 8099`，按原顺序重组给 `start`
+- help / skills/hs-cli / README 中 `-d` 文案改为如实描述（服务已分离，CLI 随后**前台 tail 日志**；真正非阻塞用 `--url` 或 `--json`）
+
+### Notes
+- 1.3.1（2026-09-04）为展示名 patch 发布，**未单列 CHANGELOG 条目**（版本链承认既有漂移，F-12）
+- `hs list --port` 语义不变（布尔开关，仅打印端口号）；指定启动端口请用 `hs start -p <N>`
+- 端口探测「假占用」（`is_port_in_use` 裸 bind 无 SO_REUSEADDR）为已知观察项，**本批不修**，另批处理（O1）
+
 ## 1.3.0 (2026-08-27)
 
 ### Added

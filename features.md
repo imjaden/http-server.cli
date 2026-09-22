@@ -10,7 +10,7 @@
 
 ## CLI 命令
 
-1. `hs start [path]` — 启动服务，选项: `-o` 打开浏览器 / `-d` 后台 / `-f` 前台 / `-i <file>` 首页 ✅ — `documents/hs-cli-design-v1.0-20260624.md`
+1. `hs start [path]` — 启动服务，选项: `-o` 打开浏览器 / `-d` 分离运行（前台 tail 日志）/ `-f` 前台 / `-i <file>` 首页 / `-p <port>` 指定端口（1024-65535；被占用即失败退出，不漂移）✅ — `documents/hs-cli-design-v1.0-20260624.md`
 2. `hs .` — 快捷启动当前目录（等价 `hs start .`）✅
 3. `hs <name>` — 书签名称启动（自动解析为 `hs start <path>`）✅
 4. `hs list [--port|--path|--short] [--json]` — 列出运行中服务 ✅
@@ -66,13 +66,17 @@
 ## 服务管理
 
 1. 自动端口分配 — 默认 8080，冲突自动递增 ✅
-2. 端口检测 — IPv4 + IPv6 双栈 bind 检测（macOS 兼容）✅ — `documents/ports-detect-design-v1.1-20250716.md`
-3. 进程资源监控 — CPU%、内存 MB、运行时长 ✅
-4. 进程组管理 — daemon 模式 `os.killpg` 防孤儿进程 ✅
-5. 原子写入 — 防多进程并发脏读 ✅
-6. 智能历史 — `hs history` 自动过滤系统临时目录 ✅
-7. 文件路径 kill — `hs kill ~/my-site` 按路径关闭 ✅
-8. HTML 文件 kill — `hs kill file.html` 自动解析父目录 ✅
+2. 指定端口 — `hs start -p <port>`（CLI 优先于 config.port 且一次性不回写；被占用 / 保留端口 8180/8181 fail-closed 不漂移）✅ — HTTP-SERVER-CL003
+3. 端口检测 — IPv4 + IPv6 双栈 bind 检测（macOS 兼容）✅ — `documents/ports-detect-design-v1.1-20250716.md`
+4. 进程资源监控 — CPU%、内存 MB、运行时长 ✅
+5. 进程组管理 — daemon 模式 `os.killpg` 防孤儿进程 ✅
+6. 原子写入 — 防多进程并发脏读 ✅
+7. 智能历史 — `hs history` 自动过滤系统临时目录 ✅
+8. 文件路径 kill — `hs kill ~/my-site` 按路径关闭 ✅
+9. HTML 文件 kill — `hs kill file.html` 自动解析父目录 ✅
+10. 退出码三态 — 0 成功（含幂等）/ 1 运行期失败（路径不存在、端口不可用、`hs kill` 未注册端口）/ 2 用法错误 ✅ — HTTP-SERVER-CL003
+11. 未识别参数告警 — stderr 提示「未识别参数（已忽略）」+ 近形引导（stdout / JSON 信封零污染）✅ — HTTP-SERVER-CL003
+12. 顶层 `-p` 归位 — `hs -p 8099 [path]` 不再误报 `Unknown command` ✅ — HTTP-SERVER-CL003
 
 ## 数据持久化
 
@@ -123,7 +127,7 @@
 
 ## 测试
 
-1. 13 个测试模块，490 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
+1. 14 个测试模块，535 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
 2. `conftest.py` — autouse 数据隔离 + monkeypatch 路径注入 ✅
 3. 集成测试模式 — mock `_COMMANDS` / `ensure_storage`，set `sys.argv`，catch `SystemExit` ✅
 

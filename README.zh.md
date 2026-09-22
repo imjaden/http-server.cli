@@ -91,7 +91,7 @@ pip install http-server-cli
 
 验证：
 ```
-hs version     # → http-server v1.2.x
+hs version     # → http-server v1.4.x
 hs -o        # 当前目录启动 + 打开浏览器
 ```
 
@@ -125,14 +125,15 @@ hs kill-all                 # 一键全关
 | `hs . -i './snapshots/*.html' [-o]` | 通配符 → 取最近修改的文件 |
 | `hs /path/to/file.html [-o]` | HTML 文件 → 自动提取目录 + 设 index |
 | `hs /path/snapshots/*.html [-o]` | 路径通配符 → 取最近文件 |
-| `hs start [path] [-o] [-d] [-f] [-i <file>]` | `hs .` 的完整形式 |
+| `hs start [path] [-o] [-d] [-f] [-i <file>] [-p <port>]` | `hs .` 的完整形式 |
+| `hs . -p 8099 [-o]` | 指定端口（1024-65535；被占用即失败退出 1，不自动漂移） |
 
 ### 查看
 
 | 命令 | 说明 |
 |:--------|:------------|
 | `hs list` | 列出运行中的服务（仅存活实例） |
-| `hs list --port` | 仅端口号 |
+| `hs list --port` | 仅端口号（布尔开关；指定启动端口用 `hs start -p <N>`） |
 | `hs list --path` | 仅路径 |
 | `hs list --short` | `端口:路径` 格式 |
 | `hs list --json` | JSON 输出 |
