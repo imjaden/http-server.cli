@@ -1432,14 +1432,14 @@ def _web_add(args):
             json_output(False, cmd, error=err)
         else:
             print(f'❌ {err}', file=sys.stderr)
-        return
+        sys.exit(2)   # CL004 D3：用法错误统一 exit 2（对齐 start 口径 D9e）
     err = ServiceStore.validate_port(parsed.port)
     if err:
         if json_mode:
             json_output(False, cmd, error=err)
         else:
             print(f'❌ {err}', file=sys.stderr)
-        return
+        sys.exit(2)   # CL004 D3
 
     store = ServiceStore()
     try:
@@ -1705,14 +1705,14 @@ def _web_update(args):
             json_output(False, cmd, error=err)
         else:
             print(f'❌ {err}', file=sys.stderr)
-        return
+        sys.exit(2)   # CL004 D3：用法错误统一 exit 2（对齐 start 口径 D9e）
     err = ServiceStore.validate_port(parsed.port)
     if err:
         if json_mode:
             json_output(False, cmd, error=err)
         else:
             print(f'❌ {err}', file=sys.stderr)
-        return
+        sys.exit(2)   # CL004 D3
 
     # --no-domain 优先（清除语义，对齐 --url ''）
     use_domain = None
@@ -1894,16 +1894,18 @@ def main():
                     implicit += ['-i', idx]
             parsed.args = implicit + parsed.args
             cmd = 'start'
-        # ➋ 回退到路径快捷方式
+        # ➋ 取值型 flag 的值被 argparse 误判为 positional（D8 / CL004 D2）：
+        #     hs -p 8089 → command='8089'/unknown=['-p']；hs -i a.html -p 8089 → command='a.html'/unknown=['-i']
+        #     按原顺序重组回 start 参数；有意不含 -o/-d/-f（布尔 flag 无「值泄漏」场景）。
+        #     CL004 D2：本分支**先于**路径快捷方式——取值型 flag 在场即用户明确使用参数形态；
+        #     否则 hs -i <CWD 存在的文件> -p N <dir> 会命中快捷方式，丢掉 -i 且服务落 CWD。
+        elif unknown and any(t in ('-p', '--port', '-i', '--index') for t in unknown):
+            parsed.args = unknown + [parsed.command] + parsed.args
+            cmd = 'start'
+        # ➌ 回退到路径快捷方式
         elif (cmd.startswith(('.', '/', '~')) or cmd == '..'
                 or os.path.exists(cmd) or glob.glob(cmd)):
             parsed.args = [parsed.command] + parsed.args
-            cmd = 'start'
-        # ➌ 取值型 flag 的值被 argparse 误判为 positional（D8）：
-        #     hs -p 8089 → command='8089'/unknown=['-p']；hs -i a.html -p 8089 → command='a.html'/unknown=['-i']
-        #     按原顺序重组回 start 参数；有意不含 -o/-d/-f（布尔 flag 无「值泄漏」场景）
-        elif unknown and any(t in ('-p', '--port', '-i', '--index') for t in unknown):
-            parsed.args = unknown + [parsed.command] + parsed.args
             cmd = 'start'
         else:
             eprint(f'Unknown command: {cmd}', '❌')
