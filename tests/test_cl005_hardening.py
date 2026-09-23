@@ -368,6 +368,49 @@ class TestStartLockProtocol:
         assert 'time.clock_gettime(time.CLOCK_MONOTONIC)' in src
 
 
+# ── T28：注册失败回滚（SEC-1 / 设计 D3.5）───────────────
+
+class TestRegistryRollback:
+
+    def test_t28_registry_add_failure_terminates_runner(self, temp_project, capsys, monkeypatch):
+        """D3.5：registry.add 抛异常 ⇒ 先终止本次 runner（不产生孤儿）并报运行期失败。"""
+        popen_calls, _ = _mocked_start_env(monkeypatch)
+        monkeypatch.setattr('http_server_cli.server.time.sleep', lambda s: None)
+        killed = []
+        monkeypatch.setattr('http_server_cli.server._terminate_runner',
+                            lambda pid: (killed.append(pid), True)[1])
+        from http_server_cli.registry import Registry
+
+        def boom(self, **kw):
+            raise OSError('disk full')
+
+        monkeypatch.setattr(Registry, 'add', boom)
+        assert ServerManager().start(path=temp_project, url_only=True) is False
+        captured = capsys.readouterr()
+        assert killed == [90001]                                   # 本次 runner 被终止
+        assert 'Registry write failed' in captured.err
+        assert not os.path.exists(hs_utils.lock_path(_abs(temp_project)))   # 锁已释放（finally）
+
+    def test_t28b_history_add_failure_json_envelope(self, temp_project, capsys, monkeypatch):
+        """history.add 失败同样回滚；`--json` 走信封（stdout 可解析、success=false）。"""
+        _mocked_start_env(monkeypatch)
+        monkeypatch.setattr('http_server_cli.server.time.sleep', lambda s: None)
+        killed = []
+        monkeypatch.setattr('http_server_cli.server._terminate_runner',
+                            lambda pid: (killed.append(pid), True)[1])
+        from http_server_cli.history import HistoryStore
+
+        def boom(self, **kw):
+            raise OSError('read-only fs')
+
+        monkeypatch.setattr(HistoryStore, 'add', boom)
+        assert ServerManager().start(path=temp_project, json=True) is False
+        payload = json.loads(capsys.readouterr().out)
+        assert payload['success'] is False and 'Registry write failed' in payload['error']
+        assert killed == [90001]
+        assert not os.path.exists(hs_utils.lock_path(_abs(temp_project)))
+
+
 # ── T25：派发件模板 ─────────────────────────────────────
 
 class TestReviewDispatchTemplate:

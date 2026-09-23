@@ -436,6 +436,10 @@ def a9_dispatch_template():
     stubdir = os.path.join(WORK, 'stub-bin')
     shutil.rmtree(stubdir, ignore_errors=True)
     os.makedirs(stubdir)
+    # 假 pgrep：派发壳的「等 review 通道空闲」循环立即满足（不依赖真实通道状态）
+    with open(os.path.join(stubdir, 'pgrep'), 'w', encoding='utf-8') as f:
+        f.write('#!/bin/bash\nexit 1\n')
+    os.chmod(os.path.join(stubdir, 'pgrep'), 0o755)
     stub = os.path.join(stubdir, 'hermes')
     with open(stub, 'w', encoding='utf-8') as f:
         f.write('#!/bin/bash\n'
@@ -499,7 +503,7 @@ def a12_sync():
     ch = Path(ROOT, 'CHANGELOG.md').read_text(encoding='utf-8')
     chg_ok = '## 1.4.1 (2026-09-23)' in ch and '目录级启动锁' in ch
     feat = Path(ROOT, 'features.md').read_text(encoding='utf-8')
-    feat_ok = '17 个测试模块，590 个测试用例' in feat
+    feat_ok = '17 个测试模块，592 个测试用例' in feat
     ls = subprocess.run(['git', 'ls-files', 'tests/test_*.py'], cwd=ROOT,
                         capture_output=True, text=True).stdout.split()
     n_mod = len(set(ls))
@@ -633,8 +637,19 @@ def a16_ownership():
         write_lock(d, {'path': d, 'pid': holder.pid, 'started_mono': mono, 'started_at': ''})
         hs([d, '-p', str(port)])
         owner_ok = os.path.exists(lf) and not listen_pids(port)
-        check('A16', owner_ok, 'release 归属：他人有效锁未被删=%s 且未启动 runner=%s'
-              % (os.path.exists(lf), not listen_pids(port)))
+        # 注册失败回滚（SEC-1，设计 D3.5）：以 T28/T28b 可复跑用例为证据（进程内注入写盘失败）
+        rollback_ok = False
+        try:
+            rb = subprocess.run([sys.executable, '-m', 'pytest',
+                                 'tests/test_cl005_hardening.py::TestRegistryRollback', '-q', '-n', '0'],
+                                capture_output=True, text=True, timeout=300, cwd=ROOT)
+            rollback_ok = rb.returncode == 0 and '2 passed' in rb.stdout
+        except Exception as ex:      # noqa: BLE001
+            print('   rollback 异常:', ex)
+
+        check('A16', owner_ok and rollback_ok,
+              'release 归属：他人有效锁未被删=%s 且未启动 runner=%s ｜ 注册失败回滚（T28/T28b）=%s'
+              % (os.path.exists(lf), not listen_pids(port), rollback_ok))
     finally:
         holder.kill()
         holder.wait()
@@ -728,7 +743,10 @@ def main():
     try:
         for aid, fn in steps:
             if wanted(aid):
-                fn()
+                try:
+                    fn()
+                except Exception as ex:            # noqa: BLE001
+                    check(aid, False, '断言执行异常：%r' % ex)
     finally:
         # 复原数据目录（registry / services）
         if REG_BACKUP:
