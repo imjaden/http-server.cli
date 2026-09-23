@@ -1232,4 +1232,43 @@ CL005 设计 v1.2 限定复审（只审 round-2 两项 🟡 必改 + 两项增�
 | F-4a | 测试同步清单补全至 12 处 | 🟡 | P1 | ✅ Closed（v1.2） |
 | R-16~R-23 | T26 阈值/§5 漏行/sleep 语义/措辞/标签 8 项 | 🟢 | P2 | 记录（同批/下批 docs@sync 勘误） |
 
+---
+
+## 2026-09-23 — Implementation audit: HTTP-SERVER-CL005 (P1🟡)
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（实现审计 — 对照设计 v1.2 §9 逐项实证，不采信 ops 21/21 与 dev 自评）
+- **Scope**: 5 笔未 push commit（f3a4ac6 fix@cli · 7e92521 tests@cli · 709424d feat@tool · 0706bd4 docs@sync · 31bf823 test@verify），被审对象 src/{utils,cli,server}.py + tests/test_cl005_hardening.py + scripts/review-dispatch.sh；修前反证基线 4679ee8（git worktree 取基线复算）
+- **Commit(s)**: 31bf823（ahead 5，未 push）
+- **Verdict**: 🟡 CONDITIONAL_PASS（不 push，回 ops 重审）
+- **Score**: 90 / 100 (Rating: A-)
+- **Report**: documents/review/http-server-cli-cl005-audit-v1.0-20260923.md
+
+### Summary
+
+CL005 实现审计（输出通道 D1 / web 退出码 D2 / 目录级启动锁 D3 / 派发件 D4），全部以独立实测命令绑定结论。基线 590 passed、`hs version`=1.4.1、工作树 clean。D1：独立 grep 静态扫描 63 点表（stdout 23/stderr 38/分叉 2）逐点对账零漏点零错归类，+4 新增锁 eprint 均 stderr，5 条错误路径机器模式 stdout 纯信封/单行 URL 且 `json.loads` 可解析。D2：14 行退出码矩阵逐行命中，P1（remove --json 曾误改 rc=1）复核已修正，cmd 失败信封 `success=false`+`status=cmd_failed`+`exit_code` 命中。D3（本批核心）：并发互斥 3 样本 registry 1 条 + pid 同一性 + 无孤儿 + 锁 0 残留；修前反证基线 3/3 样本 registry pid ≠ listen pid（竞态真实）；锁键归一（index.html 与 dir 同 sha1 e4ee1cc7e9e546ed）；stale 四判据 + 负龄不删（fail-closed rc=1）+ mid-write 新鲜不删/陈旧清锁 + 等待三态 + 用法错误优先 rc=2；D3-1 偏差在临时副本独立复现（回退两处修法 → 5 并发 3 样本各 4 真实 runner + registry 仅 1 条；恢复后恒 1 runner）。D4：dry-run 三路径/缺必填 rc=2/空提示词 rc=2/bash -n/大小写归一 + 本轮审计自身实战 A9（派发壳 LOG/PROMPT/USAGE 三行与落盘件逐字一致）。测试：33 用例、T16 禁锁转红（非恒真）、§4.1 12 必改全 `.err`、四同步实测为真。唯一 🟡：D3.5 registry.add 失败回滚未实现（见 Findings）。未越界：registry.py 零改动、无新增保留端口、真实数据目录无污染、残留 0。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| SEC-1 | 🟡 | D3.5「registry.add 抛异常 ⇒ _terminate_runner 回滚 ⇒ 不产生孤儿」未实现（唯一 _terminate_runner 调用在 stale 清理 line 386，registry.add line 496 无 try/except；monkeypatch 抛异常后 runner 仍存活） | `server.py:496` | 待修 |
+| R-1 | 🟢 | `__release_date__='2026-09-22'` + 模块 docstring「Version: 1.4.0」未随 1.4.1/09-23 更新（无下游消费者） | `__init__.py:29` | 记录 |
+| R-2 | 🟢 | §9.2 称「test_web.py 13 处」实测 12 处；§9.5 称「+15」实测 +13（test_web 12 + port_flag 1） | 设计 §9.2/§9.5 | 记录 |
+| R-3 | 🟢 | §2 D4「usage 缺失/空 ⇒ exit 2」措辞与 §9.4/实现「日志告警」不符（仅提示词空→exit 2） | 设计 §2 D4 | 记录 |
+
+### Positives
+
+- 并发互斥用 pid 同一性（lsof `-sTCP:LISTEN -F p` 直取，非计数/非子串/非 `hs list --json`）+ 修前反证基线 3/3 不一致坐实竞态真实
+- D3-1 偏差在临时副本（勿改工作树）独立复现并验证修法（回退 4 runner / 恢复 1 runner），确认修法为最小收敛（不改 Registry 本体，避免扩散 CL004 面）
+- 锁协议四判据 + 负龄 fail-closed + mid-write 并发级 + 用法错误优先全在 CLI 子进程级实证（非单测 mock）
+- 本轮审计自身即由 D4 派发件派发，A9 以真实落盘件核对（非 dry-run 模拟）
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| HM-CL005-SEC-001 | D3.5 registry.add/history.add 失败回滚（_terminate_runner）补 try/except | 🟡 | P1 | 待修（回 ops 重审） |
+| HM-CL005-SEC-002 | __release_date__/docstring 勘误 + §9.2/§9.5 计数勘误 + §2 D4 措辞勘误 | 🟢 | P2 | 记录（同批/下批 docs@sync） |
+
 
