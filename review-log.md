@@ -1103,4 +1103,133 @@ CL004 合并单一批（探测根因 O1 + CL003 遗留 AUD-1/2/3）实现审计�
 |:------|:------|:--------|:--------|:------|
 | AUD-1 | features.md 模块数 18→16（文档同步失真） | 🟢 | P2 | 记录（非阻断） |
 
+---
+
+## 2026-09-23 — Design doc review: HTTP-SERVER-CL005 设计 v1.0（O1/O3/O5/O6 四项收口）
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（设计评审 — 只审设计可执行性/判据完备性/回归风险/测试断言设计，不审实现）
+- **Scope**: 1 个未 push commit（70c7a3d docs@design 设计 v1.0），被审对象 documents/http-server-cl005-hardening-design-v1.0-20260923.md（293 行）
+- **Commit(s)**: 70c7a3d
+- **Verdict**: ⚠️ CONDITIONAL_PASS
+- **Score**: 78 / 100 (Rating: B)
+- **Report**: documents/review/http-server-cli-cl005-design-review-v1.0-20260923.md
+
+### Summary
+
+CL005 设计 v1.0（CL004 批遗留四项收口：O1 输出通道 / O3 web 退出码 / O5 目录级启动锁 / O6 派发件模板）评审，19 项逐条「实证命令 + 实测输出 + 判定」。基线核验：树 clean（评审前提未破坏）、`hs version`=1.4.0、pytest 557 passed 与基线一致。方向性判断：eprint→stderr + print_msg 语义纠正正确（O_EXCL 原子性实测 20 线程 1 赢家成立）；退出码三态方向对；O_EXCL 锁方向对；派发模板方向对。但锁机制存在 2 处正确性缺口（①「无 pid/不可解析→删锁」在 mid-write 窗口可致双重持有，②锁键未按 html 提取后最终 abs_path 归一 ⇒ `hs file.html` 与 `hs dir` 互斥失效，实测锁键发散 1d4434…/2bdca8…）；web 退出码分类自相矛盾（`ValueError` 用法错误误归运行期 1，且 `_web_run` cmd 失败分支缺失）；测试同步漏 `test_utils.py:222`（migration full-failure `.out`→`.err`）。共 4 必改（F-1~F-4）+ 9 记录（R-1~R-9）。**回 ops 出设计 v1.1 后 rereview，不提交不 push。**
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| F-1 | 🟡 | 锁放置过宽 + stale「无 pid→删锁」mid-write 竞态 + 锁键 html 发散 | 设计 §2 D3/§3.3/§4.3 | 待 v1.1 |
+| F-2 | 🟡 | stale 判据反例：时钟回拨 started_at / 字段不一致 | 设计 §2 D3/§3.3 | 待 v1.1 |
+| F-3 | 🟡 | web 退出码 ValueError 误归运行期 + `_web_run` cmd 失败分支缺失 | 设计 §1.2/§2 D2 | 待 v1.1 |
+| F-4 | 🟡 | 测试同步漏 test_utils.py:222 + LOCK_DIR 隔离缺口 | 设计 §4.1/§6 | 待 v1.1 |
+| R-1~R-9 | 🟢 | 计数 63/锁字段/host 死数据/token 过松/D4 命名/print() 诊断漏审 | 多处 | 记录 |
+
+### Positives
+
+- O_EXCL 原子性独立实测（20 线程竞争同一锁文件 → 1 赢家；空文件仍 FileExistsError），非采信设计自述
+- eprint→stderr 语义纠正 + print_msg 分流的「信封污染函数层面消失」收益真实（CL004 F-1 同源根因）
+- 退出码三态与 CL003 D14 对齐方向正确；版本 1.4.1 独立小版本理由成立（1.4.0 已审计 PASS 未发布）
+- 派发模板方向正确（自校验 + 缺 usage-file exit 2），已发现 LOG/USAGE 命名不同源等落地细节并记录
+- A5 修前反证基线 4679ee8 选择恰当（锁缺失但 CL004 已修，取更早 ef125b3 反而引入噪音）
+- 19 项全覆盖 + 无恒真断言（逐条可翻转性抽查通过）
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| F-1 | 锁放置 + mid-write 竞态 + html 锁键发散 | 🟡 | P1 | Open（待 v1.1） |
+| F-2 | stale 判据反例（时钟回拨/字段不一致） | 🟡 | P1 | Open（待 v1.1） |
+| F-3 | web 退出码分类自相矛盾 + 分支未穷尽 | 🟡 | P1 | Open（待 v1.1） |
+| F-4 | 测试同步漏点 + 隔离缺口 | 🟡 | P1 | Open（待 v1.1） |
+| R-1~R-9 | 计数/字段/命名/审计范围 9 项记录 | 🟢 | P2 | 记录（同批落点） |
+
+---
+
+## 2026-09-23 — Design doc rereview: HTTP-SERVER-CL005 设计 v1.1（round-2 限定复审）
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（设计复审 — 只审上轮未闭合项 F-1~F-4/SEC + 本版增量 N-1~N-7，不审实现）
+- **Scope**: 1 个未 push commit（ecd0322 docs@design 设计 v1.1），被审对象 documents/http-server-cl005-hardening-design-v1.1-20260923.md（355 行，含 §0 修订落点表）
+- **Commit(s)**: ecd0322（上轮 70c7a3d）
+- **Verdict**: ⚠️ CONDITIONAL_PASS
+- **Score**: 86 / 100 (Rating: B+)
+- **Report**: documents/review/http-server-cli-cl005-design-rereview-v1.0-20260923.md
+
+### Summary
+
+CL005 设计 v1.1 限定复审（只审未闭合项 + 本版增量）。源码零改动、评审前提未破坏。逐项判定：F-1 四子项全闭合（① 锁键归一——html/通配/相对/尾 `/`/符号链接六类入口在锁落点处 abs_path 必同；② mid-write 读三态——/tmp 实验复现新鲜空锁 age=0.0000s→WAIT、陈旧 age=1.1053s→unlink；③ 锁放置——三时序 rc 符合 §3.2，D3.4③ 补偿不 hoist `-p` 入正链、与 CL003 D5 不冲突；④ release 归属——pid==getpid() 才删，读-删 TOCTOU 窗口极窄留 🟢）；F-3 闭合（services.py 全量 ValueError 均为用法/校验类，无误伤；run 失败信封 success=False 无消费方冲突）。**2 项 🟡 残留**：F-2a——`time.monotonic()` 跨进程可比性非文档契约，实测 `python3`(3.9.6) 返回近零(0.0035s)跨进程非单调（CLOCK_MONOTONIC 235526s 才正确），部署态 3.12/3.11 可比(119500s)但 `age<0 ⇒ stale` 在 3.9.6 下 ~50% 伪触发→双重持有，建议改 `clock_gettime(CLOCK_MONOTONIC)` 并重审/删 age<0 规则；F-4a——测试同步清单漏 8 处将红断言（test_server.py:87/135/228/250/314/320/326 + test_cli.py:365，设计仅列 2 处）。N-6 D4 双模板逐字符一致；N-7 T/A 覆盖 §0 全落点。**回 ops 出 v1.2 后复审，不提交不 push。**
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| F-1①~④ | ✅ | 锁键归一/mid-write/锁放置/release 归属 全闭合 | 设计 §2 D3.1-D3.5 | 闭合 |
+| F-2a | 🟡 | time.monotonic() 跨进程可比性无契约保证（3.9.6 破坏 + age<0 伪触发） | 设计 §2 D3.3/§3.3 | 待 v1.2 |
+| F-3 | ✅ | web 退出码分类 + run 失败信封 全闭合 | 设计 §1.2/§2 D2 | 闭合 |
+| F-4a | 🟡 | 测试同步清单漏 8 处将红断言 | 设计 §4.1 | 待 v1.2 |
+| R-10~R-15 + O7 | 🟢 | grace 取值/WAIT 续接/TOCTOU/就绪措辞/1798 通道/print() 审计推迟/O7 | 多处 | 记录 |
+
+### Positives
+
+- F-1 锁键归一独立推演六类入口（html/.htm/通配/相对/尾斜杠/符号链接）逻辑必同，非采信设计自述
+- mid-write 读三态 /tmp 独立复现（空锁 O_EXCL 仍 FileExistsError + 新鲜/陈旧两时序 age 实测），非仅理论
+- time.monotonic() 跨进程可比性独立实测（3 进程 + 同进程双时钟源对比），坐实 3.9.6 近零/3.12 可比的分裂，证据链完整
+- F-4 测试同步全量 grep（非只查已知两条），列出 8 处漏列断言 + 6 处不红归口
+- D4 双模板与 cache/closed-loop 既有文件逐字符比对一致；§0 落点表逐行闭合判定表齐备
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| F-2a | 计时时钟改 clock_gettime(CLOCK_MONOTONIC) / 重审 age<0 规则 | 🟡 | P1 | Open（待 v1.2） |
+| F-4a | 测试同步清单补全至 10 处 | 🟡 | P1 | Open（待 v1.2） |
+| R-10~R-15 | grace/WAIT 续接/TOCTOU/就绪措辞/1798 通道/print() 审计推迟 | 🟢 | P2 | 记录（同批落点） |
+
+---
+
+## 2026-09-23 — Design doc rereview: HTTP-SERVER-CL005 设计 v1.2（round-3 限定复审）
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（设计复审 — 只审 F-2a/F-4a/N-2/N-4 闭合 + 本版增量 M-1~M-5，不审实现）
+- **Scope**: 1 个未 push commit（502a114 docs@design 设计 v1.2），被审对象 documents/http-server-cl005-hardening-design-v1.2-20260923.md（449 行，含 §2.1 63 点判定表）
+- **Commit(s)**: 502a114（上轮 70c7a3d / ecd0322）
+- **Verdict**: ✅ PASS
+- **Score**: 93 / 100 (Rating: A-)
+- **Report**: documents/review/http-server-cli-cl005-design-rereview2-v1.0-20260923.md
+
+### Summary
+
+CL005 设计 v1.2 限定复审（只审 round-2 两项 🟡 必改 + 两项增量残留 + 本版增量）。源码零改动、评审前提未破坏。四项闭合判定全过：F-2a——计时改 `time.clock_gettime(CLOCK_MONOTONIC)` 经双解释器实测跨进程/跨解释器可比（conda py3.12 236356.99/236357.00/236357.008 vs 系统 py3.9.6 236357.04/236357.05/236357.06，互差 ~0.07s），删除 `age<0⇒stale` 后负龄全时序（跨重启/pid 复用/伪造未来 started_mono）均 fail-closed 无双持有，T26/T27 可复现；F-4a——§2.1 63 点判定表（stdout 23/stderr 38/分叉 2）抽查 ≥10 点全自洽，§4.1 穷举 12 必改与全量 grep `captured.out|capsys` 逐条对上无遗漏（补出 test_port_flag.py:178/347），5 条「保持绿」实测真绿；N-2——「命中且就绪」措辞排除返回未就绪端口；N-4——裸 print 303 处与设计一致，json/url 提前 return 结构性兜底成立，仍漏机器模式点=无。8 项 🟢 记录（R-16~R-23）：T26 `>1e4` 阈值容器假失败/§5 漏容器+跨平台两行/CLOCK_MONOTONIC sleep-inclusive 使 TTL 睡眠后触发（幂等兜底）/D1.3 两处措辞失实/A12「features 计数」应为「模块数」/D9 计数歧义/§2.1 #7 标签/D1.3 措辞精确化，均非阻断。无方向性错误（CLOCK_MONOTONIC 可用、负龄无双持有）。**push origin main（设计件 3 笔 + 本轮三件套）**。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| F-2a | ✅ | 计时改 clock_gettime(CLOCK_MONOTONIC) + 删负龄规则（双解释器可比 + fail-closed） | 设计 §2 D3.3 | 闭合 |
+| F-4a | ✅ | 63 点判定表 + 12 必改穷举（全量 grep 逐条对上） | 设计 §2.1/§4.1 | 闭合 |
+| N-2 | ✅ | D3.4①「命中且就绪」措辞 | 设计 §2 D3.4① | 闭合 |
+| N-4 | ✅ | 裸 print 范围 + 1798→stderr + 结构性兜底 | 设计 §2 D1.3/D1.4 | 闭合 |
+| R-16~R-23 | 🟢 | T26 阈值/§5 漏行/sleep 语义/措辞失实/标签误差 8 项 | 设计 §5/§6/D1.3/§2.1/D9 | 记录（非阻断） |
+
+### Positives
+
+- F-2a 改法双解释器独立实测（CLOCK_MONOTONIC 3 进程×2 解释器 + 对照 time.monotonic() 3.9.6 近零），非采信设计自述
+- 负龄全时序穷举（跨重启/pid 复用/伪造未来值/时钟回拨 5 时序）坐实 fail-closed 无双持有
+- §2.1 63 点表逐点核对源码控制流 × 机器模式可达 × 归类自洽（抽查 11 点全过，统计 23/38/2 算术自洽）
+- §4.1 12 必改与全量 grep 逐条对上 + 5 保持绿实测，补出 round-2 漏列的 test_port_flag.py:178/347
+- 裸 print 303 处逐文件核验 json/url 提前 return 兜底成立，仍漏机器模式点=无
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| F-2a | 计时时钟改 clock_gettime + 删负龄规则 | 🟡 | P1 | ✅ Closed（v1.2） |
+| F-4a | 测试同步清单补全至 12 处 | 🟡 | P1 | ✅ Closed（v1.2） |
+| R-16~R-23 | T26 阈值/§5 漏行/sleep 语义/措辞/标签 8 项 | 🟢 | P2 | 记录（同批/下批 docs@sync 勘误） |
+
 

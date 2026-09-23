@@ -266,3 +266,34 @@ review_history:
     tracking: HTTP-SERVER-CL004 (AUD-1 🟢 记录; OBS-1/OBS-2 🟢 记录)
     scope: "Implementation audit: HTTP-SERVER-CL004 实现审计 v1.0 (commits 36b1e91/2651511/4ecf537/6f8392f/275ae93/127db13) — D1' 探测口径偏差独立复核成立(lsof LISTEN 为准 + socket 回退, 3x3 矩阵逐格一致, 纯 socket 在 macOS 漏判 127.0.0.1/LAN 绑定真监听); stale 三态+宽限+归属校验 token 精确匹配+文案三态 stderr 以 pid 同一性实测; 557 passed 零回归 + CL003 31/31 + ops A1-A11 独立复跑 13/13; 四同步实测核对; 数据目录 sha256 前后逐字节一致无污染; 1x🟢 AUD-1(features.md 模块数 18→16)+2x🟢 记录; PASS 99/100"
     report: documents/review/http-server-cli-cl004-audit-v1.0-20260922.md
+  - date: 2026-09-23
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: CONDITIONAL_PASS
+    score: 78
+    findings_total: 13
+    findings_open: 4
+    tracking: HTTP-SERVER-CL005 (F-1~F-4; R-1~R-9)
+    scope: "Design doc review: http-server-cl005-hardening-design-v1.0-20260923.md (commit 70c7a3d) — O1 输出通道/O3 web 退出码/O5 目录级启动锁/O6 派发件模板; eprint→stderr 方向正确 + O_EXCL 原子性实测(20线程1赢家)+退出码三态方向对; 4 必改(F-1 锁放置与 stale mid-write 竞态+html 锁键发散/F-2 stale 判据反例/F-3 web 退出码分类自相矛盾/F-4 测试同步漏点)+9 记录(R-1~R-9), 回 ops 设计 v1.1 后 rereview"
+    report: documents/review/http-server-cli-cl005-design-review-v1.0-20260923.md
+    resolved_by: "rereview v1.1 (2026-09-23) — CONDITIONAL_PASS 86/100: F-1 四子项全闭合/F-3 闭合; 2 🟡 残留 F-2a 计时时钟(monotonic 3.9.6 破坏)/F-4a 测试同步漏 8 处, 回 ops 设计 v1.2"
+  - date: 2026-09-23
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: CONDITIONAL_PASS
+    score: 86
+    findings_total: 9
+    findings_open: 2
+    tracking: HTTP-SERVER-CL005 (F-2a, F-4a; R-10~R-15 + O7)
+    scope: "Design doc rereview: http-server-cl005-hardening-design-v1.1-20260923.md (commit ecd0322) — 限定复审(只审未闭合项+本版增量 N-1~N-7); F-1 四子项全闭合(锁键归一/mid-write 读三态/锁放置/release 归属), F-3 闭合(web 退出码 ValueError→2 + run 失败信封); 2 🟡 残留 F-2a time.monotonic() 跨进程可比性无契约保证(3.9.6 近零+age<0 伪触发)/F-4a 测试同步漏 8 处; 6 🟢 R-10~R-15 + O7, 回 ops 设计 v1.2"
+    report: documents/review/http-server-cli-cl005-design-rereview-v1.0-20260923.md
+  - date: 2026-09-23
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: PASS
+    score: 93
+    findings_total: 8
+    findings_open: 0
+    tracking: HTTP-SERVER-CL005 (R-16~R-23)
+    scope: "Design doc rereview: http-server-cl005-hardening-design-v1.2-20260923.md (commit 502a114) — round-3 限定复审(只审 F-2a/F-4a/N-2/N-4 闭合 + 本版增量 M-1~M-5); 四项全闭合(F-2a clock_gettime(CLOCK_MONOTONIC) 双解释器跨进程可比 236357s + 删负龄规则 fail-closed 无双持有; F-4a 63 点判定表 stdout23/stderr38/分叉2 + §4.1 穷举 12 必改与全量 grep 逐条对上; N-2 命中且就绪措辞; N-4 裸 print 303 处结构性兜底成立); 8 🟢 记录 R-16~R-23(T26 阈值容器假失败/§5 漏容器+跨平台/sleep-inclusive TTL 语义/D1.3 两处措辞失实/A12 features 计数应为模块数/D9 计数/§2.1#7 标签/端口 LISTEN 精确化) 非阻断"
+    report: documents/review/http-server-cli-cl005-design-rereview2-v1.0-20260923.md
