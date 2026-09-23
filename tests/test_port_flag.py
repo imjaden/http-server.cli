@@ -175,7 +175,7 @@ class TestKillReturnContract:
 
     def test_not_registered_port_returns_false(self, capsys):
         assert ServerManager().kill('59999') is False
-        assert 'not registered' in capsys.readouterr().out
+        assert 'not registered' in capsys.readouterr().err
 
     def test_empty_arg_returns_false(self, capsys):
         assert ServerManager().kill('') is False
@@ -344,7 +344,7 @@ class TestDashboardRestartPort:
         calls = self._patch_managed(monkeypatch, None)
         cli._manage_dashboard('restart', json_mode=False)
         assert calls == {}
-        assert 'not running' in capsys.readouterr().out
+        assert 'not running' in capsys.readouterr().err
 
 
 # ── hs web --port / --no-port（D9b）────────────────────
@@ -389,7 +389,9 @@ class TestWebPortFlag:
 
     def test_update_nothing_to_update_message(self, capsys):
         cli._COMMANDS['web'](None, ['add', 'cl003v', '--cmd', 'echo hi'])
-        cli._COMMANDS['web'](None, ['update', 'cl003v'])
+        with pytest.raises(SystemExit) as exc:
+            cli._COMMANDS['web'](None, ['update', 'cl003v'])
+        assert exc.value.code == 2   # CL005 D2：Nothing to update = 用法错误
         assert '--no-port' in capsys.readouterr().err
 
     def test_run_injects_domain_then_port(self, monkeypatch):

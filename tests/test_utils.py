@@ -219,7 +219,7 @@ class TestLegacyDataMigration:
         hs_utils._migrate_legacy_data()
 
         captured = capsys.readouterr()
-        assert 'migration failed' in captured.out
+        assert 'migration failed' in captured.err
         assert os.path.exists(legacy)      # 旧数据安全保留
 
 

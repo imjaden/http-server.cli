@@ -362,7 +362,7 @@ class TestSearchCommand:
         from http_server_cli.cli import _cmd_search
         _cmd_search(None, [])
         captured = capsys.readouterr()
-        assert 'Usage' in captured.out
+        assert 'Usage' in captured.err
 
     def test_search_by_port(self, search_manager, capsys):
         """按端口搜索应匹配"""
@@ -1050,7 +1050,7 @@ class TestSetDomainCli:
     def test_set_domain_invalid(self, capsys):
         _COMMANDS['set'](None, ['domain', 'bad value'])
         # 注: _handle_set 错误经 eprint 输出到 stdout（项目惯例，非 stderr）
-        assert 'domain must match' in capsys.readouterr().out
+        assert 'domain must match' in capsys.readouterr().err
         from http_server_cli.config import Config
         assert Config().domain == 'localhost'
 

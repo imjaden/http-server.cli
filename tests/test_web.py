@@ -245,25 +245,35 @@ class TestWebCliAdd:
         assert result['data']['name'] == 'a'
 
     def test_add_missing_cmd(self, capsys):
-        _COMMANDS['web'](None, ['add', 'a'])
+        with pytest.raises(SystemExit) as exc:
+            _COMMANDS['web'](None, ['add', 'a'])
+        assert exc.value.code == 2   # CL005 D2：缺必填 = 用法错误
         assert '--cmd is required' in capsys.readouterr().err
 
     def test_add_conflicts_with_builtin(self, capsys):
-        _COMMANDS['web'](None, ['add', 'list', '--cmd', 'echo a'])
+        with pytest.raises(SystemExit) as exc:
+            _COMMANDS['web'](None, ['add', 'list', '--cmd', 'echo a'])
+        assert exc.value.code == 2   # CL005 D2：与内置命令冲突
         assert 'conflicts' in capsys.readouterr().err
 
     def test_add_invalid_url(self, capsys):
-        _COMMANDS['web'](None, ['add', 'a', '--cmd', 'echo a', '--url', 'nope'])
+        with pytest.raises(SystemExit) as exc:
+            _COMMANDS['web'](None, ['add', 'a', '--cmd', 'echo a', '--url', 'nope'])
+        assert exc.value.code == 2   # CL005 D2：url 非法
         assert 'url must start' in capsys.readouterr().err
 
     def test_add_invalid_open_mode(self, capsys):
-        _COMMANDS['web'](None, ['add', 'a', '--cmd', 'echo a', '--open', 'bogus'])
+        with pytest.raises(SystemExit) as exc:
+            _COMMANDS['web'](None, ['add', 'a', '--cmd', 'echo a', '--open', 'bogus'])
+        assert exc.value.code == 2   # CL005 D2：open_mode 非法
         assert 'open mode' in capsys.readouterr().err
 
     def test_add_duplicate(self, capsys):
         _COMMANDS['web'](None, ['add', 'a', '--cmd', 'echo a'])
         capsys.readouterr()
-        _COMMANDS['web'](None, ['add', 'a', '--cmd', 'echo b'])
+        with pytest.raises(SystemExit) as exc:
+            _COMMANDS['web'](None, ['add', 'a', '--cmd', 'echo b'])
+        assert exc.value.code == 2   # CL005 D2/F-3：ValueError（名已存在）= 用法错误
         assert 'already exists' in capsys.readouterr().err
 
     def test_add_force_overrides(self, capsys):
@@ -355,7 +365,9 @@ class TestWebCliListShowRemoveUpdate:
         assert 'http://x' in out
 
     def test_show_not_found(self, capsys):
-        _COMMANDS['web'](None, ['show', 'a'])
+        with pytest.raises(SystemExit) as exc:
+            _COMMANDS['web'](None, ['show', 'a'])
+        assert exc.value.code == 1   # CL005 D2：名不存在 = 运行期失败
         assert 'not found' in capsys.readouterr().err
 
     def test_show_json(self, capsys):
@@ -372,7 +384,9 @@ class TestWebCliListShowRemoveUpdate:
         assert ServiceStore().get('a') is None
 
     def test_remove_not_found(self, capsys):
-        _COMMANDS['web'](None, ['remove', 'a'])
+        with pytest.raises(SystemExit) as exc:
+            _COMMANDS['web'](None, ['remove', 'a'])
+        assert exc.value.code == 1   # CL005 D2：名不存在
         assert 'not found' in capsys.readouterr().err
 
     def test_remove_json(self, capsys):
@@ -394,11 +408,15 @@ class TestWebCliListShowRemoveUpdate:
 
     def test_update_nothing(self, capsys):
         ServiceStore().add('a', cmd='echo a')
-        _COMMANDS['web'](None, ['update', 'a'])
+        with pytest.raises(SystemExit) as exc:
+            _COMMANDS['web'](None, ['update', 'a'])
+        assert exc.value.code == 2   # CL005 D2：无更新参数 = 用法错误
         assert 'Nothing to update' in capsys.readouterr().err
 
     def test_update_not_found(self, capsys):
-        _COMMANDS['web'](None, ['update', 'a', '--cmd', 'echo b'])
+        with pytest.raises(SystemExit) as exc:
+            _COMMANDS['web'](None, ['update', 'a', '--cmd', 'echo b'])
+        assert exc.value.code == 1   # CL005 D2：名不存在
         assert 'not found' in capsys.readouterr().err
 
 
@@ -519,7 +537,9 @@ class TestWebCliRun:
         ServiceStore().add('a', cmd='false')
         with patch('http_server_cli.cli.subprocess.run') as mock_run:
             mock_run.return_value.returncode = 1
-            _COMMANDS['web'](None, ['a'])
+            with pytest.raises(SystemExit) as exc:
+                _COMMANDS['web'](None, ['a'])
+        assert exc.value.code == 1   # CL005 D2/F-3：cmd 退出码非 0 = 运行期失败
         assert 'exited with code 1' in capsys.readouterr().err
 
 
@@ -597,12 +617,16 @@ class TestWebCliDomain:
 
     def test_add_subcommand_name_conflict(self, capsys):
         """SEC-022-1: web 子命令名不得作服务名"""
-        _COMMANDS['web'](None, ['add', 'show', '--cmd', 'echo a'])
+        with pytest.raises(SystemExit) as exc:
+            _COMMANDS['web'](None, ['add', 'show', '--cmd', 'echo a'])
+        assert exc.value.code == 2   # CL005 D2：子命令名冲突
         assert 'conflicts' in capsys.readouterr().err
         assert ServiceStore().get('show') is None
 
     def test_add_help_subcommand_name_conflict(self, capsys):
-        _COMMANDS['web'](None, ['add', 'help', '--cmd', 'echo a'])
+        with pytest.raises(SystemExit) as exc:
+            _COMMANDS['web'](None, ['add', 'help', '--cmd', 'echo a'])
+        assert exc.value.code == 2   # CL005 D2：子命令名冲突
         assert 'conflicts' in capsys.readouterr().err
 
     def test_update_domain_on(self, capsys):

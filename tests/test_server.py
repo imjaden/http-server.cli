@@ -73,7 +73,7 @@ class TestStart:
         mgr = ServerManager()
         mgr.start(path=temp_project)
         captured = capsys.readouterr()
-        assert 'auto-assigned port' in captured.out or '8081' in captured.out
+        assert 'auto-assigned port' in captured.err or '8081' in captured.out
 
     def test_start_no_port_available(self, monkeypatch, temp_project, capsys):
         """所有端口被占时应报错"""
@@ -84,7 +84,7 @@ class TestStart:
         mgr = ServerManager()
         mgr.start(path=temp_project)
         captured = capsys.readouterr()
-        assert 'all in use, cannot start' in captured.out
+        assert 'all in use, cannot start' in captured.err
 
     def test_start_registers_in_registry(self, temp_project):
         mgr = ServerManager()
@@ -132,7 +132,7 @@ class TestStart:
         mgr = ServerManager()
         mgr.start(path='/nonexistent/path')
         captured = capsys.readouterr()
-        assert 'Path does not exist' in captured.out
+        assert 'Path does not exist' in captured.err
         assert mgr.registry.count() == 0
 
     def test_start_with_open_browser(self, monkeypatch, temp_project):
@@ -225,7 +225,7 @@ class TestStatus:
         mgr = ServerManager()
         mgr.status('8080')
         captured = capsys.readouterr()
-        assert 'not managed by this tool' in captured.out
+        assert 'not managed by this tool' in captured.err
 
 class TestDaemon:
     """daemon 模式专用测试"""
@@ -247,7 +247,7 @@ class TestDaemon:
         mgr = ServerManager()
         mgr.start(path=temp_project, daemon=True)
         captured = capsys.readouterr()
-        assert 'still running in background' in captured.out
+        assert 'still running in background' in captured.err
 
     def test_daemon_registers_flag(self, temp_project):
         """daemon 模式条目应标记 daemon=True"""
@@ -311,19 +311,19 @@ class TestKill:
         mgr = ServerManager()
         mgr.kill('9999')
         captured = capsys.readouterr()
-        assert 'not registered' in captured.out
+        assert 'not registered' in captured.err
 
     def test_kill_unregistered_path(self, capsys):
         mgr = ServerManager()
         mgr.kill('/nonexistent')
         captured = capsys.readouterr()
-        assert 'not registered' in captured.out
+        assert 'not registered' in captured.err
 
     def test_kill_no_arg(self, capsys):
         mgr = ServerManager()
         mgr.kill('')
         captured = capsys.readouterr()
-        assert 'Please specify' in captured.out
+        assert 'Please specify' in captured.err
 
 # ── kill_all ────────────────────────────────────────────
 
