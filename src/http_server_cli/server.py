@@ -17,6 +17,7 @@ from http_server_cli.history import HistoryStore
 from http_server_cli.registry import Registry
 from http_server_cli.utils import (
     eprint,
+    print_msg,
     format_path,
     is_port_in_use,
     find_available_port,
@@ -31,6 +32,11 @@ from http_server_cli.utils import (
     format_duration,
     json_output,
     timestamp,
+    acquire_start_lock,
+    release_start_lock,
+    lock_path,
+    LOCK_POLL,
+    LOCK_WAIT,
 )
 
 from typing import Optional
@@ -158,6 +164,71 @@ class ServerManager:
         7. daemon 模式：前台 tail -f 日志，Ctrl+C 仅停止日志查看
         8. foreground 模式：前台运行服务，Ctrl+C 终止服务进程
         """
+        abs_path, index_page, ok = self._prepare_start_target(
+            path, index_page, json, url_only)
+        if not ok:
+            return False
+
+        # ── 启动锁（CL005 D3）：目录级互斥，防同目录并发启动残留孤儿 runner ──
+        #    放置：路径/index 校验之后、registry.find（幂等判定）之前 —— 用法错误优先于锁
+        state, holder, lockfile = acquire_start_lock(abs_path)
+        if state != 'hit':
+            outcome = self._await_start_lock(abs_path)
+            if outcome != 'timeout':
+                # 刷新自身快照（同上）：重试获取成功后的幂等判定、以及 'ready' 快径都要看到他人刚写入的条目
+                self.registry = Registry()
+                state, holder, lockfile = acquire_start_lock(abs_path)
+            if state == 'hit':
+                pass
+            elif outcome == 'ready':
+                # 另一实例已就绪且仍持锁（--daemon tail / foreground）⇒ 只读幂等快径，rc=0
+                return self._start_locked(abs_path, index_page, open_browser, daemon,
+                                          foreground, json, url_only, port,
+                                          idempotent_only=True)
+            else:
+                # 超时/重试仍被占：先做 `-p` 纯语法校验（用法错误优先于「正在启动」，F-1③）
+                if port is not None and (port < 1024 or port > 65535):
+                    msg = 'Port must be between 1024-65535'
+                    if json:
+                        json_output(False, 'start', error=msg)
+                    else:
+                        eprint(msg, '❌')
+                    raise UsageError(msg)
+                holder_pid = (holder or {}).get('pid')
+                where = f'（pid {holder_pid}）' if holder_pid else ''
+                eprint(f'另一实例正在启动{where}，请稍后重试或先 hs kill {format_path(abs_path)}', '⚠️')
+                return False
+
+        try:
+            return self._start_locked(abs_path, index_page, open_browser, daemon,
+                                      foreground, json, url_only, port)
+        finally:
+            release_start_lock(lockfile)
+
+    def _await_start_lock(self, abs_path: str) -> str:
+        """有效锁期间的等待路径（CL005 D3.4）。
+
+        返回 'ready'（另一实例已就绪）/ 'released'（锁已释放 ⇒ 上层重试整链）/ 'timeout'。
+        就绪判据与顺序链第 2 步①同口径：登记 pid 存活 **且** 端口已监听。
+        """
+        deadline = time.time() + LOCK_WAIT
+        while time.time() < deadline:
+            # 必须新建实例：Registry 的 `_data` 是构造期快照（P2 mtime 缓存），
+            # 比他人登记更早创建的实例永远看不到新条目 ⇒ 等待路径会误判「未就绪」。
+            entry = Registry().find(path=abs_path)
+            if entry and is_process_alive(entry.get('pid')) and is_port_in_use(entry.get('port')):
+                return 'ready'
+            if not os.path.exists(lock_path(abs_path)):
+                return 'released'
+            time.sleep(LOCK_POLL)
+        return 'timeout'
+
+    def _prepare_start_target(self, path, index_page, json, url_only):
+        """路径归一 + index_page 校验 + 目录存在性校验（CL005 D3.2：锁之前的用法校验面）。
+
+        返回 (abs_path, index_page, ok)；ok=False 时已按 url/json/默认三态输出错误。
+        注意：html 文件路径在此已归一到其父目录（⇒ 与目录入口共用同一把锁，F-1①）。
+        """
         path = path or '.'
         abs_path = resolve_path(path)
 
@@ -182,30 +253,42 @@ class ServerManager:
             if err:
                 if url_only:
                     print(f'❌ {err}', file=sys.stderr)
-                    return False
+                    return abs_path, index_page, False
                 elif json:
                     json_output(False, 'start', error=err)
                 else:
                     eprint(err, '❌')
-                return False
+                return abs_path, index_page, False
+
+        if not os.path.isdir(abs_path):
+            if url_only:
+                print(f'❌ Path does not exist or is not a directory: {format_path(abs_path)}', file=sys.stderr)
+                return abs_path, index_page, False
+            elif json:
+                json_output(False, 'start', error=f'Path does not exist or is not a directory: {format_path(abs_path)}')
+            else:
+                eprint(f'Path does not exist or is not a directory: {format_path(abs_path)}', '❌')
+            return abs_path, index_page, False
+
+        return abs_path, index_page, True
+
+    def _start_locked(self, abs_path: str, index_page, open_browser: bool, daemon: bool,
+                      foreground: bool, json: bool, url_only: bool, port,
+                      idempotent_only: bool = False):
+        """临界区主体（CL005 D3.5）：持锁执行 —— 幂等判定 / -p 校验 / 启动 / 登记 / 信息块 /
+        daemon tail / foreground 长阻塞；`finally` 由 `start()` 负责释放锁。
+
+        idempotent_only=True 时仅走只读幂等快径（等待路径命中「另一实例已就绪」时使用）。
+        """
 
         domain = self.config.domain
         # CLI -p/--port 优先（一次性生效，不回写 config.json；D3）
         requested_port = port
         default_port = port if port is not None else self.config.port
-
-        if not os.path.isdir(abs_path):
-            if url_only:
-                print(f'❌ Path does not exist or is not a directory: {format_path(abs_path)}', file=sys.stderr)
-                return False
-            elif json:
-                json_output(False, 'start', error=f'Path does not exist or is not a directory: {format_path(abs_path)}')
-            else:
-                eprint(f'Path does not exist or is not a directory: {format_path(abs_path)}', '❌')
-            return False
-
         # ── 检查是否已注册且存活 ──
         entry = self.registry.find(path=abs_path)
+        if entry is None and idempotent_only:
+            return False   # CL005 D3.4① 幂等快径：本调用未持锁，不在此启动
         if entry:
             port = entry['port']
             entry_pid = entry.get('pid')
@@ -289,6 +372,8 @@ class ServerManager:
                     webbrowser.open(url)
                 return True
 
+            elif idempotent_only:
+                return False   # CL005 D3.4① 幂等快径：未就绪且未持锁 ⇒ 不清理、不启动
             else:
                 # ③ stale 清理（D4/AUD-3）：进程已死 → 仅删登记；进程仍活（宽限后仍未监听）→
                 #    归属校验通过则**先终止进程组**再删登记，杜绝「登记已删但进程在跑」的孤儿。
@@ -497,6 +582,7 @@ class ServerManager:
 
         return True
 
+
     # ── list ───────────────────────────────────────────
 
     def list(self, json: bool = False) -> None:
@@ -516,8 +602,8 @@ class ServerManager:
             if json:
                 json_output(True, 'list', data={'servers': [], 'count': 0})
             else:
-                eprint('No running HTTP services', 'ℹ️')
-                eprint('Use hs start [path] -o to start one', '💡')
+                print_msg('No running HTTP services', 'ℹ️')
+                print_msg('Use hs start [path] -o to start one', '💡')
             return
 
         if json:
@@ -542,7 +628,7 @@ class ServerManager:
             json_output(True, 'list', data=data)
             return
 
-        eprint(f'Total {len(servers)} HTTP services:', '📊')
+        print_msg(f'Total {len(servers)} HTTP services:', '📊')
         print()
 
         for entry in servers:
@@ -613,7 +699,7 @@ class ServerManager:
                             print(f'🛑 kill: kill -KILL {pid}')
                             print()
                     else:
-                        eprint(f'Port {port} not registered', 'ℹ️')
+                        print_msg(f'Port {port} not registered', 'ℹ️')
                 return
         else:
             abs_path = resolve_path(arg)
@@ -623,7 +709,7 @@ class ServerManager:
             if json:
                 json_output(True, 'status', data={'found': False})
             else:
-                eprint('No matching service found', 'ℹ️')
+                print_msg('No matching service found', 'ℹ️')
             return
 
         port = entry['port']
@@ -654,9 +740,9 @@ class ServerManager:
             return
 
         if alive and port_active:
-            eprint(f'http://{ep}:{port}  ✅ running', '🔍')
+            print_msg(f'http://{ep}:{port}  ✅ running', '🔍')
         else:
-            eprint(f'http://{ep}:{port}  ❌ stopped', '🔍')
+            print_msg(f'http://{ep}:{port}  ❌ stopped', '🔍')
 
         print(f'  Path:  {format_path(entry["path"])}')
         print(f'  PID:   {pid}')
@@ -782,7 +868,7 @@ class ServerManager:
             if json:
                 json_output(True, 'kill-all', data={'total': 0, 'killed': 0, 'entries': []})
             else:
-                eprint('No running services', 'ℹ️')
+                print_msg('No running services', 'ℹ️')
             return
 
         count = 0
@@ -811,4 +897,4 @@ class ServerManager:
                 ],
             })
         else:
-            eprint(f'{count} service(s) closed', '✅')
+            print_msg(f'{count} service(s) closed', '✅')

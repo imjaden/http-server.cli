@@ -4,6 +4,7 @@
 所有操作基于 Python 标准库，零外部依赖。
 """
 
+import hashlib
 import json
 import os
 import shutil
@@ -11,6 +12,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -29,9 +31,18 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 MAX_PORT = 10000
 
 # ── 打印 ────────────────────────────────────────────────
+# 通道契约（CL005 D1）：命令主产物（含查询类命令的空态与 not-found）→ stdout（print_msg）；
+# 过程反馈 / 警告 / 错误 / 清理动作 / 用法提示 → stderr（eprint）。逐调用点判定见设计 §2.1 表。
 
 def eprint(msg: str, emoji: str = '') -> None:
-    """智能打印，自动匹配 Emoji 前缀"""
+    """错误/警告/过程反馈 → stderr（CL005 D1：原实写 stdout，会污染 --json 信封）"""
+    if emoji:
+        print(f'{emoji} {msg}', file=sys.stderr)
+    else:
+        print(msg, file=sys.stderr)
+
+def print_msg(msg: str, emoji: str = '') -> None:
+    """命令主产物（清单/配置值/URL/查询答案）→ stdout"""
     if emoji:
         print(f'{emoji} {msg}')
     else:
@@ -79,6 +90,7 @@ def ensure_storage() -> None:
     """确保数据目录和初始文件存在"""
     _migrate_legacy_data()
     os.makedirs(LOG_DIR, exist_ok=True)
+    os.makedirs(lock_dir(), exist_ok=True)      # CL005 D3.6：启动锁目录（幂等）
     if not os.path.exists(CONFIG_PATH):
         from http_server_cli.config import DEFAULT_CONFIG
         write_json(CONFIG_PATH, dict(DEFAULT_CONFIG))
@@ -238,6 +250,133 @@ def is_process_alive(pid):
         return True
     except (OSError, ProcessLookupError):
         return False
+
+# ── 启动锁（CL005 D3）：目录级互斥，防同目录并发启动残留孤儿 runner ──
+LOCK_TTL = 30.0          # 锁最长有效期（秒）；仅当 0 ≤ 龄 > TTL 才判 stale
+LOCK_WAIT = 3.0          # 有效锁期间等待 holder 完成的预算（秒）
+LOCK_POLL = 0.2          # 等待轮询间隔（秒）
+LOCK_WRITE_GRACE = 1.0   # 「锁文件存在但不可解析」的写入宽限（秒）——防 mid-write 误删
+
+def lock_dir() -> str:
+    """锁目录（派生自 DATA_DIR ⇒ 测试经 DATA_DIR monkeypatch 自动隔离）"""
+    return os.path.join(DATA_DIR, 'locks')
+
+def lock_path(abs_path: str) -> str:
+    """锁文件路径 = sha1(最终 abs_path)[:16].json（html 快捷方式已归一，见 D3.1）"""
+    key = hashlib.sha1(abs_path.encode('utf-8')).hexdigest()[:16]
+    return os.path.join(lock_dir(), f'{key}.json')
+
+def mono_now() -> float:
+    """CLOCK_MONOTONIC（契约上系统级、自 boot 起，跨进程可比）。
+    勿改回 time.monotonic()：其跨进程可比性非契约（py3.9.6 实测近零且非单调，CL005 F-2a）。"""
+    return time.clock_gettime(time.CLOCK_MONOTONIC)
+
+def _cmdline_is_this_cli(pid) -> bool:
+    """pid 命令行是否属本 CLI（token 精确匹配；仅用于 pid 复用拦截，主判据是 pid 活性）"""
+    if not pid:
+        return False
+    info = get_process_info(pid)
+    if not info:
+        return False
+    for token in (info.get('command') or '').split():
+        if 'http_server_cli' in token or os.path.basename(token) == 'hs':
+            return True
+    return False
+
+def _read_lock(lockfile: str) -> Optional[dict]:
+    """读锁内容；不可解析/无 pid ⇒ None（调用方按写入龄判定）"""
+    try:
+        raw = Path(lockfile).read_text(encoding='utf-8')
+    except OSError:
+        return None
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(data, dict) or not data.get('pid'):
+        return None
+    return data
+
+def _safe_unlink(path: str) -> None:
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
+
+def acquire_start_lock(abs_path: str):
+    """获取目录级启动锁。
+
+    返回 (state, holder, lockfile)：
+      'hit'  → 本进程已持有（调用方 finally 必须 release_start_lock）
+      'busy' → 他人持有（holder 为 dict）或正处 mid-write（holder=None）⇒ 走等待路径
+
+    stale 四判据（清锁重试一次）：不可解析且写入龄 ≥ LOCK_WRITE_GRACE / pid 非活 /
+    pid 活但命令行非本 CLI（pid 复用）/ 0 ≤ 龄 > LOCK_TTL。
+    负龄（跨重启、时钟异常）**不判 stale**，交 pid 活性 + token 兜底（F-2a）。
+    """
+    lockfile = lock_path(abs_path)
+    try:
+        os.makedirs(lock_dir(), exist_ok=True)
+    except OSError:
+        pass
+
+    for attempt in (1, 2):
+        try:
+            fd = os.open(lockfile, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        except FileExistsError:
+            holder = _read_lock(lockfile)
+            stale = False
+            if holder is None:
+                try:
+                    age_m = time.time() - os.stat(lockfile).st_mtime
+                except OSError:
+                    age_m = 0.0
+                if age_m < LOCK_WRITE_GRACE:
+                    return ('busy', None, lockfile)       # holder 正在写内容 ⇒ 等待，不删
+                stale = True
+            else:
+                pid = holder.get('pid')
+                if not is_process_alive(pid) or not _cmdline_is_this_cli(pid):
+                    stale = True                          # pid 死 / pid 复用
+                else:
+                    try:
+                        age = mono_now() - float(holder.get('started_mono') or 0.0)
+                    except (TypeError, ValueError):
+                        age = 0.0
+                    if age >= 0 and age > LOCK_TTL:
+                        stale = True
+            if stale and attempt == 1:
+                _safe_unlink(lockfile)
+                continue
+            return ('busy', holder, lockfile)
+        except OSError:
+            return ('busy', None, lockfile)               # 无法创建（权限等）⇒ 保守 fail-closed
+        else:
+            payload = {
+                'path': abs_path,
+                'pid': os.getpid(),
+                'started_mono': mono_now(),
+                'started_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            }
+            try:
+                os.write(fd, json.dumps(payload, ensure_ascii=False).encode('utf-8'))
+                os.fsync(fd)
+            except OSError:
+                pass
+            finally:
+                os.close(fd)
+            return ('hit', payload, lockfile)
+
+def release_start_lock(lockfile: str) -> None:
+    """释放锁（归属校验：仅当内容 pid == 本进程才删；F-1④）"""
+    holder = _read_lock(lockfile)
+    if holder is None:
+        eprint(f'锁文件不可解析，未释放（可能他人正在写入）：{format_path(lockfile)}', '⚠️')
+        return
+    if holder.get('pid') != os.getpid():
+        eprint(f'锁由 pid {holder.get("pid")} 持有，本进程不释放', '⚠️')
+        return
+    _safe_unlink(lockfile)
 
 def get_process_info(pid: int) -> Optional[dict]:
     """获取进程的用户和完整命令行（用于非本工具服务诊断）"""

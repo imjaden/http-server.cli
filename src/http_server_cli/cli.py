@@ -13,7 +13,7 @@ import webbrowser
 from http_server_cli import __version__
 from http_server_cli.config import Config
 from http_server_cli.server import ServerManager, UsageError
-from http_server_cli.utils import eprint, ensure_storage
+from http_server_cli.utils import eprint, print_msg, ensure_storage
 import glob
 
 # ── 统一解析入口（D6 / D9e） ──────────────────────────
@@ -193,7 +193,7 @@ def _handle_set(args):
                 from http_server_cli.utils import json_output
                 json_output(True, 'set', data={'key': 'port', 'old_value': old_value, 'new_value': port})
             else:
-                eprint(f'Default port set to {port}', '✅')
+                print_msg(f'Default port set to {port}', '✅')
         except ValueError:
             if json_mode:
                 from http_server_cli.utils import json_output
@@ -215,7 +215,7 @@ def _handle_set(args):
             from http_server_cli.utils import json_output
             json_output(True, 'set', data={'key': 'domain', 'old_value': old_value, 'new_value': value})
         else:
-            eprint(f'Default domain set to {value}', '✅')
+            print_msg(f'Default domain set to {value}', '✅')
     else:
         if json_mode:
             from http_server_cli.utils import json_output
@@ -360,8 +360,8 @@ def _list_servers(manager, json: bool = False, port_only: bool = False,
 
     total = len(user_servers) + len(managed_servers)
     if total == 0:
-        eprint('No running HTTP services', 'ℹ️')
-        eprint('Use hs start [path] -o to start one', '💡')
+        print_msg('No running HTTP services', 'ℹ️')
+        print_msg('Use hs start [path] -o to start one', '💡')
         return
 
     # 过滤输出模式（优先级: --port > --path > --short）
@@ -379,7 +379,7 @@ def _list_servers(manager, json: bool = False, port_only: bool = False,
         return
 
     # 用户服务
-    eprint(f'Total {len(user_servers)} HTTP services:', '📊')
+    print_msg(f'Total {len(user_servers)} HTTP services:', '📊')
     print()
     for entry in user_servers:
         alive = entry['_alive']
@@ -407,7 +407,7 @@ def _list_servers(manager, json: bool = False, port_only: bool = False,
 
     # Managed 基础设施服务
     if managed_servers:
-        eprint(f'Total {len(managed_servers)} infrastructure services:', '🔧')
+        print_msg(f'Total {len(managed_servers)} infrastructure services:', '🔧')
         print()
         for entry in managed_servers:
             port = entry['port']
@@ -512,15 +512,15 @@ def _cmd_history(manager, args):
         return
     if not records:
         if filtered_count:
-            eprint(f'No meaningful history records ('
+            print_msg(f'No meaningful history records ('
                    f'{filtered_count} temp entr'
                    f'{"y" if filtered_count == 1 else "ies"} filtered out)', 'ℹ️')
         else:
-            eprint('No history records', 'ℹ️')
+            print_msg('No history records', 'ℹ️')
         return
-    eprint(f'Total {len(records)} history records:', '📊')
+    print_msg(f'Total {len(records)} history records:', '📊')
     if filtered_count:
-        eprint(f'  ({filtered_count} system temp entr'
+        print_msg(f'  ({filtered_count} system temp entr'
                f'{"y" if filtered_count == 1 else "ies"} excluded'
                f' — they appear when `hs` runs without a project path'
                f' or when external tools create temporary servers)', '🔎')
@@ -572,10 +572,10 @@ def _cmd_search(manager, args):
         return
 
     if not matches:
-        eprint(f'No services matching "{parsed.keyword}"', 'ℹ️')
+        print_msg(f'No services matching "{parsed.keyword}"', 'ℹ️')
         return
 
-    eprint(f'Found {len(matches)} matching "{parsed.keyword}":', '📊')
+    print_msg(f'Found {len(matches)} matching "{parsed.keyword}":', '📊')
     print()
     for entry in matches:
         port = entry['port']
@@ -668,7 +668,10 @@ def _manage_dashboard(subcmd: str, json_mode: bool = False, port=None) -> None:
             json_output(False, f'dashboard-{subcmd}',
                         error='dashboard not running')
         else:
-            eprint('dashboard not running', 'ℹ️')
+            if subcmd == 'status':
+                print_msg('dashboard not running', 'ℹ️')      # 查询答案 → stdout（CL005 D1.2）
+            else:
+                eprint('dashboard not running', 'ℹ️')         # stop/restart 失败 → stderr
         return
 
     port = entry.get('port', '?')
@@ -727,7 +730,7 @@ def _manage_dashboard(subcmd: str, json_mode: bool = False, port=None) -> None:
                     'name': 'dashboard', 'port': port, 'stopped': True,
                 })
             else:
-                eprint(f'dashboard (port {port}) stopped', '🛑')
+                print_msg(f'dashboard (port {port}) stopped', '🛑')
 
     if subcmd == 'restart':
         from http_server_cli.dashboard import serve
@@ -926,7 +929,10 @@ def _manage_mcp(subcmd: str, json_mode: bool = False) -> None:
         if json_mode:
             json_output(False, f'mcp-{subcmd}', error='MCP not running')
         else:
-            eprint('MCP not running', 'ℹ️')
+            if subcmd == 'status':
+                print_msg('MCP not running', 'ℹ️')            # 查询答案 → stdout（CL005 D1.2）
+            else:
+                eprint('MCP not running', 'ℹ️')               # stop/restart 失败 → stderr
         return
 
     port = entry.get('port', '?')
@@ -968,7 +974,7 @@ def _manage_mcp(subcmd: str, json_mode: bool = False) -> None:
                     'name': 'mcp', 'port': port, 'stopped': True,
                 })
             else:
-                eprint(f'MCP (port {port}) stopped', '🛑')
+                print_msg(f'MCP (port {port}) stopped', '🛑')
 
     if subcmd == 'restart':
         from http_server_cli.mcp import serve_sse
@@ -1394,7 +1400,7 @@ def _web_add(args):
             json_output(False, cmd, error=err)
         else:
             print(f'❌ {err}', file=sys.stderr)
-        return
+        sys.exit(2)   # CL005 D2：缺必填 = 用法错误
 
     name_err = ServiceStore.validate_name(parsed.name)
     if name_err:
@@ -1402,14 +1408,14 @@ def _web_add(args):
             json_output(False, cmd, error=name_err)
         else:
             print(f'❌ {name_err}', file=sys.stderr)
-        return
+        sys.exit(2)   # CL005 D2：名非法
     if parsed.name in _COMMANDS or parsed.name in _WEB_SUBCOMMANDS:
         err = f"'{parsed.name}' conflicts with built-in command"
         if json_mode:
             json_output(False, cmd, error=err)
         else:
             print(f'❌ {err}', file=sys.stderr)
-        return
+        sys.exit(2)   # CL005 D2：与内置命令冲突
 
     open_mode = parsed.open_mode or 'url'
     err = ServiceStore.validate_open_mode(open_mode)
@@ -1418,14 +1424,14 @@ def _web_add(args):
             json_output(False, cmd, error=err)
         else:
             print(f'❌ {err}', file=sys.stderr)
-        return
+        sys.exit(2)   # CL005 D2：open_mode 非法
     err = ServiceStore.validate_url(parsed.url)
     if err:
         if json_mode:
             json_output(False, cmd, error=err)
         else:
             print(f'❌ {err}', file=sys.stderr)
-        return
+        sys.exit(2)   # CL005 D2：url 非法
     if parsed.no_port and parsed.port is not None:
         err = '--port and --no-port are mutually exclusive'
         if json_mode:
@@ -1468,11 +1474,13 @@ def _web_add(args):
             json_output(False, cmd, error=str(e))
         else:
             print(f'❌ {e}', file=sys.stderr)
+        sys.exit(2)   # CL005 D2：ValueError（名已存在/cmd 空/值非法）= 用法错误
     except DataCorruptionError:
         if json_mode:
             json_output(False, cmd, error='services file corrupted')
         else:
             print('❌ services file corrupted', file=sys.stderr)
+        sys.exit(1)   # CL005 D2：store 损坏 = 运行期失败
 
 
 def _web_list(args):
@@ -1498,7 +1506,7 @@ def _web_list(args):
             json_output(False, cmd, error='services file corrupted')
         else:
             print('❌ services file corrupted', file=sys.stderr)
-        return
+        sys.exit(1)   # CL005 D2：store 损坏 = 运行期失败
 
     # 排序（大小写不敏感 a-z）：默认 name → cmd → url；cmd+url 时以 name 兜底
     def sort_key(s):
@@ -1566,7 +1574,7 @@ def _web_show(args):
             json_output(False, cmd, error='services file corrupted')
         else:
             print('❌ services file corrupted', file=sys.stderr)
-        return
+        sys.exit(1)
 
     if not svc:
         err = f"service '{parsed.name}' not found"
@@ -1574,7 +1582,7 @@ def _web_show(args):
             json_output(False, cmd, error=err)
         else:
             print(f'❌ {err}', file=sys.stderr)
-        return
+        sys.exit(1)   # CL005 D2：名不存在 = 运行期失败
 
     if parsed.json:
         json_output(True, cmd, data=svc)
@@ -1618,19 +1626,20 @@ def _web_remove(args):
             json_output(False, cmd, error='services file corrupted')
         else:
             print('❌ services file corrupted', file=sys.stderr)
-        return
+        sys.exit(1)
 
     if parsed.json:
         if removed:
             json_output(True, cmd, data={'name': parsed.name})
-        else:
-            json_output(False, cmd, error=f"service '{parsed.name}' not found")
-        return
+            return
+        json_output(False, cmd, error=f"service '{parsed.name}' not found")
+        sys.exit(1)   # CL005 D2：名不存在（json 分支）
 
     if removed:
         print(f"✅ Service '{parsed.name}' removed")
     else:
         print(f"❌ service '{parsed.name}' not found", file=sys.stderr)
+        sys.exit(1)   # CL005 D2
 
 
 def _web_update(args):
@@ -1662,7 +1671,7 @@ def _web_update(args):
             json_output(False, cmd, error='services file corrupted')
         else:
             print('❌ services file corrupted', file=sys.stderr)
-        return
+        sys.exit(1)
 
     if not existing:
         err = f"service '{parsed.name}' not found"
@@ -1670,7 +1679,7 @@ def _web_update(args):
             json_output(False, cmd, error=err)
         else:
             print(f'❌ {err}', file=sys.stderr)
-        return
+        sys.exit(1)   # CL005 D2：名不存在
 
     if (parsed.cmd is None and parsed.url is None and parsed.open_mode is None
             and not parsed.domain and not parsed.no_domain
@@ -1681,7 +1690,7 @@ def _web_update(args):
             json_output(False, cmd, error=err)
         else:
             print(f'❌ {err}', file=sys.stderr)
-        return
+        sys.exit(2)   # CL005 D2：无更新参数 = 用法错误
 
     if parsed.open_mode is not None:
         err = ServiceStore.validate_open_mode(parsed.open_mode)
@@ -1690,7 +1699,7 @@ def _web_update(args):
                 json_output(False, cmd, error=err)
             else:
                 print(f'❌ {err}', file=sys.stderr)
-            return
+            sys.exit(2)   # CL005 D2：open_mode 非法
     if parsed.url is not None:
         err = ServiceStore.validate_url(parsed.url)
         if err:
@@ -1698,7 +1707,7 @@ def _web_update(args):
                 json_output(False, cmd, error=err)
             else:
                 print(f'❌ {err}', file=sys.stderr)
-            return
+            sys.exit(2)   # CL005 D2：url 非法
     if parsed.no_port and parsed.port is not None:
         err = '--port and --no-port are mutually exclusive'
         if json_mode:
@@ -1752,11 +1761,13 @@ def _web_update(args):
             json_output(False, cmd, error=str(e))
         else:
             print(f'❌ {e}', file=sys.stderr)
+        sys.exit(2)   # CL005 D2：ValueError = 用法/校验错误
     except DataCorruptionError:
         if json_mode:
             json_output(False, cmd, error='services file corrupted')
         else:
             print('❌ services file corrupted', file=sys.stderr)
+        sys.exit(1)   # CL005 D2：store 损坏 = 运行期失败
 
 
 def _web_run(args):
@@ -1785,7 +1796,7 @@ def _web_run(args):
             json_output(False, cmd, error='services file corrupted')
         else:
             print('❌ services file corrupted', file=sys.stderr)
-        return
+        sys.exit(1)   # CL005 D2：store 损坏
 
     if not svc:
         err = f"service '{parsed.name}' not found"
@@ -1795,7 +1806,7 @@ def _web_run(args):
             print(f'❌ {err}', file=sys.stderr)
             available = sorted(store.names())
             if available:
-                print(f'   Available: {", ".join(available)}')
+                print(f'   Available: {", ".join(available)}', file=sys.stderr)   # CL005 D1/N-4
         sys.exit(1)
 
     url = svc.get('url') or None
@@ -1833,22 +1844,30 @@ def _web_run(args):
         elif not json_mode:
             print(f'   ⚠️ URL not ready yet: {url}', file=sys.stderr)
 
+    cmd_failed = result.returncode != 0
+    payload = {
+        'name': parsed.name,
+        'cmd': svc['cmd'],
+        'cmd_effective': cmd_line,
+        'url': url,
+        'open': open_mode,
+        'status': 'cmd_failed' if cmd_failed else 'started',
+        'exit_code': result.returncode,
+    }
     if json_mode:
-        json_output(True, cmd, data={
-            'name': parsed.name,
-            'cmd': svc['cmd'],
-            'cmd_effective': cmd_line,
-            'url': url,
-            'open': open_mode,
-            'status': 'started',
-            'exit_code': result.returncode,
-        })
+        if cmd_failed:
+            json_output(False, cmd, data=payload,
+                        error=f'cmd exited with code {result.returncode}')
+        else:
+            json_output(True, cmd, data=payload)
     else:
         print(f"✅ Service '{parsed.name}' started")
         if url:
             print(f"   🌐 {url}")
-        if result.returncode != 0:
+        if cmd_failed:
             print(f'   ⚠️ Cmd exited with code {result.returncode}', file=sys.stderr)
+    if cmd_failed:
+        sys.exit(1)   # CL005 D2：cmd 退出码非 0 = 运行期失败
 
 
 # ── main ───────────────────────────────────────────────
