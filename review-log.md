@@ -1271,4 +1271,45 @@ CL005 实现审计（输出通道 D1 / web 退出码 D2 / 目录级启动锁 D3 
 | HM-CL005-SEC-001 | D3.5 registry.add/history.add 失败回滚（_terminate_runner）补 try/except | 🟡 | P1 | 待修（回 ops 重审） |
 | HM-CL005-SEC-002 | __release_date__/docstring 勘误 + §9.2/§9.5 计数勘误 + §2 D4 措辞勘误 | 🟢 | P2 | 记录（同批/下批 docs@sync） |
 
+---
+
+## 2026-09-23 — Implementation audit rereview: HTTP-SERVER-CL005 (round-2 收口复审)
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（实现审计 round-2 收口 — 只审 SEC-1 闭合面 + 3×🟢 记录 + 回归，不重开 v1.0 已 PASS 项）
+- **Scope**: 3 笔 rework commit（91ebea3 fix@cli · 4cb256d test@cli · 70df367 docs@sync），被审对象 server.py 注册段 + __init__ 版本元数据 + 设计 §9.3/§9.7/§9.8 + T28/T28b；上轮 v1.0 CONDITIONAL_PASS 唯一 🟡 SEC-1
+- **Commit(s)**: 70df367（ahead 9，未 push）
+- **Verdict**: ✅ PASS
+- **Score**: 100 / 100 (Rating: A)
+- **Report**: documents/review/http-server-cli-cl005-audit-v1.1-20260923.md
+
+### Summary
+
+CL005 实现审计 round-2 收口复审（只审闭合面 + 回归）。基线 592 passed、`hs version`=1.4.1、工作树 clean。SEC-1 闭合：`registry.add`+`history.add` 合入同一 `try`（server.py:497-516），异常时 `_terminate_runner(proc.pid)`（SIGTERM→0.5s→SIGKILL 进程组）后按 url_only/json/默认三态报错并 `return False`；锁由 `start()` 的 `finally` 释放。独立复现 T28/T28b（monkeypatch `Registry.add`/`HistoryStore.add` 抛 OSError → 断言 start 返回 False + `killed==[90001]` + 锁释放 + stderr 文案 / `--json` 信封 `success=false` 可解析）2 passed；ops A16 复用同证据 `rollback_ok=True`。差量判定：审计 v1.0 建议「re-raise」，本批改「return False + 三态文案」——判定**语义等价且优于 re-raise**（return False 经 `_cmd_start` cli.py:288-295 恒 exit 1；re-raise 的 OSError 不被 `except UsageError` 捕获、向上冒泡至无顶层 catch 的 main ⇒ dump traceback，与 D14「exit 1 + 干净文案」相悖），采纳、不要求 re-raise。R-1/R-2/R-3 全闭合：`__init__.py` 1.4.1/2026-09-23；§9.2「12+1」/§9.5「+13」与 `git diff` 复算（test_web 12 + port_flag 1）一致；§9.7 定口径（usage 空=软告警、提示词空=exit 2）与 `review-dispatch.sh:94-96/125-127/149-151` 行为一致。回归：592 passed / 35 passed（T1–T28b）/ ops 21/21（A1–A17）/ 既有 harness 31/31+13/13。未越界：rework src diff 仅 `__init__.py`(4 行) + `server.py`(33 行)，registry.py/MAX_PORT/保留端口零改动。残留：registry.json 9 服务结构身份不变（仅 last_access_at 漂移）、services.json 逐字节一致、locks/ 空、无遗留 START listener/锁。🟢 OBS-1（既有测试 dashboard daemon 泄漏，非 CL005）。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| SEC-1 | ✅ | D3.5 `registry.add`/`history.add` 失败 ⇒ `_terminate_runner` 回滚 + 三态报错 + return False（exit 1） | `server.py:497-516` | 闭合 |
+| R-1 | ✅ | `__release_date__`/docstring 版本元数据 1.4.1(2026-09-23) | `__init__.py:25,28-29` | 闭合 |
+| R-2 | ✅ | §9.2「12+1」/§9.5「+13」计数与实测一致 | 设计 §9.2:466/§9.5:503 | 闭合 |
+| R-3 | ✅ | usage-file 软告警 vs 提示词 exit 2 口径定案 | §9.7:524 + `review-dispatch.sh` | 闭合 |
+| OBS-1 | 🟢 | 全量 pytest 经 `test_dashboard.py::TestDaemonMode` 泄漏 daemon dashboard 孤儿（既有测试卫生，非 CL005） | `tests/test_dashboard.py:246-263` | 记录 |
+
+### Positives
+
+- SEC-1 独立复现以 monkeypatch 直接断言「runner 终止 + 无孤儿 + 锁释放 + 三态报错」四点，非采信 dev 自评
+- re-raise vs return False 差量做了逐点语义对照（孤儿/锁/退出码 + re-raise 冒泡路径 traceback 后果），结论有据
+- 计数勘误用 `git diff 4679ee8 HEAD` 独立复算（test_web 12 + port_flag 1 = 13），非采信设计自述
+- 残留以逐字节 hash 对照 registry.json/services.json，识别 last_access_at 为 benign 漂移（A13 同口径）
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| HM-CL005-SEC-001 | D3.5 registry.add/history.add 失败回滚（_terminate_runner） | 🟡 | P1 | ✅ Closed（round-2） |
+| HM-CL005-SEC-002 | __release_date__/docstring + §9.2/§9.5 计数 + §2 D4 口径 | 🟢 | P2 | ✅ Closed（round-2） |
+| HM-CL005-OBS-001 | 测试 dashboard daemon 泄漏（test_dashboard.py，既有） | 🟢 | P2 | 记录（下批 test 收口清理） |
+
 
