@@ -244,13 +244,48 @@ class TestHandlerBehavior:
 
 class TestDaemonMode:
     def test_daemon_mode_subprocess(self):
-        """daemon 模式通过子进程启动（不 hang）"""
+        """daemon 模式通过子进程启动（不 hang），且**测试自身回收**守护进程（O11：不留孤儿）"""
+        import re
+        import signal
+        import time
+
+        import subprocess
+
         from http_server_cli.dashboard import serve
-        import socket
+        from http_server_cli.utils import is_process_alive, is_port_in_use
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind(('127.0.0.1', 0))
         port = s.getsockname()[1]
         s.close()
+
+        def _stat(pid):
+            """ps 状态：'' = 已不存在，'Z…' = 僵尸（已退出，待父进程 reaped）"""
+            if not pid:
+                return ''
+            try:
+                r = subprocess.run(['ps', '-p', str(pid), '-o', 'stat='],
+                                   capture_output=True, text=True, timeout=5)
+                return r.stdout.strip()
+            except Exception:                      # noqa: BLE001
+                return ''
+
+        def _reap(pid):
+            """回收 daemon（setsid 后自成一进程组）：SIGTERM → 轮询 → SIGKILL"""
+            if not pid:
+                return
+            try:
+                os.killpg(os.getpgid(pid), signal.SIGTERM)
+            except (ProcessLookupError, PermissionError):
+                return
+            for _ in range(20):
+                time.sleep(0.05)
+                if not is_process_alive(pid):
+                    return
+            try:
+                os.killpg(os.getpgid(pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+
         captured = __import__('io').StringIO()
         old = sys.stdout
         sys.stdout = captured
@@ -259,8 +294,27 @@ class TestDaemonMode:
         finally:
             sys.stdout = old
         output = captured.getvalue()
-        assert 'daemon' in output
-        assert 'PID:' in output
+        m = re.search(r'PID: (\d+)', output)
+        pid = int(m.group(1)) if m else None
+        try:
+            assert 'daemon' in output
+            assert 'PID:' in output
+            assert pid and is_process_alive(pid)          # 子进程确实起来了
+            for _ in range(40):                            # 就绪等待 ≤2s
+                if is_port_in_use(port):
+                    break
+                time.sleep(0.05)
+            assert is_port_in_use(port)                    # 且真的在监听（非空转）
+        finally:
+            _reap(pid)
+        for _ in range(60):
+            if not is_port_in_use(port):
+                break
+            time.sleep(0.05)
+        assert not is_port_in_use(port)                    # 断言：端口已释放（无孤儿 listener）
+        # 允许短暂僵尸态（已退出、尚未被父进程 wait 回收）；不得是运行态（'S','R' 等）
+        st = _stat(pid)
+        assert st == '' or st.startswith('Z'), '守护进程仍存活：pid=%s stat=%s' % (pid, st)
 
 
 class TestDashboardUrlWithIndex:
