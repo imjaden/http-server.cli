@@ -285,15 +285,17 @@ def a4_double_start():
     ok = len(entries) == 1 and ours == reg_pids and len(ours) > 0
     check('A4-修后', ok, '双击后 registry 条目=%d listener_pids=%s registry_pids=%s（须 1 条且同一性相等）'
           % (len(entries), sorted(ours), sorted(reg_pids)))
-    # 修前反证（基线：≥3 次有效样本）
+    # 修前反证（基线：≥3 次有效样本）——采样预算 12 + 命中 3 次即止；第二次点击延迟轮换
+    # （0.02/0.05/0.08s）以覆盖竞态窗口：固定 5 样本在机器负载变化时会出现「只复现 1–2 次」的假 FAIL
     repro, samples = 0, 0
-    for i in range(5):
+    delays = (0.02, 0.05, 0.08)
+    for i in range(12):
         d2 = demo('a4old%d' % i)
         kill_path(d2)
         p = subprocess.Popen([sys.executable, '-m', 'http_server_cli.cli', d2, '-d', '--url'],
                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                              cwd=ROOT, env=dict(os.environ, PYTHONPATH=os.path.join(WORKTREE, 'src')))
-        time.sleep(0.05)
+        time.sleep(delays[i % len(delays)])
         hs_old([d2, '-d', '--url'])
         p.communicate(timeout=60)
         time.sleep(0.5)
@@ -305,8 +307,11 @@ def a4_double_start():
             repro += 1
         kill_path(d2)
         shutil.rmtree(os.path.join(WORK, 'a4old%d' % i), ignore_errors=True)
+        if repro >= 3:
+            break
     check('A4-修前反证', repro >= 3,
-          '基线双击 %d 次样本中 %d 次出现 listener 集合 != registry 集合（须 ≥3）' % (samples, repro))
+          '基线双击 %d 次样本（预算 12，命中即止）中 %d 次出现 listener 集合 != registry 集合（须 ≥3）'
+          % (samples, repro))
     kill_path(d)
     hs(['kill', d])
 
