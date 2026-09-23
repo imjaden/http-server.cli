@@ -21,7 +21,7 @@
 
 ### Notes
 - 1.4.0（CL003 + CL004）与 1.4.1（CL005）均**尚未发布 PyPI**，可按同批发布
-- 新增测试模块 `tests/test_cl005_hardening.py`（33 用例，T1–T27）；全量 590 passed
+- 新增测试模块 `tests/test_cl005_hardening.py`（35 用例，T1–T28b）；全量 592 passed
 - 设计件：`documents/http-server-cl005-hardening-design-v1.2-20260923.md`（v1.0 / v1.1 留档）
 
 ## 1.4.0 (2026-09-22)

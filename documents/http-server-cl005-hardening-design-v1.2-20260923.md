@@ -463,7 +463,7 @@ FileExists:
 
 - 用法错误 → `sys.exit(2)`；运行期失败 → `sys.exit(1)`；成功/幂等 → 正常 return（rc=0）。
 - **实现期修正（P1）**：`remove --json` 分支的 `return` 一度被改成 `sys.exit(1)`，会把**成功**也变成 rc=1（`test_remove_json` 立即变红）。已改回：成功 `json_output(True…)` + `return`，仅「名不存在」`sys.exit(1)`。
-- **实施面补充（§4.1 未列）**：14 处 web 单测直接调用 `_COMMANDS['web']` 且不含 SystemExit 期望，本批按新三态改为 `pytest.raises(SystemExit)` + `code` 断言（`test_web.py` 13 处 + `test_port_flag.py` 1 处）。根因：§4.1 穷举口径是「`.out` 断言 grep」，覆盖不到这一类「直接调函数、默认不退出」的用例。
+- **实施面补充（§4.1 未列）**：13 处 web 单测直接调用 `_COMMANDS['web']` 且不含 SystemExit 期望，本批按新三态改为 `pytest.raises(SystemExit)` + `code` 断言（`test_web.py` 12 处 + `test_port_flag.py` 1 处）。根因：§4.1 穷举口径是「`.out` 断言 grep」，覆盖不到这一类「直接调函数、默认不退出」的用例。
 - 打桩纪律：web 单测统一 `monkeypatch.setattr('http_server_cli.cli.subprocess', SimpleNamespace(run=…))`——只替换模块内绑定，不用 `setattr('…subprocess.run')`（后者改到 stdlib 全局，会让 `utils.get_process_info` 拿到 `None` 而崩）。同一理由适用于新用例的锁打桩。
 
 ### 9.3 D3 目录级启动锁（落地 + 2 处偏差）
@@ -482,6 +482,13 @@ FileExists:
 - 残留窗口：快径校验通过后、`_start_locked` 内 `find` 之前条目消失（µs 级）⇒ 由 `idempotent_only` 分支返回 False（不启动、不清理），不产生第二个 runner。
 - `finally` 只在本进程确实取得锁时释放；`release_start_lock` 的归属校验（仅删本进程锁）在快径不被触发。
 
+**偏差 D3-3（审计 SEC-1，round-2 补齐）——`registry.add` 失败回滚**
+
+- 设计 §2 D3.5 bullet 2 要求「`registry.add` 抛异常 ⇒ 释放锁前先 `_terminate_runner` 终止本次 runner ⇒ 不产生孤儿」，本批初版**漏实现**（§9.3 初稿亦未记录，属实施记录失实；审计 SEC-1 指出，非回归）。
+- 补齐：`registry.add` + `history.add` 合入同一 `try`，异常时 `_terminate_runner(proc.pid)`（SIGTERM → 0.5s → SIGKILL 进程组）后按 `url_only/json/默认` 三态报错并 `return False`（⇒ CLI 退出码 1，符合 D2 三态；锁由 `start()` 的 `finally` 释放）。
+- 与审计建议「再 re-raise」的差异：**不回抛**，改为返回 False + 三态文案——理由：与 CL003 D14 退出码三态一致，避免向用户 dump traceback；语义等价（runner 已终止、不产生孤儿、锁已释放）。
+- 回归：新增 T28/T28b（`registry.add` 失败 → 终止 runner + 锁释放 + stderr 文案；`history.add` 失败 → 同回滚 + `--json` 信封 `success=false`）。
+
 ### 9.4 D4 派发件模板（落地；本批 [5/6] 起自身即实战验证）
 
 - 新增 `scripts/review-dispatch.sh`：`--target/--code/--project/--step/--date/--prompt` 唯一推导 派发壳/日志/用量 三路径；编号大小写归一；① 派发前校验提示词非空（缺失/空 ⇒ exit 2）② 生成物过 `bash -n` ③ 派发后校验 usage-file 非空（缺失/空 ⇒ 日志告警）。
@@ -493,10 +500,10 @@ FileExists:
 | 面 | 设计 §4.1 | 实际 | 差异说明 |
 |:--|:--|:--|:--|
 | 存量断言通道同步 | 12 必改 + 1 可选 | 13 | 逐条一致（`test_utils:222` / `test_cli:365,1053` / `test_server:76,87,135,228,250,314,320,326` / `test_port_flag:178,347`） |
-| web 单测 SystemExit | 未列 | +15 | 见 9.2（口径缺口，本批补上并留档） |
+| web 单测 SystemExit | 未列 | +13 | 见 9.2（口径缺口，本批补上并留档） |
 | 版本三处 | `__init__` / CHANGELOG / spec | 3 + harness 2 | `scripts/port-{flag,residual}-verify.py` 的 1.4.0 断言改为「1.4.0/1.4.1 兼容」⇒ CL003/CL004 harness 保持可复跑 |
 | 四同步 | CHANGELOG/features/README/spec | 4（+ README.zh） | README.zh 与 README 同步（退出码 + 启动锁 + stderr 口径） |
-| 测试计数 | — | 557 → **590**（17 模块） | 新增 `tests/test_cl005_hardening.py` 33 用例 |
+| 测试计数 | — | 557 → **592**（17 模块） | 新增 `tests/test_cl005_hardening.py` 35 用例（T1–T28b；审计 SEC-1 补 T28/T28b） |
 
 ### 9.6 commit 分组（§8 计划 vs 实际）
 
@@ -507,9 +514,18 @@ FileExists:
 | 3 | `scripts/review-dispatch.sh` | `feat@tool:` |
 | 4 | CHANGELOG/features/README×2/spec/`__init__` + 本 §9 + harness 兼容 | `docs@sync:` |
 
-### 9.7 实测基线（dev 收口）
+### 9.7 实现审计记录项处置（audit v1.0，2026-09-23）
 
-- 全量：`python3 -m pytest tests/ -q -n 4` ⇒ **590 passed**（连续 3 轮，~2.5s/轮），零回归。
+| # | 级别 | 内容 | 处置 |
+|:--|:--|:--|:--|
+| SEC-1 | 🟡 | D3.5 `registry.add` 失败回滚未实现（§9.3 初稿漏记） | **本批已修**：见修订后的 §9.3 偏差 D3-3 + 新增 T28/T28b |
+| R-1 | 🟢 | `__release_date__` / 模块 docstring 版本未随 1.4.1 更新 | 已修：`2026-09-23` / `Version: 1.4.1(2026-09-23)` |
+| R-2 | 🟢 | §9.2「test_web.py 13 处」/§9.5「+15」计数有误 | 已修：12 处 / +13（test_web 12 + port_flag 1） |
+| R-3 | 🟢 | §2 D4「usage 缺失/空 ⇒ exit 2」措辞与实现（stderr 告警、不退出）不符 | **不改历史件**：以本条记录口径为准 —— usage-file 缺失/空为**软告警**（写日志 + stderr 提示）；提示词缺失/空才是 `exit 2`（派发前硬校验） |
+
+### 9.8 实测基线（dev 收口 + 审计 round-2 回填）
+
+- 全量：`python3 -m pytest tests/ -q -n 4` ⇒ **592 passed**（dev 收口 590 + 审计 SEC-1 补 2 例），零回归。
 - `hs version` ⇒ `http-server v1.4.1`；`hs web show <不存在>` ⇒ rc=1 且错误文案在 stderr。
 - 真机并发（5 进程同目录同 `-p`）⇒ 1 登记 / 1 listener（pid 同一）/ 锁目录 0 残留；`hs kill 8097` rc=0。
 - 修前反证基线：`4679ee8`（CL004 收尾）。
