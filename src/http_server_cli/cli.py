@@ -172,7 +172,7 @@ def _handle_set(args):
             eprint('Usage: set <port|domain> <value>', '⚠️')
             eprint('  set port 8080      Set default port', '💡')
             eprint('  set domain 0.0.0.0 Set bind domain', '💡')
-        return
+        sys.exit(2)   # O7：用法错误统一 exit 2（对齐 CL003 D9e / CL005 D2 口径）
 
     key, value = clean_args[0], clean_args[1]
     config = Config()
@@ -186,7 +186,7 @@ def _handle_set(args):
                     json_output(False, 'set', error='Port must be between 1024-65535')
                 else:
                     eprint('Port must be between 1024-65535', '⚠️')
-                return
+                sys.exit(2)   # O7：用法错误
             old_value = config.port
             config.set_port(port)
             if json_mode:
@@ -200,6 +200,7 @@ def _handle_set(args):
                 json_output(False, 'set', error=f'Invalid port number: {value}')
             else:
                 eprint(f'Invalid port number: {value}', '❌')
+            sys.exit(2)   # O7：用法错误
     elif key == 'domain':
         old_value = config.domain
         try:
@@ -210,7 +211,7 @@ def _handle_set(args):
                 json_output(False, 'set', error=str(e))
             else:
                 eprint(str(e), '❌')
-            return
+            sys.exit(2)   # O7：用法错误（domain 字符集非法）
         if json_mode:
             from http_server_cli.utils import json_output
             json_output(True, 'set', data={'key': 'domain', 'old_value': old_value, 'new_value': value})
@@ -222,6 +223,7 @@ def _handle_set(args):
             json_output(False, 'set', error=f'Unknown config key: {key} (supported: port, domain)')
         else:
             eprint(f'Unknown config key: {key} (supported: port, domain)', '⚠️')
+        sys.exit(2)   # O7：用法错误（未知配置键）
 
 # ── 命令分派 ──────────────────────────────────────────
 
@@ -547,9 +549,12 @@ def _cmd_search(manager, args):
     parser.add_argument('--json', action='store_true')
     parsed, _ = _parse_known_args(parser, args, allow_positional=True)
     if not parsed.keyword:
-        from http_server_cli.utils import eprint
-        eprint('Usage: hs search <keyword>', '⚠️')
-        return
+        from http_server_cli.utils import eprint, json_output
+        if parsed.json:
+            json_output(False, 'search', error='Usage: hs search <keyword>')
+        else:
+            eprint('Usage: hs search <keyword>', '⚠️')
+        sys.exit(2)   # O7：用法错误统一 exit 2（--json 时仍给可解析信封）
 
     # 从 registry 中搜索匹配项（仅搜索运行中的服务）
     servers = manager.registry.active_servers()
@@ -672,7 +677,9 @@ def _manage_dashboard(subcmd: str, json_mode: bool = False, port=None) -> None:
                 print_msg('dashboard not running', 'ℹ️')      # 查询答案 → stdout（CL005 D1.2）
             else:
                 eprint('dashboard not running', 'ℹ️')         # stop/restart 失败 → stderr
-        return
+        if subcmd == 'status':
+            return                                        # O8：status 是查询 ⇒ rc 0
+        sys.exit(1)   # O8：stop/restart 未运行 = 运行期失败 ⇒ rc 1（对齐 web 三态）
 
     port = entry.get('port', '?')
     pid = entry.get('pid')
@@ -933,7 +940,9 @@ def _manage_mcp(subcmd: str, json_mode: bool = False) -> None:
                 print_msg('MCP not running', 'ℹ️')            # 查询答案 → stdout（CL005 D1.2）
             else:
                 eprint('MCP not running', 'ℹ️')               # stop/restart 失败 → stderr
-        return
+        if subcmd == 'status':
+            return                                        # O8：status 是查询 ⇒ rc 0
+        sys.exit(1)   # O8：stop/restart 未运行 = 运行期失败 ⇒ rc 1（对齐 web 三态）
 
     port = entry.get('port', '?')
     pid = entry.get('pid')

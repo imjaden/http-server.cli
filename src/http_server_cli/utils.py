@@ -20,7 +20,10 @@ from typing import Any, Optional
 HOME = os.path.expanduser('~')
 # v1.1.0: 数据目录从 ~/.http-server-cli 迁移至 ~/.http-server.cli
 LEGACY_DATA_DIR = os.path.join(HOME, '.http-server-cli')
-DATA_DIR = os.path.join(HOME, '.http-server.cli')
+# O11：`HS_DATA_DIR` 可覆盖数据目录（测试/CI 隔离；子进程同样继承该 env，避免子进程回写真实数据目录）
+_DATA_DIR_ENV = os.environ.get('HS_DATA_DIR', '').strip()
+DATA_DIR = (os.path.expanduser(_DATA_DIR_ENV) if _DATA_DIR_ENV
+            else os.path.join(HOME, '.http-server.cli'))
 CONFIG_PATH = os.path.join(DATA_DIR, 'config.json')
 REGISTRY_PATH = os.path.join(DATA_DIR, 'registry.json')
 HISTORY_PATH = os.path.join(DATA_DIR, 'history.json')
@@ -252,10 +255,24 @@ def is_process_alive(pid):
         return False
 
 # ── 启动锁（CL005 D3）：目录级互斥，防同目录并发启动残留孤儿 runner ──
-LOCK_TTL = 30.0          # 锁最长有效期（秒）；仅当 0 ≤ 龄 > TTL 才判 stale
-LOCK_WAIT = 3.0          # 有效锁期间等待 holder 完成的预算（秒）
-LOCK_POLL = 0.2          # 等待轮询间隔（秒）
-LOCK_WRITE_GRACE = 1.0   # 「锁文件存在但不可解析」的写入宽限（秒）——防 mid-write 误删
+# 锁常量（O10：支持环境变量覆盖，便于重负载/慢盘场景调参；默认值保持不变）
+#   HS_LOCK_TTL / HS_LOCK_WAIT / HS_LOCK_POLL / HS_LOCK_WRITE_GRACE
+def _lock_env(name: str, default: float) -> float:
+    """读环境变量覆盖值；非法值 → 退回默认（不抛异常，避免启动即崩）"""
+    raw = os.environ.get(name)
+    if raw is None or raw == '':
+        return default
+    try:
+        val = float(raw)
+    except (TypeError, ValueError):
+        return default
+    return val if val > 0 else default
+
+
+LOCK_TTL = _lock_env('HS_LOCK_TTL', 30.0)          # 锁最长有效期（秒）；仅当 0 ≤ 龄 > TTL 才判 stale
+LOCK_WAIT = _lock_env('HS_LOCK_WAIT', 3.0)         # 有效锁期间等待 holder 完成的预算（秒）
+LOCK_POLL = _lock_env('HS_LOCK_POLL', 0.2)         # 等待轮询间隔（秒）
+LOCK_WRITE_GRACE = _lock_env('HS_LOCK_WRITE_GRACE', 1.0)   # 「锁文件存在但不可解析」的写入宽限（秒）——防 mid-write 误删
 
 def lock_dir() -> str:
     """锁目录（派生自 DATA_DIR ⇒ 测试经 DATA_DIR monkeypatch 自动隔离）"""

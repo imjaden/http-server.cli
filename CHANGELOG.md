@@ -9,11 +9,17 @@
   - 等待路径 `LOCK_WAIT=3s` / `LOCK_POLL=0.2s`：期间该目录登记就绪 ⇒ 幂等命中退出 0；锁已释放 ⇒ 重试整链；超时 ⇒ fail-closed 退出 1（提示持锁 pid）
   - 用法错误优先：路径不存在 / index 非法 / `-p` 越界仍按原语义 exit 1 / 2，不被锁等待掩盖
   - 计时基准 `time.clock_gettime(CLOCK_MONOTONIC)`（跨进程可比；`time.monotonic()` 在 py3.9 实测跨进程近零且非单调，会导致活锁被误判 stale）
+- **`HS_DATA_DIR` 数据目录覆盖**（HTTP-SERVER-CL005 收口 / O11）— 数据目录可用环境变量指向任意路径（测试 / CI 隔离）；子进程继承该变量，daemon 子进程的登记不再回写真实 `~/.http-server.cli`（未设时行为不变）
+- **锁常量环境变量覆盖**（HTTP-SERVER-CL005 收口 / O10）— `HS_LOCK_TTL` / `HS_LOCK_WAIT` / `HS_LOCK_POLL` / `HS_LOCK_WRITE_GRACE` 可覆盖默认值（重负载 / 慢盘场景调参）；未设或非法值一律退回默认（默认行为不变）
 - **派发件模板** `scripts/review-dispatch.sh`（HTTP-SERVER-CL005 / D4）— 由「编号 + 项目 + 步骤 + 日期」唯一推导 派发壳/日志/用量 三路径；派发前校验提示词非空、派发后校验 usage-file 非空，生成物先过 `bash -n`
 
 ### Fixed
 - **`eprint()` 实际写 stdout**（HTTP-SERVER-CL005）— 内部打印函数名为 stderr 系列却写 stdout，导致错误/警告文案污染 `--json` 输出与下游管道；现 `eprint()` 写 stderr、查询类结果走新增的 `print_msg()`（stdout），并逐调用点固化通道契约（63 处：stdout 23 / stderr 38 / 三态分叉 2）
 - **`hs web` 错误分支退出 0**（HTTP-SERVER-CL005）— `hs web add/list/show/remove/update/<name>` 的用法错误与运行期失败此前一律退出 0（假成功）；现用法错误（缺必填 / 子命令名冲突 / 名已存在 / 非法 url·open / 无更新参数）退出 2，运行期失败（名不存在 / services 文件损坏 / 执行命令退出码非 0）退出 1；并补 `hs web <name>` 的命令失败分支（修前 rc=0 且 JSON `success=true`）
+
+- **`hs set` / `hs search` 用法错误退出 0**（HTTP-SERVER-CL005 收口 / O7）— 缺参 / 端口越界 / 端口非数字 / domain 字符集非法 / 未知配置键 / `hs search` 缺 keyword 现统一退出 `2`（`--json` 下仍先输出可解析失败信封再退出）
+- **`hs dashboard` / `hs mcp` 的 `stop`・`restart` 未运行退出 0**（HTTP-SERVER-CL005 收口 / O8）— 现退出 `1`（运行期失败）；`status` 作为查询保持 `0`（文案仍在 stdout）；`--json` 失败信封不变
+- **`tests/test_dashboard.py::TestDaemonMode` 泄漏 dashboard 守护进程**（HTTP-SERVER-CL005 收口 / O11）— 用例的 daemon 子进程（独立会话）在测试结束后残留为孤儿，且会在真实 `~/.http-server.cli/registry-managed.json` 留下 stale 登记；现用例 ① 就绪确认后自行回收（SIGTERM → SIGKILL 进程组）② 通过 `HS_DATA_DIR` 把子进程数据目录指向临时目录（登记写入临时目录）③ 断言「无存活进程 + 端口已释放 + 子进程登记落在临时目录」
 
 ### Changed
 - 锁语义：`--daemon` tail / `foreground` 长驻期间由首实例持有锁，第二实例在该期间命中「已就绪」快径 ⇒ 幂等退出 0（不判忙、不重复启动）
@@ -21,7 +27,7 @@
 
 ### Notes
 - 1.4.0（CL003 + CL004）与 1.4.1（CL005）均**尚未发布 PyPI**，可按同批发布
-- 新增测试模块 `tests/test_cl005_hardening.py`（35 用例，T1–T28b）；全量 592 passed
+- 新增测试模块 `tests/test_cl005_hardening.py`（47 用例：T1–T28b + O7/O8/O9/O10 收口组）；`tests/test_dashboard.py` daemon 用例补回收 + 数据目录隔离断言；全量 **605 passed**
 - 设计件：`documents/http-server-cl005-hardening-design-v1.2-20260923.md`（v1.0 / v1.1 留档）
 
 ## 1.4.0 (2026-09-22)

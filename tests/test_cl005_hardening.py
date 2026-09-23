@@ -120,8 +120,11 @@ class TestOutputChannels:
         assert captured.err == ''
 
     def test_t4_set_error_is_stderr_only(self, capsys):
+        """错误文案只走 stderr 且 rc=2（O7：用法错误统一 exit 2）"""
         from http_server_cli.config import Config
-        cli._handle_set(['port', 'abc'])
+        with pytest.raises(SystemExit) as exc:
+            cli._handle_set(['port', 'abc'])
+        assert exc.value.code == 2
         captured = capsys.readouterr()
         assert captured.out == ''
         assert 'Invalid port number' in captured.err or 'must match' in captured.err
@@ -468,3 +471,155 @@ class TestReviewDispatchTemplate:
         assert r.returncode == 0, r.stderr
         assert 'HTTP-SERVER-CL005-audit-dispatch.log' in r.stdout
         assert '20260923-http-server.cli-HTTP-SERVER-CL005-audit.json' in r.stdout
+
+
+# ── O7/O8 收口：用法/运行期退出码三态扩展 ───────────────
+
+def _patch_managed(monkeypatch, entry):
+    """把 ManagedRegistry 与进程/端口判据打桩（照 test_port_flag 口径）"""
+    class _MReg:
+        def find(self, name=None):
+            return entry
+
+        def remove(self, name=None):
+            pass
+
+    monkeypatch.setattr('http_server_cli.registry_managed.ManagedRegistry', _MReg)
+    monkeypatch.setattr('http_server_cli.utils.is_process_alive', lambda pid: False)
+    monkeypatch.setattr('http_server_cli.utils.is_port_in_use', lambda p: False)
+
+
+class TestOSeriesExitCodes:
+    """O7：`set`/`search` 用法错误 ⇒ rc=2；O8：`dashboard`/`mcp` stop·restart 未运行 ⇒ rc=1（status 保持 0）"""
+
+    def test_o7_set_usage_exit2_matrix(self):
+        for args in ([], ['port'], ['port', 'abc'], ['port', '70000'],
+                     ['domain', 'a;b'], ['unknown', 'x']):
+            with pytest.raises(SystemExit) as exc:
+                cli._handle_set(list(args))
+            assert exc.value.code == 2, args
+
+    def test_o7_set_json_envelope_exit2(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            cli._handle_set(['port', 'abc', '--json'])
+        assert exc.value.code == 2
+        payload = json.loads(capsys.readouterr().out)
+        assert payload['success'] is False and 'Invalid port number' in payload['error']
+
+    def test_o7_search_usage_exit2(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            cli._cmd_search(None, [])
+        assert exc.value.code == 2
+        assert capsys.readouterr().out == ''          # 非 json：stdout 零污染（用法提示走 stderr）
+
+    def test_o7_search_json_usage_envelope(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            cli._cmd_search(None, ['--json'])
+        assert exc.value.code == 2
+        payload = json.loads(capsys.readouterr().out)
+        assert payload['success'] is False and 'Usage' in payload['error']
+
+    def test_o8_dashboard_stop_not_running_exit1(self, monkeypatch, capsys):
+        _patch_managed(monkeypatch, None)
+        with pytest.raises(SystemExit) as exc:
+            cli._manage_dashboard('stop', json_mode=False)
+        assert exc.value.code == 1
+        assert 'not running' in capsys.readouterr().err
+
+    def test_o8_dashboard_status_not_running_rc0(self, monkeypatch, capsys):
+        _patch_managed(monkeypatch, None)
+        cli._manage_dashboard('status', json_mode=False)     # 查询：不抛 SystemExit
+        assert 'not running' in capsys.readouterr().out
+
+    def test_o8_dashboard_stop_json_envelope_exit1(self, monkeypatch, capsys):
+        _patch_managed(monkeypatch, None)
+        with pytest.raises(SystemExit) as exc:
+            cli._manage_dashboard('stop', json_mode=True)
+        assert exc.value.code == 1
+        payload = json.loads(capsys.readouterr().out)
+        assert payload['success'] is False and payload['error'] == 'dashboard not running'
+
+    def test_o8_mcp_stop_not_running_exit1(self, monkeypatch, capsys):
+        _patch_managed(monkeypatch, None)
+        with pytest.raises(SystemExit) as exc:
+            cli._manage_mcp('stop', json_mode=False)
+        assert exc.value.code == 1
+        assert 'not running' in capsys.readouterr().err
+
+    def test_o8_mcp_status_not_running_rc0(self, monkeypatch, capsys):
+        _patch_managed(monkeypatch, None)
+        cli._manage_mcp('status', json_mode=False)
+        assert 'not running' in capsys.readouterr().out
+
+
+class TestMachineModeStdoutPurity:
+    """O9：机器模式（--json）stdout 只允许可解析信封；附带文案一律走 stderr"""
+
+    def _run(self, fn, capsys):
+        try:
+            fn()
+        except SystemExit:
+            pass
+        return capsys.readouterr()
+
+    def test_o9_json_commands_stdout_parseable(self, capsys):
+        mgr = ServerManager()
+        cases = {
+            'list': lambda: cli._COMMANDS['list'](mgr, ['--json']),
+            'history': lambda: cli._COMMANDS['history'](mgr, ['--json']),
+            'status': lambda: cli._COMMANDS['status'](mgr, ['9999', '--json']),
+            'kill': lambda: cli._COMMANDS['kill'](mgr, ['9999', '--json']),
+            'search': lambda: cli._COMMANDS['search'](mgr, ['nonexistent', '--json']),
+            'set': lambda: cli._COMMANDS['set'](mgr, ['port', 'abc', '--json']),
+            'web-list': lambda: cli._COMMANDS['web'](None, ['list', '--json']),
+        }
+        bad = []
+        for name, fn in cases.items():
+            cap = self._run(fn, capsys)
+            try:
+                payload = json.loads(cap.out)
+            except Exception as e:                     # noqa: BLE001
+                bad.append((name, 'stdout 不可解析: %r' % cap.out[:120], str(e)))
+                continue
+            if 'success' not in payload:
+                bad.append((name, '信封缺 success 键', cap.out[:80]))
+        assert not bad, bad
+
+
+class TestOLockEnvOverride:
+    """O10：锁常量支持环境变量覆盖（重负载/慢盘调参），非法值退回默认；O11：HS_DATA_DIR 覆盖数据目录"""
+
+    def test_o11_data_dir_env_override(self, tmp_path):
+        """子进程级：HS_DATA_DIR → DATA_DIR 与派生路径（真实接线，非 mock）"""
+        env = dict(os.environ)
+        env.update({'HS_DATA_DIR': str(tmp_path), 'PYTHONPATH': str(REPO / 'src')})
+        r = subprocess.run(
+            [sys.executable, '-c',
+             'import http_server_cli.utils as u;'
+             'print(u.DATA_DIR);print(u.REGISTRY_PATH);print(u.LOG_DIR)'],
+            capture_output=True, text=True, timeout=60, env=env)
+        lines = [l for l in r.stdout.strip().splitlines() if l]
+        assert lines and all(l.startswith(str(tmp_path)) for l in lines), r.stdout + r.stderr
+
+    def test_o10_helper_semantics(self, monkeypatch):
+        from http_server_cli.utils import _lock_env
+        monkeypatch.setenv('HS_X', '2.5')
+        assert _lock_env('HS_X', 1.0) == 2.5
+        for bad in ('abc', '', '-1', '0'):
+            monkeypatch.setenv('HS_X', bad)
+            assert _lock_env('HS_X', 1.0) == 1.0, bad
+        monkeypatch.delenv('HS_X', raising=False)
+        assert _lock_env('HS_X', 1.0) == 1.0
+
+    def test_o10_env_applied_at_import(self):
+        """子进程级：env → 模块常量（真实接线，非 mock）"""
+        env = dict(os.environ)
+        env.update({'HS_LOCK_WRITE_GRACE': '2.5', 'HS_LOCK_TTL': '45',
+                    'HS_LOCK_WAIT': '5', 'HS_LOCK_POLL': '0.5',
+                    'PYTHONPATH': str(REPO / 'src')})
+        r = subprocess.run(
+            [sys.executable, '-c',
+             'import http_server_cli.utils as u;'
+             'print(u.LOCK_WRITE_GRACE, u.LOCK_TTL, u.LOCK_WAIT, u.LOCK_POLL)'],
+            capture_output=True, text=True, timeout=60, env=env)
+        assert r.stdout.split() == ['2.5', '45.0', '5.0', '0.5'], r.stdout + r.stderr

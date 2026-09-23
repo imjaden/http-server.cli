@@ -54,7 +54,10 @@
 13. 全局薄壳 `~/.local/bin/web` 转发 — 达成 `web <name>` 语法 ✅
 14. 推广 — skills/hs-web（命令速查 + 其他模块接入指南 + 真实实例 daily.checker/jaden.tech/线上站点），`hs prompt hs-web` 输出，镜像 ~/.hermes/profiles/ops/skills/devops/hs-web/ ✅ — HTTP-SERVER-CL002
 15. `hs web` 退出码三态 — 用法错误 2（缺必填 / 子命令名冲突 / 名已存在 / 非法 url·open / 无更新参数）/ 运行期失败 1（名不存在 / services 损坏 / 执行命令退出码非 0）/ 成功与已运行幂等 0 ✅ — HTTP-SERVER-CL005
-16. 关联文档: HTTP-SERVER-CL001 review (documents/review/http-server-cli-web-registration-audit-v1.0-20260827.md) / HTTP-SERVER-CL002 review (documents/review/http-server-cli-cl002-web-domain-promo-audit-v1.0-20260827.md, documents/review/http-server-cli-cl002-sec023-1-domain-validation-rereview-v1.1-20260827.md)
+16. 退出码三态扩展（O7/O8 收口，HTTP-SERVER-CL005）— `hs set` / `hs search` 用法错误 → 2（缺参 / 越界 / 非数字 / domain 字符集 / 未知键 / 缺 keyword）；`hs dashboard` / `hs mcp` 的 `stop`・`restart` 未运行 → 1（`status` 查询仍 0）；`--json` 一律先给可解析失败信封 ✅
+17. 锁常量可调（O10 收口，HTTP-SERVER-CL005）— `HS_LOCK_TTL` / `HS_LOCK_WAIT` / `HS_LOCK_POLL` / `HS_LOCK_WRITE_GRACE` 环境变量覆盖，非法值退回默认 ✅
+18. `HS_DATA_DIR` 数据目录覆盖（O11 收口，HTTP-SERVER-CL005）— 数据目录可由环境变量指向任意路径（测试/CI 隔离）；子进程继承，daemon 登记不回写真实 `~/.http-server.cli` ✅
+19. 关联文档: HTTP-SERVER-CL001 review (documents/review/http-server-cli-web-registration-audit-v1.0-20260827.md) / HTTP-SERVER-CL002 review (documents/review/http-server-cli-cl002-web-domain-promo-audit-v1.0-20260827.md, documents/review/http-server-cli-cl002-sec023-1-domain-validation-rereview-v1.1-20260827.md)
 
 ## HTTP 服务
 
@@ -133,7 +136,7 @@
 
 ## 测试
 
-1. 17 个测试模块，592 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
+1. 17 个测试模块，605 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
 2. `conftest.py` — autouse 数据隔离 + monkeypatch 路径注入 ✅
 3. 集成测试模式 — mock `_COMMANDS` / `ensure_storage`，set `sys.argv`，catch `SystemExit` ✅
 

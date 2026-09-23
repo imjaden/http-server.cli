@@ -243,8 +243,8 @@ class TestHandlerBehavior:
         assert DashboardHandler.manager is mgr
 
 class TestDaemonMode:
-    def test_daemon_mode_subprocess(self):
-        """daemon 模式通过子进程启动（不 hang），且**测试自身回收**守护进程（O11：不留孤儿）"""
+    def test_daemon_mode_subprocess(self, monkeypatch):
+        """daemon 模式通过子进程启动（不 hang）；子进程数据目录隔离 + **测试自身回收**（O11：不留孤儿/不留真实数据目录残留）"""
         import re
         import signal
         import time
@@ -253,6 +253,9 @@ class TestDaemonMode:
 
         from http_server_cli.dashboard import serve
         from http_server_cli.utils import is_process_alive, is_port_in_use
+        # 子进程继承 HS_DATA_DIR ⇒ 其 managed 登记落在临时目录，不回写 ~/.http-server.cli
+        child_dir = tempfile.mkdtemp(prefix='hs_test_daemon_')
+        monkeypatch.setenv('HS_DATA_DIR', child_dir)
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind(('127.0.0.1', 0))
         port = s.getsockname()[1]
@@ -305,6 +308,14 @@ class TestDaemonMode:
                     break
                 time.sleep(0.05)
             assert is_port_in_use(port)                    # 且真的在监听（非空转）
+            # 子进程自身把 dashboard 登记写进 HS_DATA_DIR（证明隔离生效、未污染真实数据目录）
+            child_reg = os.path.join(child_dir, 'registry-managed.json')
+            for _ in range(40):
+                if os.path.exists(child_reg):
+                    break
+                time.sleep(0.05)
+            entries = json.load(open(child_reg)).get('services', []) if os.path.exists(child_reg) else []
+            assert any(e.get('name') == 'dashboard' and e.get('pid') == pid for e in entries), entries
         finally:
             _reap(pid)
         for _ in range(60):

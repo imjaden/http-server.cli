@@ -341,8 +341,11 @@ class TestDashboardRestartPort:
         assert exc.value.code == 1
 
     def test_not_running_does_not_start(self, monkeypatch, capsys):
+        """O8：未运行时 restart 不启动（rc=1 运行期失败；status 才是 rc=0 查询）"""
         calls = self._patch_managed(monkeypatch, None)
-        cli._manage_dashboard('restart', json_mode=False)
+        with pytest.raises(SystemExit) as exc:
+            cli._manage_dashboard('restart', json_mode=False)
+        assert exc.value.code == 1
         assert calls == {}
         assert 'not running' in capsys.readouterr().err
 

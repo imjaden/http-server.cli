@@ -185,8 +185,9 @@ hs web add dk --cmd 'dk server start --daemon --open' --domain   # inject config
 ```
 
 > `services.json` (independent of bookmarks): bookmark maps a name to a static directory; `hs web` maps a name to any command.
-> Exit codes (CL005): usage errors (missing `--cmd`, name conflict, illegal url/open, nothing to update) → `2`; runtime failures (unknown name, corrupted store, command exited non-zero) → `1`; success and "already running" → `0`.
-> Startup lock (CL005): concurrent starts for the same directory are serialized by a per-directory lock (`~/.http-server.cli/locks/`). A second call returns the running URL idempotently (exit 0), or fails closed with the holder PID while another instance is still starting. Error/warning output goes to **stderr** (stdout carries only the main product: URL / listing / JSON envelope).
+> Exit codes (CL005): `hs web` usage errors (missing `--cmd`, name conflict, illegal url/open, nothing to update) → `2`; runtime failures (unknown name, corrupted store, command exited non-zero) → `1`; success and "already running" → `0`.
+> Exit codes (CL005 follow-up): `hs set` / `hs search` usage errors → `2`; `hs dashboard` / `hs mcp` `stop`・`restart` while not running → `1` (`status` stays `0`); `--json` always prints a parseable failure envelope first.
+> Startup lock (CL005): concurrent starts for the same directory are serialized by a per-directory lock (`~/.http-server.cli/locks/`). A second call returns the running URL idempotently (exit 0), or fails closed with the holder PID while another instance is still starting. Lock constants are tunable via `HS_LOCK_TTL` / `HS_LOCK_WAIT` / `HS_LOCK_POLL` / `HS_LOCK_WRITE_GRACE` (invalid values fall back to defaults). Error/warning output goes to **stderr** (stdout carries only the main product: URL / listing / JSON envelope).
 > Promotion: `hs prompt hs-web` — cross-project web service registration guide for other modules (daily-checker / llm-radar / html-gen / jaden.tech).
 
 ### Dashboard

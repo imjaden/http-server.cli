@@ -358,9 +358,11 @@ class TestSearchCommand:
         return mgr
 
     def test_search_no_keyword(self, capsys):
-        """无关键字时应提示用法"""
+        """无关键字时应提示用法（O7：用法错误 ⇒ exit 2）"""
         from http_server_cli.cli import _cmd_search
-        _cmd_search(None, [])
+        with pytest.raises(SystemExit) as exc:
+            _cmd_search(None, [])
+        assert exc.value.code == 2
         captured = capsys.readouterr()
         assert 'Usage' in captured.err
 
@@ -1048,15 +1050,20 @@ class TestSetDomainCli:
         assert Config().domain == 'jaden.local'
 
     def test_set_domain_invalid(self, capsys):
-        _COMMANDS['set'](None, ['domain', 'bad value'])
-        # 注: _handle_set 错误经 eprint 输出到 stdout（项目惯例，非 stderr）
+        """字符集非法 ⇒ 错误只走 stderr 且 rc=2（O7：用法错误统一 exit 2）"""
+        with pytest.raises(SystemExit) as exc:
+            _COMMANDS['set'](None, ['domain', 'bad value'])
+        assert exc.value.code == 2
         assert 'domain must match' in capsys.readouterr().err
         from http_server_cli.config import Config
         assert Config().domain == 'localhost'
 
     def test_set_domain_invalid_json(self, capsys):
-        _COMMANDS['set'](None, ['domain', 'a;b', '--json'])
+        """--json：失败信封 + rc=2（stdout 保持可解析）"""
         import json
+        with pytest.raises(SystemExit) as exc:
+            _COMMANDS['set'](None, ['domain', 'a;b', '--json'])
+        assert exc.value.code == 2
         result = json.loads(capsys.readouterr().out)
         assert result['success'] is False
         assert 'domain must match' in result['error']

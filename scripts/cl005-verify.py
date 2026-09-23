@@ -474,12 +474,14 @@ def a10_legacy_harness():
     for script, sid in (('port-flag-verify.py', 'CL003'), ('port-residual-verify.py', 'CL004')):
         p = subprocess.run([sys.executable, os.path.join(ROOT, 'scripts', script)],
                            capture_output=True, text=True, timeout=900, cwd=ROOT)
-        tail = p.stdout.strip().splitlines()[-3:]
         n_pass = p.stdout.count('[PASS]')
         n_fail = p.stdout.count('[FAIL]')
-        out.append((script, n_pass, n_fail, tail))
+        fails = [l.strip() for l in p.stdout.splitlines() if '[FAIL]' in l or '### 结论' in l]
+        out.append((script, n_pass, n_fail, fails))
     ok = all(r[2] == 0 and r[1] > 0 for r in out)
-    check('A10', ok, '既有 harness 回归：%s' % '；'.join('%s PASS=%d FAIL=%d' % (r[0], r[1], r[2]) for r in out))
+    check('A10', ok, '既有 harness 回归：%s%s' % (
+        '；'.join('%s PASS=%d FAIL=%d' % (r[0], r[1], r[2]) for r in out),
+        '｜FAIL 明细: %s' % ' | '.join(l for r in out for l in r[3]) if not ok else ''))
 
 
 def a11_full_pytest():
@@ -492,7 +494,7 @@ def a11_full_pytest():
     f = re.search(r'(\d+) failed', txt)
     n_pass = int(m.group(1)) if m else 0
     n_fail = int(f.group(1)) if f else 0
-    check('A11', n_fail == 0 and n_pass >= 582, '全量 pytest：%s' % txt[:120])
+    check('A11', n_fail == 0 and n_pass >= 600, '全量 pytest：%s' % txt[:120])
 
 
 # ── A12 四同步 ──────────────────────────────────────────
@@ -503,7 +505,7 @@ def a12_sync():
     ch = Path(ROOT, 'CHANGELOG.md').read_text(encoding='utf-8')
     chg_ok = '## 1.4.1 (2026-09-23)' in ch and '目录级启动锁' in ch
     feat = Path(ROOT, 'features.md').read_text(encoding='utf-8')
-    feat_ok = '17 个测试模块，592 个测试用例' in feat
+    feat_ok = '17 个测试模块，605 个测试用例' in feat
     ls = subprocess.run(['git', 'ls-files', 'tests/test_*.py'], cwd=ROOT,
                         capture_output=True, text=True).stdout.split()
     n_mod = len(set(ls))
@@ -561,7 +563,7 @@ def a14_no_scope_creep():
              if l.startswith('+') and not l.startswith('+++')]
     no_reserved = not any(('8180' in l or '8181' in l) for l in added)
     no_maxport = not any('MAX_PORT' in l for l in added)
-    # set 语义：与基线行为逐条一致（config 字节级不变；O7「rc 仍 0」为已登记观察项，非本批范围）
+    # set 语义（O7 收口后口径）：用法错误 rc=2 且 config 字节级不变（基线 rc=0 为已登记缺陷，本轮已修）
     cfg = HOME / 'config.json'
     cfg_backup = cfg.read_bytes()
     try:
@@ -569,10 +571,11 @@ def a14_no_scope_creep():
         for args in (['set', 'port', '70000'], ['set', 'port', 'abc']):
             o_n, e_n, rc_n = hs(args)
             same_n = cfg.read_bytes() == cfg_backup
-            o_b, e_b, rc_b = hs_old(args)
-            same_b = cfg.read_bytes() == cfg_backup
-            rows.append((args[-1], rc_n, rc_b, same_n, same_b))
-        set_ok = all((r[1] == r[2]) and r[3] and r[4] for r in rows)
+            rows.append((args[-1], rc_n, same_n))
+        o_ok, e_ok, rc_ok = hs(['set', 'port', '8099', '--json'])
+        pos_ok = rc_ok == 0 and json.loads(o_ok)['success'] is True
+        cfg.write_bytes(cfg_backup)
+        set_ok = all(r[1] == 2 and r[2] for r in rows) and pos_ok
     finally:
         cfg.write_bytes(cfg_backup)
     ok = reg_untouched and no_reserved and no_maxport and set_ok

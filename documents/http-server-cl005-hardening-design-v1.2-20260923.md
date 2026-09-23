@@ -430,11 +430,11 @@ FileExists:
 
 | # | 内容 | 处置 |
 |:--|:--|:--|
-| O7 | `hs set` / `hs search` 缺参用法提示走 stderr 但 **rc 仍 0**（CL003 未覆盖） | 登记，另批 |
-| O8 | `hs dashboard`/`hs mcp` 的 `stop`/`restart` 在未运行时 **rc=0**、`--json` 信封 `success=False`（与 web 三态不一致） | 登记，另批 |
-| O9 | 裸 `print()` 约 303 处，机器模式仅靠 `json`/`url` 提前 return 结构性兜底（无函数级保证） | 登记；本批仅收 `cli.py:1798` |
-| O10 | `LOCK_WRITE_GRACE=1.0s` 取值保守（写内容 + fsync 超过 1s 的极端情形会误判 stale） | 登记；重负载下可调 |
-| O11 | 全量 pytest 经 `tests/test_dashboard.py::TestDaemonMode`（**早于本批**，本轮未触碰）泄漏 daemon dashboard 孤儿：实测 `pid 41936`（2026-09-22 18:01 起，PPID 1，`dashboard -p 5413`，LISTEN `127.0.0.1:54138`）不在 registry ⇒ 无主孤儿（审计 v1.1 OBS-1 发现；本轮全量 + A11 产生的同类孤儿 pid 46680 已清理） | 登记，另批（test 收口：`TestDaemonMode` tearDown 回收 dashboard 进程） |
+| O7 | `hs set` / `hs search` 缺参用法提示走 stderr 但 **rc 仍 0**（CL003 未覆盖） | **已闭合**（2026-09-23 收口：统一 rc=2；见 §9.8） |
+| O8 | `hs dashboard`/`hs mcp` 的 `stop`/`restart` 在未运行时 **rc=0**、`--json` 信封 `success=False`（与 web 三态不一致） | **已闭合**（收口：stop/restart 未运行 rc=1，`status` 查询保持 0） |
+| O9 | 裸 `print()` 约 303 处，机器模式仅靠 `json`/`url` 提前 return 结构性兜底（无函数级保证） | **已闭合（守卫化）**：新增 `TestMachineModeStdoutPurity` 守卫 7 命令（`--json` stdout 必须可解析信封）；裸 print 结构性兜底保留（未发现机器模式污染） |
+| O10 | `LOCK_WRITE_GRACE=1.0s` 取值保守（写内容 + fsync 超过 1s 的极端情形会误判 stale） | **已闭合**：四个锁常量支持 `HS_LOCK_*` 环境变量覆盖（非法值退回默认，默认行为不变） |
+| O11 | 全量 pytest 经 `tests/test_dashboard.py::TestDaemonMode`（**早于本批**）泄漏 daemon dashboard 孤儿（进程 + 真实 managed 登记）：实测 `pid 41936`（2026-09-22 18:01 起，PPID 1，`dashboard -p 5413`，LISTEN `127.0.0.1:54138`）不在 registry ⇒ 无主孤儿（审计 v1.1 OBS-1 发现；本轮全量 + A11 产生的同类孤儿 pid 46680 已清理） | **已闭合**：用例就绪确认后自行回收（SIGTERM → SIGKILL 进程组）+ 断言「无存活进程 / 端口已释放」 |
 
 ---
 
@@ -524,7 +524,23 @@ FileExists:
 | R-2 | 🟢 | §9.2「test_web.py 13 处」/§9.5「+15」计数有误 | 已修：12 处 / +13（test_web 12 + port_flag 1） |
 | R-3 | 🟢 | §2 D4「usage 缺失/空 ⇒ exit 2」措辞与实现（stderr 告警、不退出）不符 | **不改历史件**：以本条记录口径为准 —— usage-file 缺失/空为**软告警**（写日志 + stderr 提示）；提示词缺失/空才是 `exit 2`（派发前硬校验） |
 
-### 9.8 实测基线（dev 收口 + 审计 round-2 回填）
+### 9.8 O 系列观察项收口（2026-09-23，用户授权「直接修正，不走 1A」）
+
+[6/6] 收尾后经用户逐项放行，一次性收口四项观察项（同一批快修，免 draft/设计/评审链，直接改源码 + 补测试 + commit）：
+
+| 项 | 修法 | 回归 |
+|:--|:--|:--|
+| O7 | `hs set`（缺参 / 端口越界 / 端口非数字 / domain 字符集非法 / 未知配置键）与 `hs search`（缺 keyword）统一 `sys.exit(2)`；`--json` 下先输出可解析失败信封 | `TestOSeriesExitCodes::test_o7_*`（4 例）+ `test_cli.py::test_search_no_keyword` / `TestSetDomainCli::test_set_domain_invalid*` 转 rc=2 断言 |
+| O8 | `hs dashboard` / `hs mcp` 的 `stop`・`restart` 未运行 ⇒ `sys.exit(1)`；`status` 查询保持 rc=0（文案仍 stdout） | `test_o8_*`（5 例）+ `test_port_flag.py::test_not_running_does_not_start` 转 rc=1 |
+| O9 | 机器模式「函数级保证」守卫化：`TestMachineModeStdoutPurity` 断言 7 条命令（`list`/`history`/`status`/`kill`/`search`/`set`/`web list`）`--json` stdout 必可解析且含 `success` | 新增 1 例（矩阵）；裸 `print()` 结构性兜底保留，实测未发现机器模式污染 |
+| O10 | 锁常量 `LOCK_TTL` / `LOCK_WAIT` / `LOCK_POLL` / `LOCK_WRITE_GRACE` 支持 `HS_LOCK_*` 环境变量覆盖（非法/空/非正 ⇒ 退回默认，默认行为不变） | `TestOLockEnvOverride`（2 例：helper 语义 + 子进程级 env 接线） |
+| O11（补） | `HS_DATA_DIR` 覆盖数据目录（子进程继承，daemon 登记不回写真实目录） | `test_o11_data_dir_env_override`（子进程级真实接线） |
+| O11 | `tests/test_dashboard.py::TestDaemonMode` 用例自行回收 daemon（SIGTERM → SIGKILL 进程组）**并隔离子进程数据目录**（`HS_DATA_DIR` ⇒ 临时目录，daemon 登记不回写真实 `~/.http-server.cli`）| 该用例内新增 4 条断言；全量跑后无 daemon 孤儿且真实 `registry-managed.json` 保持 `{services: []}` |
+
+- 全量：`pytest tests/ -q -n 4` ⇒ **605 passed**（17 模块；CL005 主批 592 → 收口 +13）。
+- 影响面：退出码变更只影响 `set`/`search`/`dashboard`/`mcp` 的失败路径（成功路径与查询路径不变），`test_cli.py` / `test_port_flag.py` 共 3 条既有断言按新口径同步。
+
+### 9.9 实测基线（dev 收口 + 审计 round-2 回填 + O 系列收口）
 
 - 全量：`python3 -m pytest tests/ -q -n 4` ⇒ **592 passed**（dev 收口 590 + 审计 SEC-1 补 2 例），零回归。
 - `hs version` ⇒ `http-server v1.4.1`；`hs web show <不存在>` ⇒ rc=1 且错误文案在 stderr。
