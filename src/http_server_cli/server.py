@@ -491,18 +491,29 @@ class ServerManager:
                 eprint(f'Start failed: {e}', '❌')
             return False
 
-        # ── 注册 ──
+        # ── 注册 + 历史（CL005 D3.5：写盘失败 ⇒ 先终止本次 runner 再报错，杜绝
+        #    「运行中 + 未登记 + 占端口」的孤儿；锁由 start() 的 finally 释放）──
         started_at = timestamp()
-        self.registry.add(
-            port=port, path=abs_path, pid=proc.pid,
-            domain=domain, daemon=daemon, foreground=foreground,
-            started_at=started_at, index_page=index,
-        )
+        try:
+            self.registry.add(
+                port=port, path=abs_path, pid=proc.pid,
+                domain=domain, daemon=daemon, foreground=foreground,
+                started_at=started_at, index_page=index,
+            )
 
-        # ── 写入历史记录 ──
-        history = HistoryStore()
-        history.add(port=port, path=abs_path, started_at=started_at,
-                    domain=domain, daemon=daemon, foreground=foreground)
+            # ── 写入历史记录 ──
+            history = HistoryStore()
+            history.add(port=port, path=abs_path, started_at=started_at,
+                        domain=domain, daemon=daemon, foreground=foreground)
+        except Exception as e:
+            _terminate_runner(proc.pid)
+            if url_only:
+                print(f'❌ Registry write failed (runner terminated): {e}', file=sys.stderr)
+            elif json:
+                json_output(False, 'start', error=f'Registry write failed: {e}')
+            else:
+                eprint(f'Registry write failed (runner terminated): {e}', '❌')
+            return False
 
         stats = get_process_stats(proc.pid)
         duration = format_duration(started_at)
