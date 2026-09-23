@@ -434,6 +434,7 @@ FileExists:
 | O8 | `hs dashboard`/`hs mcp` 的 `stop`/`restart` 在未运行时 **rc=0**、`--json` 信封 `success=False`（与 web 三态不一致） | 登记，另批 |
 | O9 | 裸 `print()` 约 303 处，机器模式仅靠 `json`/`url` 提前 return 结构性兜底（无函数级保证） | 登记；本批仅收 `cli.py:1798` |
 | O10 | `LOCK_WRITE_GRACE=1.0s` 取值保守（写内容 + fsync 超过 1s 的极端情形会误判 stale） | 登记；重负载下可调 |
+| O11 | 全量 pytest 经 `tests/test_dashboard.py::TestDaemonMode`（**早于本批**，本轮未触碰）泄漏 daemon dashboard 孤儿：实测 `pid 41936`（2026-09-22 18:01 起，PPID 1，`dashboard -p 5413`，LISTEN `127.0.0.1:54138`）不在 registry ⇒ 无主孤儿（审计 v1.1 OBS-1 发现；本轮全量 + A11 产生的同类孤儿 pid 46680 已清理） | 登记，另批（test 收口：`TestDaemonMode` tearDown 回收 dashboard 进程） |
 
 ---
 
@@ -446,7 +447,7 @@ FileExists:
 | [3/6] dev | 按 §2.1 表迁移 + web 退出码 + 启动锁 + 派发件 + §4.1 同步 + 四同步 | `fix@cli:` / `tests@cli:` / `docs@sync:` |
 | [4/6] ops 核查 | `scripts/cl005-verify.py`（A1–A17，含修前反证 + 双解释器时钟） | `test@verify:` + 报告 |
 | [5/6] 实现审计 | 用 D4 新派发模板（A9 实战验证） | `audit@review:` + push |
-| [6/6] 收尾 | 复盘 + 清单 + 四件套 + 观察项 O7–O10 + `hm loop` 六步登记 | 收尾 commit + push |
+| [6/6] 收尾 | 复盘 + 清单 + 四件套 + 观察项 O7–O11 + `hm loop` 六步登记（[5/6] 实为两轮：v1.0 CONDITIONAL 90 → SEC-1 修复 → v1.1 **PASS 100/100**） | 收尾 commit + push |
 
 ---
 
