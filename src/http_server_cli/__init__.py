@@ -25,5 +25,5 @@ Dependency
 Version: 1.4.0(2026-09-22)
 """
 
-__version__ = '1.4.0'
+__version__ = '1.4.1'
 __release_date__ = '2026-09-22'

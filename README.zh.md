@@ -185,6 +185,8 @@ hs web add dk --cmd 'dk server start --daemon --open' --domain   # 注入 config
 ```
 
 > `services.json` 独立于 bookmarks.json：bookmark 把名称映射到静态目录；`hs web` 把名称映射到任意命令。
+> 退出码（CL005）：用法错误（缺 `--cmd` / 名冲突 / 名已存在 / 非法 url·open / 无更新参数）→ `2`；运行期失败（名不存在 / services 损坏 / 执行命令退出码非 0）→ `1`；成功与「已运行」幂等 → `0`。
+> 启动锁（CL005）：同一目录的并发启动由目录级锁串行化（`~/.http-server.cli/locks/`）。第二次调用幂等返回运行中的 URL（退出码 0）；另一实例启动中则 fail-closed 并提示持锁 PID。错误/警告文案输出到 **stderr**（stdout 只承载主产物：URL / 清单 / JSON 信封）。
 > 推广：`hs prompt hs-web` — 跨项目 web 服务注册指南（daily-checker / llm-radar / html-gen / jaden.tech 等模块接入）。
 
 ### Dashboard

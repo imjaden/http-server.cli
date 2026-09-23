@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.4.1 (2026-09-23)
+
+### Added
+- **目录级启动锁**（HTTP-SERVER-CL005）— 同一目录并发启动（含 `hs index.html` 与 `hs <dir>` 混用）在临界区互斥，杜绝「先 Popen 后登记」窗口内的重复启动与孤儿 runner：
+  - 锁文件 `~/.http-server.cli/locks/<sha1(abs_path)[:16]>.json`（`O_CREAT|O_EXCL` 原子获取，`finally` 释放 + 归属校验仅删本进程锁）
+  - stale 四判据：内容不可解析且写入龄 ≥1.0s · pid 非活 · pid 活但命令行非本 CLI（pid 复用）· 持锁龄 > `LOCK_TTL=30s`；**负龄不判 stale**（跨重启/时钟异常交 pid 活性兜底）
+  - 等待路径 `LOCK_WAIT=3s` / `LOCK_POLL=0.2s`：期间该目录登记就绪 ⇒ 幂等命中退出 0；锁已释放 ⇒ 重试整链；超时 ⇒ fail-closed 退出 1（提示持锁 pid）
+  - 用法错误优先：路径不存在 / index 非法 / `-p` 越界仍按原语义 exit 1 / 2，不被锁等待掩盖
+  - 计时基准 `time.clock_gettime(CLOCK_MONOTONIC)`（跨进程可比；`time.monotonic()` 在 py3.9 实测跨进程近零且非单调，会导致活锁被误判 stale）
+- **派发件模板** `scripts/review-dispatch.sh`（HTTP-SERVER-CL005 / D4）— 由「编号 + 项目 + 步骤 + 日期」唯一推导 派发壳/日志/用量 三路径；派发前校验提示词非空、派发后校验 usage-file 非空，生成物先过 `bash -n`
+
+### Fixed
+- **`eprint()` 实际写 stdout**（HTTP-SERVER-CL005）— 内部打印函数名为 stderr 系列却写 stdout，导致错误/警告文案污染 `--json` 输出与下游管道；现 `eprint()` 写 stderr、查询类结果走新增的 `print_msg()`（stdout），并逐调用点固化通道契约（63 处：stdout 23 / stderr 38 / 三态分叉 2）
+- **`hs web` 错误分支退出 0**（HTTP-SERVER-CL005）— `hs web add/list/show/remove/update/<name>` 的用法错误与运行期失败此前一律退出 0（假成功）；现用法错误（缺必填 / 子命令名冲突 / 名已存在 / 非法 url·open / 无更新参数）退出 2，运行期失败（名不存在 / services 文件损坏 / 执行命令退出码非 0）退出 1；并补 `hs web <name>` 的命令失败分支（修前 rc=0 且 JSON `success=true`）
+
+### Changed
+- 锁语义：`--daemon` tail / `foreground` 长驻期间由首实例持有锁，第二实例在该期间命中「已就绪」快径 ⇒ 幂等退出 0（不判忙、不重复启动）
+- **依赖 stderr 捕获的脚本请注意**：错误/警告文案通道由 stdout 改为 stderr（stdout 仅剩命令主产物：URL、清单、JSON 信封）
+
+### Notes
+- 1.4.0（CL003 + CL004）与 1.4.1（CL005）均**尚未发布 PyPI**，可按同批发布
+- 新增测试模块 `tests/test_cl005_hardening.py`（33 用例，T1–T27）；全量 590 passed
+- 设计件：`documents/http-server-cl005-hardening-design-v1.2-20260923.md`（v1.0 / v1.1 留档）
+
 ## 1.4.0 (2026-09-22)
 
 ### Added

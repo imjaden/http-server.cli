@@ -269,13 +269,13 @@ def a13():
 
 def a14():
     out, _, _ = run(['version'])
-    ok = 'v1.4.0' in out
+    ok = ('v1.4.0' in out) or ('v1.4.1' in out)   # CL005：版本上移后本批 harness 仍可复跑
     check('A14-1', ok, '`hs version` → %r' % out.strip())
-    g1 = subprocess.run(['grep', '-n', "__version__ = '1.4.0'", 'src/http_server_cli/__init__.py'],
+    g1 = subprocess.run(['grep', '-nE', "__version__ = '1\.4\.(0|1)'", 'src/http_server_cli/__init__.py'],
                         cwd=ROOT, capture_output=True, text=True).stdout.strip()
     g2 = subprocess.run(['grep', '-n', '^## 1.4.0', 'CHANGELOG.md'],
                         cwd=ROOT, capture_output=True, text=True).stdout.strip()
-    g3 = subprocess.run(['grep', '-n', '^version: 1.4.0', 'http-server.cli.spec.yaml'],
+    g3 = subprocess.run(['grep', '-nE', '^version: 1\.4\.(0|1)', 'http-server.cli.spec.yaml'],
                         cwd=ROOT, capture_output=True, text=True).stdout.strip()
     check('A14-2', all([g1, g2, g3]), '__init__=%r CHANGELOG=%r spec=%r' % (g1, g2, g3))
 

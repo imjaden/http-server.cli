@@ -1,5 +1,5 @@
 name: http-server.cli
-version: 1.4.0
+version: 1.4.1
 description: 基于 python3 -m http.server 的本地 HTTP 服务管理器。自动分配端口、追踪项目映射、管理服务生命周期、智能首页跳转、进程资源监控。
 date: 2026-06-23
 author: IRIS
@@ -178,6 +178,60 @@ specs:
               - 两次输出同一 URL（第二次幂等命中，不判 stale）
               - registry 中该 path 仅 1 条
               - 该端口 LISTEN 的 runner 进程集合与 registry 条目的 pid 一致（无孤儿进程）
+
+      - id: lifecycle-07
+        name: 输出通道契约（stdout 仅主产物）
+        description: eprint → stderr、print_msg → stdout；查询类空态/not-found 走 stdout，过程反馈/警告/错误/清理/用法提示走 stderr；机器（--json）模式下 stdout 只允许 JSON 信封或单行 URL（HTTP-SERVER-CL005 / D1）
+        priority: MUST
+        scenarios:
+          - name: 错误文案不污染 --json
+            given: 目标路径不存在
+            when: 执行 hs /nonexistent --json
+            then:
+              - stdout 可被 json.loads 解析（信封 success=false）
+              - 错误文案在 stderr
+
+          - name: 查询类空态保留 stdout
+            given: 无任何运行中服务
+            when: 执行 hs list
+            then:
+              - 「暂无运行中的服务」类空态文案在 stdout（非错误）
+              - stderr 为空
+
+      - id: lifecycle-08
+        name: 目录级启动锁（同目录并发互斥）
+        description: 临界区互斥（锁文件 ~/.http-server.cli/locks/<sha1(abs_path)[:16]>.json，O_CREAT|O_EXCL 原子获取 + finally 释放）；stale 四判据 + 负龄不判 stale；有效锁等待 ≤3.0s，就绪即幂等命中，超时 fail-closed（HTTP-SERVER-CL005 / D3）
+        priority: MUST
+        scenarios:
+          - name: 并发启动只产生一个 runner
+            given: 该目录无服务在运行
+            when: 并发（5 线程 / 5 进程）执行 hs <dir> --url
+            then:
+              - registry 中该 path 仅 1 条
+              - 只发生 1 次启动（无重复 runner / 无孤儿进程）
+              - 其余调用幂等命中，退出码 0
+
+          - name: html 入口与目录入口共用同一把锁
+            when: 并发执行 hs index.html 与 hs <dir>
+            then: 锁键为 html 提取后的最终目录（同一把锁，不重复启动）
+
+          - name: 陈旧锁被清理
+            given: 锁文件中的 pid 已死
+            when: 执行 hs <dir>
+            then: 判 stale 清锁后正常启动（退出码 0）
+
+          - name: 有效锁 fail-closed
+            given: 锁由活着的本 CLI 进程持有且该目录尚未就绪
+            when: 执行 hs <dir>
+            then:
+              - stderr 提示「另一实例正在启动（pid …）」
+              - 退出码 1，不启动第二个 runner
+              - 他人锁文件不被删除
+
+          - name: 用法错误优先于锁等待
+            given: 他人持锁
+            when: 执行 hs <dir> -p 70000
+            then: 仍按用法错误退出 2（端口越界），不被锁等待掩盖
 
           - name: 判定 stale 时不留下孤儿
             given: registry 中存在该目录条目，pid 存活但端口始终未监听（启动失败）
@@ -494,6 +548,30 @@ specs:
             then:
               - stderr 输出 --port and --no-port are mutually exclusive
               - 退出码 2
+
+      - id: cli-06
+        name: hs web 退出码三态
+        description: 用法错误（缺必填 / 子命令名冲突 / 名已存在 / 非法 url·open / 无更新参数）exit 2；运行期失败（名不存在 / services 文件损坏 / 执行命令退出码非 0）exit 1；成功与「已运行」幂等 exit 0（HTTP-SERVER-CL005 / D2）
+        priority: MUST
+        scenarios:
+          - name: 缺必填
+            when: 执行 hs web add demo
+            then:
+              - stderr 输出 --cmd is required
+              - 退出码 2
+
+          - name: 名不存在（查询）
+            when: 执行 hs web show nope
+            then:
+              - stderr 输出 not found
+              - 退出码 1
+
+          - name: 执行命令失败
+            given: 注册的命令退出码非 0
+            when: 执行 hs web demo --no-probe
+            then:
+              - stderr 输出 Cmd exited with code N
+              - 退出码 1（修前为 0，且 --json 信封 success=true）
 
   # ── 智能首页跳转 ───────────────────────────────────
 

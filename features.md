@@ -53,7 +53,8 @@
 12. `hs web add/update --port <N> | --no-port` — 端口注入声明（执行期在 `--domain` 之后追加 `--port <N>`）；用法错误（越界 / 互斥）退出 2 ✅ — HTTP-SERVER-CL003 + CL004
 13. 全局薄壳 `~/.local/bin/web` 转发 — 达成 `web <name>` 语法 ✅
 14. 推广 — skills/hs-web（命令速查 + 其他模块接入指南 + 真实实例 daily.checker/jaden.tech/线上站点），`hs prompt hs-web` 输出，镜像 ~/.hermes/profiles/ops/skills/devops/hs-web/ ✅ — HTTP-SERVER-CL002
-15. 关联文档: HTTP-SERVER-CL001 review (documents/review/http-server-cli-web-registration-audit-v1.0-20260827.md) / HTTP-SERVER-CL002 review (documents/review/http-server-cli-cl002-web-domain-promo-audit-v1.0-20260827.md, documents/review/http-server-cli-cl002-sec023-1-domain-validation-rereview-v1.1-20260827.md)
+15. `hs web` 退出码三态 — 用法错误 2（缺必填 / 子命令名冲突 / 名已存在 / 非法 url·open / 无更新参数）/ 运行期失败 1（名不存在 / services 损坏 / 执行命令退出码非 0）/ 成功与已运行幂等 0 ✅ — HTTP-SERVER-CL005
+16. 关联文档: HTTP-SERVER-CL001 review (documents/review/http-server-cli-web-registration-audit-v1.0-20260827.md) / HTTP-SERVER-CL002 review (documents/review/http-server-cli-cl002-web-domain-promo-audit-v1.0-20260827.md, documents/review/http-server-cli-cl002-sec023-1-domain-validation-rereview-v1.1-20260827.md)
 
 ## HTTP 服务
 
@@ -80,6 +81,8 @@
 12. 顶层 `-p` 归位 — `hs -p 8099 [path]` 不再误报 `Unknown command` ✅ — HTTP-SERVER-CL003
 13. 顶层取值型 flag 归位 — `hs -i <CWD 存在的文件> -p <N> <dir>` 按参数形态优先重组（`-i` 与 `<dir>` 均保留；`-o/-d/-f` 不受影响）✅ — HTTP-SERVER-CL004
 14. 启动竞态防护 — 同目录并发启动 ≤1.0s 宽限 + 归属校验（token 精确匹配 `runner.py` + 目录）；判 stale 先终止进程组再清登记，防孤儿进程与误杀；stale 文案三态一律 stderr ✅ — HTTP-SERVER-CL004
+15. 目录级启动锁 — 同目录并发启动临界区互斥（`~/.http-server.cli/locks/<sha1(路径)[:16]>.json`，O_CREAT|O_EXCL 原子获取 + finally 释放 + 归属校验仅删本进程锁）；stale 四判据（不可解析且写入龄≥1.0s / pid 死 / pid 复用 / 龄>30s）+ 负龄不判 stale；等待 ≤3.0s 就绪即幂等、超时 fail-closed；用法错误（路径不存在 / `-p` 越界）优先于锁 ✅ — HTTP-SERVER-CL005
+16. 输出通道契约 — `eprint()` → stderr、`print_msg()` → stdout；63 处调用点逐点固化（stdout 23 / stderr 38 / 三态分叉 2）；机器模式 stdout 仅 JSON 信封或单行 URL ✅ — HTTP-SERVER-CL005
 
 ## 数据持久化
 
@@ -130,7 +133,7 @@
 
 ## 测试
 
-1. 16 个测试模块，557 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
+1. 17 个测试模块，590 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
 2. `conftest.py` — autouse 数据隔离 + monkeypatch 路径注入 ✅
 3. 集成测试模式 — mock `_COMMANDS` / `ensure_storage`，set `sys.argv`，catch `SystemExit` ✅
 
@@ -138,7 +141,8 @@
 
 1. `release-local.sh` — 本地安装（`--editable` / `--versions`）✅
 2. `release-pypi.sh` — PyPI 发布（`--production` / `--versions`）✅
-3. `setup.py` — 入口点 `hs = http_server_cli.cli:main` ✅
+3. `scripts/review-dispatch.sh` — 审查/审计派发件模板（编号+项目+步骤+日期 → 派发壳/日志/用量三路径唯一推导；提示词非空 + usage-file 非空自校验；生成物过 `bash -n`）✅ — HTTP-SERVER-CL005
+4. `setup.py` — 入口点 `hs = http_server_cli.cli:main` ✅
 
 ## 待定/规划
 

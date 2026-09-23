@@ -398,12 +398,12 @@ def a8_full_pytest():
 
 def a9_sync_greps():
     out, _, _ = hs(['version'])
-    ver_ok = 'v1.4.0' in out
+    ver_ok = ('v1.4.0' in out or 'v1.4.1' in out)   # CL005：版本上移 1.4.0 → 1.4.1（CL004 保持可复跑）
     changelog = Path(ROOT, 'CHANGELOG.md').read_text(encoding='utf-8')
     fixed_ok = '### Fixed' in changelog
     stale_ok = '另批处理' not in changelog
     spec = Path(ROOT, 'http-server.cli.spec.yaml').read_text(encoding='utf-8')
-    spec_ok = '\nversion: 1.4.0' in ('\n' + spec)
+    spec_ok = ('\nversion: 1.4.0' in ('\n' + spec)) or ('\nversion: 1.4.1' in ('\n' + spec))
     check('A9', ver_ok and fixed_ok and stale_ok and spec_ok,
           'hs version=%r｜CHANGELOG ### Fixed=%s｜旧「另批处理」残留=%s｜spec 1.4.0=%s'
           % (out.strip(), fixed_ok, not stale_ok, spec_ok))

@@ -447,3 +447,69 @@ FileExists:
 | [4/6] ops 核查 | `scripts/cl005-verify.py`（A1–A17，含修前反证 + 双解释器时钟） | `test@verify:` + 报告 |
 | [5/6] 实现审计 | 用 D4 新派发模板（A9 实战验证） | `audit@review:` + push |
 | [6/6] 收尾 | 复盘 + 清单 + 四件套 + 观察项 O7–O10 + `hm loop` 六步登记 | 收尾 commit + push |
+
+---
+
+## 9 实施记录与偏差（[3/6] dev 回填，2026-09-23）
+
+### 9.1 D1 输出通道（落地与设计一致）
+
+- `utils.eprint()` 语义纠正为 **stderr**；新增 `utils.print_msg()`（stdout），二者由 utils 顶部「通道契约」注释块定案。
+- 63 处调用点按 §2.1 表迁移：产物/查询类 → `print_msg`（stdout 23 处），过程反馈/警告/错误/清理/用法 → `eprint`（stderr 38 处），三态分叉 2 处按分支各走各的通道。
+- 机器模式（`--json`）stdout 仅信封；`--url` 仅单行 URL；`cli.py:1798`（web 运行失败提示）随本批归 stderr。
+- 存量断言同步 12 处（§4.1）+ 可选加固 1 处（`test_server.py:76` 改为 `captured.err or captured.out`）。
+
+### 9.2 D2 `hs web` 退出码三态（落地与设计一致 + 1 处实现期修正）
+
+- 用法错误 → `sys.exit(2)`；运行期失败 → `sys.exit(1)`；成功/幂等 → 正常 return（rc=0）。
+- **实现期修正（P1）**：`remove --json` 分支的 `return` 一度被改成 `sys.exit(1)`，会把**成功**也变成 rc=1（`test_remove_json` 立即变红）。已改回：成功 `json_output(True…)` + `return`，仅「名不存在」`sys.exit(1)`。
+- **实施面补充（§4.1 未列）**：14 处 web 单测直接调用 `_COMMANDS['web']` 且不含 SystemExit 期望，本批按新三态改为 `pytest.raises(SystemExit)` + `code` 断言（`test_web.py` 13 处 + `test_port_flag.py` 1 处）。根因：§4.1 穷举口径是「`.out` 断言 grep」，覆盖不到这一类「直接调函数、默认不退出」的用例。
+- 打桩纪律：web 单测统一 `monkeypatch.setattr('http_server_cli.cli.subprocess', SimpleNamespace(run=…))`——只替换模块内绑定，不用 `setattr('…subprocess.run')`（后者改到 stdlib 全局，会让 `utils.get_process_info` 拿到 `None` 而崩）。同一理由适用于新用例的锁打桩。
+
+### 9.3 D3 目录级启动锁（落地 + 2 处偏差）
+
+**偏差 D3-1（实质缺陷，已修）——等待路径必须新建 `Registry` 实例**
+
+- 现象：T16（5 线程并发同目录启动）在 xdist 下偶发 **2–3 次真实 `Popen`**；`-n 0` 单跑常绿 ⇒ 时序依赖。
+- 根因：`Registry.__init__` 把 `_get_cached_data()` 结果**快照**进 `self._data`（P2 mtime 懒加载缓存）。比「他人写入登记」更早创建的实例永远看不到新条目 ⇒ `_await_start_lock` 的 `find()` 恒为 `None` ⇒ 判「锁已释放且非就绪」⇒ 重试整链后**再启动一个 runner**。实测 trace：t0 popen → t2/t3/t4 `find` 命中 → t1 `find` 连续 `None` 直至超时并 popen（第 2 个 runner）。
+- 修法：`_await_start_lock` 每轮轮询新建 `Registry()`（重新 stat + 必要时重读）；`start()` 在「等待结束、重试获取/幂等快径之前」`self.registry = Registry()` 刷新自身快照。
+- 实证：修后同用例连续 3 轮 **5/5 True、`Popen` 恰 1 次、登记恰 1 条**；真机 5 进程并发 `hs <dir> -p 8097 --url` ⇒ 5/5 rc=0 + 同一 URL + 登记 1 条（pid 82744）+ `lsof -sTCP:LISTEN` 恰 1 个且 pid 一致 + 锁目录 0 残留。
+- 边界：生产形态（一次调用一进程）不受影响（无长驻多实例共用内存快照），故未改 `Registry` 本体（避免扩散到 CL004 面），仅在本批新增的等待路径内收敛。
+
+**偏差 D3-2（口径说明，非缺陷）——就绪快径不持锁**
+
+- 等待路径判「另一实例已就绪」时第二实例并不持锁（首实例在 `--daemon` tail / `foreground` 期间仍持锁），直接走只读幂等快径（`idempotent_only=True`）返回 rc=0；该路径**不执行** `release_start_lock`（未获取 ⇒ 不释放，避免误删他人锁）。
+- 残留窗口：快径校验通过后、`_start_locked` 内 `find` 之前条目消失（µs 级）⇒ 由 `idempotent_only` 分支返回 False（不启动、不清理），不产生第二个 runner。
+- `finally` 只在本进程确实取得锁时释放；`release_start_lock` 的归属校验（仅删本进程锁）在快径不被触发。
+
+### 9.4 D4 派发件模板（落地；本批 [5/6] 起自身即实战验证）
+
+- 新增 `scripts/review-dispatch.sh`：`--target/--code/--project/--step/--date/--prompt` 唯一推导 派发壳/日志/用量 三路径；编号大小写归一；① 派发前校验提示词非空（缺失/空 ⇒ exit 2）② 生成物过 `bash -n` ③ 派发后校验 usage-file 非空（缺失/空 ⇒ 日志告警）。
+- 步骤名由「编号 + 步骤」直接派生 ⇒ 复审轮次不再可能漏文件（CL004 复审轮 usage 缺失即 O6 根因）。
+- 实测：`--dry-run` 三路径打印、缺参 exit 2、大小写归一、`--no-run` 生成物三行内容与 `bash -n` 由 pytest 用例 T25/T25b/T25c/T25d/T25e 守卫。
+
+### 9.5 同步清单实际执行（§4.1 覆盖核对）
+
+| 面 | 设计 §4.1 | 实际 | 差异说明 |
+|:--|:--|:--|:--|
+| 存量断言通道同步 | 12 必改 + 1 可选 | 13 | 逐条一致（`test_utils:222` / `test_cli:365,1053` / `test_server:76,87,135,228,250,314,320,326` / `test_port_flag:178,347`） |
+| web 单测 SystemExit | 未列 | +15 | 见 9.2（口径缺口，本批补上并留档） |
+| 版本三处 | `__init__` / CHANGELOG / spec | 3 + harness 2 | `scripts/port-{flag,residual}-verify.py` 的 1.4.0 断言改为「1.4.0/1.4.1 兼容」⇒ CL003/CL004 harness 保持可复跑 |
+| 四同步 | CHANGELOG/features/README/spec | 4（+ README.zh） | README.zh 与 README 同步（退出码 + 启动锁 + stderr 口径） |
+| 测试计数 | — | 557 → **590**（17 模块） | 新增 `tests/test_cl005_hardening.py` 33 用例 |
+
+### 9.6 commit 分组（§8 计划 vs 实际）
+
+| 组 | 内容 | 类型 |
+|:--|:--|:--|
+| 1 | `src/http_server_cli/{utils,cli,server}.py` | `fix@cli:` |
+| 2 | `tests/**`（存量同步 + 新用例） | `tests@cli:` |
+| 3 | `scripts/review-dispatch.sh` | `feat@tool:` |
+| 4 | CHANGELOG/features/README×2/spec/`__init__` + 本 §9 + harness 兼容 | `docs@sync:` |
+
+### 9.7 实测基线（dev 收口）
+
+- 全量：`python3 -m pytest tests/ -q -n 4` ⇒ **590 passed**（连续 3 轮，~2.5s/轮），零回归。
+- `hs version` ⇒ `http-server v1.4.1`；`hs web show <不存在>` ⇒ rc=1 且错误文案在 stderr。
+- 真机并发（5 进程同目录同 `-p`）⇒ 1 登记 / 1 listener（pid 同一）/ 锁目录 0 残留；`hs kill 8097` rc=0。
+- 修前反证基线：`4679ee8`（CL004 收尾）。
