@@ -1,5 +1,5 @@
 name: http-server.cli
-version: 1.4.2
+version: 1.5.0
 description: 基于 python3 -m http.server 的本地 HTTP 服务管理器。自动分配端口、追踪项目映射、管理服务生命周期、智能首页跳转、进程资源监控。
 date: 2026-06-23
 author: IRIS
@@ -610,6 +610,46 @@ specs:
             then:
               - stderr 输出 Cmd exited with code N
               - 退出码 1（修前为 0，且 --json 信封 success=true）
+
+      - id: cli-07
+        name: 参数面加固（未知参数 fail-closed）
+        description: 写 / 破坏性命令遇未知 flag 或多余位置参数时不执行副作用（exit 2）；-h/--help/-v/--version 在任意位置识别；裸 hs 打印用法退出非 0；只读命令保持告警放行（HTTP-SERVER-CL007）
+        priority: MUST
+        scenarios:
+          - name: 写命令未知 flag fail-closed
+            given: registry 含某端口登记
+            when: 执行 hs prune --bogus（或 hs kill <port> --bogus / hs <dir> --prot 8080）
+            then:
+              - stderr 输出 未识别参数
+              - 退出码 2
+              - 不执行副作用（不删记录 / 不 kill / 不起服务）
+
+          - name: 帮助与版本任意位置识别
+            when: 执行 hs prune --help
+            then:
+              - stdout 输出用法
+              - 退出码 0
+              - 不执行 prune（无副作用）
+
+          - name: 裸调用不静默起服务
+            given: 当前目录未被登记
+            when: 执行 hs（无路径 / 无命令 / 无参数）
+            then:
+              - stdout 输出用法
+              - 退出码 2
+              - 不启动服务、不新增登记
+
+          - name: 只读命令保持告警放行
+            when: 执行 hs list --prot
+            then:
+              - stderr 输出 未识别参数（已忽略）
+              - 退出码 0
+
+          - name: 写命令错误信封
+            when: 执行 hs prune --bogus --json
+            then:
+              - stdout 输出 JSON 信封 success=false
+              - 退出码 2
 
   # ── 智能首页跳转 ───────────────────────────────────
 

@@ -22,8 +22,8 @@ Dependency
 - 本地开发需要快速启动 HTTP 服务时
 - 需要管理多个 HTTP 服务时
 
-Version: 1.4.2(2026-10-13)
+Version: 1.5.0(2026-10-13)
 """
 
-__version__ = '1.4.2'
+__version__ = '1.5.0'
 __release_date__ = '2026-10-13'

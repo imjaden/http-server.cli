@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.5.0 (2026-10-13)
+
+### Changed
+- **参数面加固 — 未知 flag 不再「告警后照常执行」**（HTTP-SERVER-CL007 / 转交自 script-miner ops）— 12 分钟内两次真实触发：`hs prune --help` 被当「未知参数（已忽略）」后**照删** registry 沉积记录；裸 `hs`（想读用法）在 cwd **凭空起服务**。收紧规则：
+  - **A1 fail-closed**：写 / 破坏性命令（`start` / `kill` / `kill-all` / `prune` / `web add·update·remove·<name>` / `mcp` / `dashboard` / `bookmark add·update·remove` / `set`）遇未知 flag 或多余位置参数 → stderr 报错 + **exit 2，不执行任何副作用**（`hs <dir> --prot 8080` 这类近形 typo 不再静默起服务）
+  - **`-h/--help`、`-v/--version` 在任意位置识别**：`hs prune --help` 现打印用法 exit 0（原实现因顶层 `REMAINDER` 把 `--help` 吞进子命令 args，既不走全局 help 分支、又被当未知参数忽略而照常执行）
+  - **A2**：裸 `hs`（无路径 / 无命令 / 无参数）→ 打印用法 **exit 2**，不再默认在当前目录起服务；显式 `hs .` / `hs <dir>` 行为不变
+  - **A4 只读命令不变**：`list` / `status` / `history` / `config` / `search` / `bookmark list·show` / `web list·show` 遇未知 flag 仍告警放行（rc 不变，D6 口径）；`--json` 既有字段与退出码语义不变
+  - 写命令 + `--json` 遇未知 flag：stdout 输出 `{"success": false, "command": ..., "error": "unrecognized arguments: ..."}` 信封，exit 2
+
+### Added
+- **`hs prune` 汇总行**（A3）— 输出末尾新增 `📦 Kept N registry record(s)`（已删 N / 保留 N）；`hs prune --json` 新增 additive 字段 `kept`
+- 复跑 harness `scripts/cl007-verify.py`（AC A1–A4，10 断言，`HS_DATA_DIR` 沙箱）
+
+### Notes
+- 新增测试模块 `tests/test_cl007_argsurface.py`（20 用例）；全量 **650 passed**（+20）
+- 兼容性：本次只收紧**异常输入**路径；合法调用与既有 JSON 字段、退出码语义均不变。历史 harness 版本断言放宽至 1.5.0（`cl005-verify.py` / `port-flag-verify.py` A14 / `port-residual-verify.py`），`port-flag-verify.py` A6 期望随 A1 收紧更新为 rc=2
+- 设计件：`documents/http-server-cl007-argsurface-hardening-design-v1.0-20261013.md`
+- 本仓**未 push**（用户放行后再推）
+
 ## 1.4.2 (2026-10-13)
 
 ### Fixed

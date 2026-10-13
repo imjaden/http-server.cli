@@ -25,6 +25,8 @@
 13. 全局 `--json` 标志 — 所有管理命令（list/status/kill/kill-all/history/search/config/set/version）均支持 ✅
 14. `hs prompt [<skill>]` — 输出技能使用说明（AI 对接）✅
 15. `hs prune [-n|--dry-run] [--json]` — 清理 registry 中 pid 已不存活的沉积登记（默认命令不删记录）✅ — HTTP-SERVER-CL006
+16. 参数面加固 — 写 / 破坏性命令遇未知 flag 或多余位置参数 → **exit 2 且不执行副作用**（`hs prune --bogus` 不删、`hs <dir> --prot 8080` 不起服务）；`-h/--help`·`-v/--version` 任意位置识别；裸 `hs` 打印用法 exit 2（不再静默起服务）✅ — HTTP-SERVER-CL007
+17. `hs prune` 汇总行 — 末尾输出「已删 N / 保留 N」（`--json` 增 `kept`，additive）✅ — HTTP-SERVER-CL007
 
 ## 书签系统
 
@@ -81,7 +83,7 @@
 8. 文件路径 kill — `hs kill ~/my-site` 按路径关闭 ✅
 9. HTML 文件 kill — `hs kill file.html` 自动解析父目录 ✅
 10. 退出码三态 — 0 成功（含幂等）/ 1 运行期失败（路径不存在、端口不可用、`hs kill` 未注册端口）/ 2 用法错误 ✅ — HTTP-SERVER-CL003
-11. 未识别参数告警 — stderr 提示「未识别参数（已忽略）」+ 近形引导（stdout / JSON 信封零污染）✅ — HTTP-SERVER-CL003
+11. 未识别参数告警（**只读命令**口径）— stderr 提示「未识别参数（已忽略）」+ 近形引导（stdout / JSON 信封零污染）；**写命令已升级为 fail-closed**（见服务管理 19）✅ — HTTP-SERVER-CL003 / CL007
 12. 顶层 `-p` 归位 — `hs -p 8099 [path]` 不再误报 `Unknown command` ✅ — HTTP-SERVER-CL003
 13. 顶层取值型 flag 归位 — `hs -i <CWD 存在的文件> -p <N> <dir>` 按参数形态优先重组（`-i` 与 `<dir>` 均保留；`-o/-d/-f` 不受影响）✅ — HTTP-SERVER-CL004
 14. 启动竞态防护 — 同目录并发启动 ≤1.0s 宽限 + 归属校验（token 精确匹配 `runner.py` + 目录）；判 stale 先终止进程组再清登记，防孤儿进程与误杀；stale 文案三态一律 stderr ✅ — HTTP-SERVER-CL004
@@ -89,6 +91,7 @@
 16. 输出通道契约 — `eprint()` → stderr、`print_msg()` → stdout；63 处调用点逐点固化（stdout 23 / stderr 38 / 三态分叉 2）；机器模式 stdout 仅 JSON 信封或单行 URL ✅ — HTTP-SERVER-CL005
 17. 同端口多记录选择口径 — `Registry.find(port=)` 按「存活优先 + 最近 `started_at`」选条，`hs status` / `hs kill` 与 `hs list` 结论一致；访问记账（`touch` + 60s 刷盘）只写存活实例记录 ✅ — HTTP-SERVER-CL006
 18. status/list 不误导 — 陈旧记录显式 `Status:  stale-record`；端口被他人占用 = `Port:  occupied by PID <n>（非本记录）`、空闲 = `Port:  free`，不再出现「❌ stopped + Port: in use」矛盾组合；`--json` 增 `record_status` / `occupants` / `stale_count`（additive）✅ — HTTP-SERVER-CL006
+19. 参数面 fail-closed — 写 / 破坏性命令（start / kill / kill-all / prune / web 写子命令 / mcp / dashboard / bookmark 写子命令 / set）遇未知 flag → stderr 报错 + exit 2，**不执行任何副作用**；写命令 + `--json` 出 `{"success": false, "error": "unrecognized arguments: ..."}` 信封；`list`/`status`/`history`/`config`/`search` 等只读命令保持告警放行 ✅ — HTTP-SERVER-CL007
 
 ## 数据持久化
 
@@ -139,7 +142,7 @@
 
 ## 测试
 
-1. 18 个测试模块，630 个测试用例（629 passed + 1 环境相关红 `test_t26` uptime 断言）✅ — `documents/test-design-spec-v1.2-20260702.md`
+1. 19 个测试模块，650 个测试用例（650 passed）✅ — `documents/test-design-spec-v1.2-20260702.md`
 2. `conftest.py` — autouse 数据隔离 + monkeypatch 路径注入 ✅
 3. 集成测试模式 — mock `_COMMANDS` / `ensure_storage`，set `sys.argv`，catch `SystemExit` ✅
 
