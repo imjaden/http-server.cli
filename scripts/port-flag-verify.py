@@ -137,13 +137,15 @@ def a5(d):
 
 
 def a6(a1dir):
+    # CL007/A1：start（写命令）遇未知 flag → fail-closed，不再「告警后照常起服务」
     out, err, rc = run([a1dir, '--prot', '8080'])
-    ok = rc == 0 and '未识别参数' in err and '--prot' in err and '未识别参数' not in out
-    check('A6', ok, '`hs <a1dir> --prot 8080` → rc=%s stderr=%r stdout_has_warn=%s' % (
+    ok = rc == 2 and '未识别参数' in err and '未识别参数' not in out
+    check('A6', ok, '`hs <a1dir> --prot 8080`（写命令）→ rc=%s stderr=%r stdout_has_warn=%s' % (
         rc, err.strip().replace('\n', ' | ')[:120], '未识别参数' in out))
+    # CL007/A4：list（只读命令）保持 D6 口径：告警到 stderr，rc 不变
     out2, err2, rc2 = run(['list', '--prot'])
     check('A6-b', rc2 == 0 and '未识别参数' in err2 and '未识别参数' not in out2,
-          '`hs list --prot`（不启动服务路径）→ rc=%s stderr=%r' % (rc2, err2.strip().replace('\n', ' | ')[:110]))
+          '`hs list --prot`（只读命令）→ rc=%s stderr=%r' % (rc2, err2.strip().replace('\n', ' | ')[:110]))
 
 
 def a7():
@@ -269,13 +271,13 @@ def a13():
 
 def a14():
     out, _, _ = run(['version'])
-    ok = any(v in out for v in ('v1.4.0', 'v1.4.1', 'v1.4.2'))   # CL006：版本上移后本批 harness 仍可复跑
+    ok = any(v in out for v in ('v1.4.0', 'v1.4.1', 'v1.4.2', 'v1.5.0'))   # CL007：版本上移后本批 harness 仍可复跑
     check('A14-1', ok, '`hs version` → %r' % out.strip())
-    g1 = subprocess.run(['grep', '-nE', "__version__ = '1\.4\.(0|1|2)'", 'src/http_server_cli/__init__.py'],
+    g1 = subprocess.run(['grep', '-nE', "__version__ = '1[.](4[.](0|1|2)|5[.]0)'", 'src/http_server_cli/__init__.py'],
                         cwd=ROOT, capture_output=True, text=True).stdout.strip()
     g2 = subprocess.run(['grep', '-n', '^## 1.4.0', 'CHANGELOG.md'],
                         cwd=ROOT, capture_output=True, text=True).stdout.strip()
-    g3 = subprocess.run(['grep', '-nE', '^version: 1\.4\.(0|1|2)', 'http-server.cli.spec.yaml'],
+    g3 = subprocess.run(['grep', '-nE', '^version: 1[.](4[.](0|1|2)|5[.]0)', 'http-server.cli.spec.yaml'],
                         cwd=ROOT, capture_output=True, text=True).stdout.strip()
     check('A14-2', all([g1, g2, g3]), '__init__=%r CHANGELOG=%r spec=%r' % (g1, g2, g3))
 

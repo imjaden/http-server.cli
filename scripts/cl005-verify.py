@@ -501,23 +501,24 @@ def a11_full_pytest():
 
 def a12_sync():
     o, e, rc = hs(['version'])
-    ver_ok = any(v in o for v in ('v1.4.1', 'v1.4.2'))   # CL006：版本上移 1.4.1 → 1.4.2（CL005 保持可复跑）
+    ver_ok = any(v in o for v in ('v1.4.1', 'v1.4.2', 'v1.5.0'))   # CL007：版本上移 1.4.2 → 1.5.0（历史 harness 保持可复跑）
     ch = Path(ROOT, 'CHANGELOG.md').read_text(encoding='utf-8')
     chg_ok = '## 1.4.1 (2026-09-23)' in ch and '目录级启动锁' in ch
     feat = Path(ROOT, 'features.md').read_text(encoding='utf-8')
-    # CL006：features.md 测试规模前移（17/605 → 18/630），两代口径任一生效即视为通过
+    # CL007：features.md 测试规模前移（17/605 → 18/630 → 19/650），任一代口径生效即视为通过
     feat_ok = ('17 个测试模块，605 个测试用例' in feat
-               or '18 个测试模块，630 个测试用例' in feat)
+               or '18 个测试模块，630 个测试用例' in feat
+               or '19 个测试模块，650 个测试用例' in feat)
     ls = subprocess.run(['git', 'ls-files', 'tests/test_*.py'], cwd=ROOT,
                         capture_output=True, text=True).stdout.split()
     n_mod = len(set(ls))
     spec = Path(ROOT, 'http-server.cli.spec.yaml').read_text(encoding='utf-8')
-    spec_ok = (('version: 1.4.1' in spec) or ('version: 1.4.2' in spec)) and ('lifecycle-07' in spec) and ('lifecycle-08' in spec) and ('cli-06' in spec)
+    spec_ok = any(('version: ' + v) in spec for v in ('1.4.1', '1.4.2', '1.5.0')) and ('lifecycle-07' in spec) and ('lifecycle-08' in spec) and ('cli-06' in spec)
     rd = Path(ROOT, 'README.md').read_text(encoding='utf-8')
     rdz = Path(ROOT, 'README.zh.md').read_text(encoding='utf-8')
     readme_ok = ('Exit codes (CL005)' in rd) and ('退出码（CL005）' in rdz)
     n_pass = sum([ver_ok, chg_ok, feat_ok, spec_ok, readme_ok])
-    check('A12', n_pass == 5 and n_mod == 17,
+    check('A12', n_pass == 5 and n_mod >= 17,
           '四同步：version=%s CHANGELOG=%s features=%s spec=%s README=%s 测试模块数=%d'
           % (ver_ok, chg_ok, feat_ok, spec_ok, readme_ok, n_mod))
 
