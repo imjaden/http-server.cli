@@ -24,6 +24,7 @@
 12. `hs --url` — 启动后仅输出完整 URL（与 --json 互斥）✅ — `documents/url-flag-design-v2.0-20250715.md`
 13. 全局 `--json` 标志 — 所有管理命令（list/status/kill/kill-all/history/search/config/set/version）均支持 ✅
 14. `hs prompt [<skill>]` — 输出技能使用说明（AI 对接）✅
+15. `hs prune [-n|--dry-run] [--json]` — 清理 registry 中 pid 已不存活的沉积登记（默认命令不删记录）✅ — HTTP-SERVER-CL006
 
 ## 书签系统
 
@@ -86,6 +87,8 @@
 14. 启动竞态防护 — 同目录并发启动 ≤1.0s 宽限 + 归属校验（token 精确匹配 `runner.py` + 目录）；判 stale 先终止进程组再清登记，防孤儿进程与误杀；stale 文案三态一律 stderr ✅ — HTTP-SERVER-CL004
 15. 目录级启动锁 — 同目录并发启动临界区互斥（`~/.http-server.cli/locks/<sha1(路径)[:16]>.json`，O_CREAT|O_EXCL 原子获取 + finally 释放 + 归属校验仅删本进程锁）；stale 四判据（不可解析且写入龄≥1.0s / pid 死 / pid 复用 / 龄>30s）+ 负龄不判 stale；等待 ≤3.0s 就绪即幂等、超时 fail-closed；用法错误（路径不存在 / `-p` 越界）优先于锁 ✅ — HTTP-SERVER-CL005
 16. 输出通道契约 — `eprint()` → stderr、`print_msg()` → stdout；63 处调用点逐点固化（stdout 23 / stderr 38 / 三态分叉 2）；机器模式 stdout 仅 JSON 信封或单行 URL ✅ — HTTP-SERVER-CL005
+17. 同端口多记录选择口径 — `Registry.find(port=)` 按「存活优先 + 最近 `started_at`」选条，`hs status` / `hs kill` 与 `hs list` 结论一致；访问记账（`touch` + 60s 刷盘）只写存活实例记录 ✅ — HTTP-SERVER-CL006
+18. status/list 不误导 — 陈旧记录显式 `Status:  stale-record`；端口被他人占用 = `Port:  occupied by PID <n>（非本记录）`、空闲 = `Port:  free`，不再出现「❌ stopped + Port: in use」矛盾组合；`--json` 增 `record_status` / `occupants` / `stale_count`（additive）✅ — HTTP-SERVER-CL006
 
 ## 数据持久化
 
@@ -136,7 +139,7 @@
 
 ## 测试
 
-1. 17 个测试模块，605 个测试用例 ✅ — `documents/test-design-spec-v1.2-20260702.md`
+1. 18 个测试模块，630 个测试用例（629 passed + 1 环境相关红 `test_t26` uptime 断言）✅ — `documents/test-design-spec-v1.2-20260702.md`
 2. `conftest.py` — autouse 数据隔离 + monkeypatch 路径注入 ✅
 3. 集成测试模式 — mock `_COMMANDS` / `ensure_storage`，set `sys.argv`，catch `SystemExit` ✅
 

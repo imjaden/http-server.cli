@@ -1,5 +1,5 @@
 name: http-server.cli
-version: 1.4.1
+version: 1.4.2
 description: 基于 python3 -m http.server 的本地 HTTP 服务管理器。自动分配端口、追踪项目映射、管理服务生命周期、智能首页跳转、进程资源监控。
 date: 2026-06-23
 author: IRIS
@@ -397,6 +397,44 @@ specs:
             then:
               - 输出"发现残留注册记录，清理后重新启动"
               - 旧记录被删除，新记录写入
+
+      - id: reg-04
+        name: 同端口多记录选择口径
+        description: 同端口存在多条登记（历史沉积）时，查询与访问记账一律按「存活优先 + 最近 started_at」选择，使 hs status 与 hs list 结论一致
+        priority: MUST
+        scenarios:
+          - name: status 指向存活实例
+            given: 同端口 8080 有两条登记（陈旧 pid 已死在前、存活 pid 在后）
+            when: 执行 hs status 8080
+            then:
+              - 指向存活实例的 path 与 pid
+              - 输出报 running 且 record_status=live
+          - name: 访问记账落在存活实例
+            given: 同端口多条登记
+            when: 访问一次页面触发 last_access_at 刷新
+            then: last_access_at 只写入存活实例记录，陈旧记录不被污染
+          - name: 无存活实例
+            given: 该端口仅有 pid 已死的沉积记录
+            when: 执行 hs status <port>
+            then:
+              - 报 stopped 且 record_status=stale-record
+              - Port 行不再出现与 stopped 矛盾的 in use
+
+      - id: reg-05
+        name: 沉积记录显式清理
+        description: hs prune 显式清理 pid 已不存活的沉积登记；list/status/start 默认命令不删记录
+        priority: SHOULD
+        scenarios:
+          - name: prune 预览
+            given: registry 含 pid 已死的记录
+            when: 执行 hs prune --dry-run
+            then: 列出将删条且不修改 registry
+          - name: prune 执行
+            given: registry 含 pid 已死的记录
+            when: 执行 hs prune
+            then:
+              - 删除 pid 已死记录，保留存活记录
+              - history.json 不受影响
 
   # ── 配置管理 ───────────────────────────────────────
 

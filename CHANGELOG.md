@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.4.2 (2026-10-13)
+
+### Fixed
+- **`hs status <port>` 口径缺陷 — 陈旧 registry 记录压过存活实例**（HTTP-SERVER-CL006）— 同端口存在多条登记（历史沉积）时，`hs status` 按端口取**首条**命中、而 `hs list` 做存活过滤，导致同一端口结论自相矛盾（`hs status` 报 `❌ stopped`（陈旧 pid / 错拼 path）却又 `Port: in use`，使用者据此会误判「服务已停」）：
+  - **D1 选条口径**：`Registry.find(port=)` 现按「存活优先 + 最近 `started_at`」选择，`hs status` / `hs kill` / dashboard 与 `hs list` 结论一致（`prefer_alive=False` 保留旧「首个命中」语义作逃生口）
+  - **D2 记账目标**：`Registry.touch(port)` 与 60s 批量刷盘 `_flush_access_cache()` 均写入**存活实例**记录，不再把 `last_access_at` 刷到同端口陈旧沉积条上
+
+### Added
+- **`hs prune [-n|--dry-run] [--json]`**（HTTP-SERVER-CL006 / A4）— 显式清理 `registry.json` 中 pid 已不存活的沉积登记；`list` / `status` / `start` 等默认命令**不删记录**。`history.json` 为独立文件，语义不受影响
+- **`hs status --json` 新增字段** `record_status`（`live` / `stale-record`）；陈旧记录且端口被他人占用时附 `occupants`（占用者 pid 列表）—— additive
+- **`hs list --json` 新增字段** `stale_count`（被过滤的沉积条数）—— additive
+- 复跑 harness `scripts/cl006-verify.py`（AC A1–A4，16 断言）
+
+### Changed
+- `hs list` / `hs status <port>` 输出：不再出现「`❌ stopped` + `Port: in use`」矛盾组合 —— 陈旧记录显式标注 `Status:  stale-record`；端口被他人占用时 `Port:  occupied by PID <n>（非本记录）`，端口空闲则 `Port:  free`
+- 同端口多条时展示层按「存活优先 + 最近 `started_at`」保留一条；非 JSON `hs list` 末尾附沉积条数提示（`N stale registry record(s) hidden — run hs prune to clean`）
+- `registry.json` 结构 `{"servers":[...]}` 不变（旧文件可读；未新增/删除字段）
+
+### Notes
+- 新增测试模块 `tests/test_cl006_status_registry.py`（25 用例）；全量 **629 passed**（+25）
+- 已知环境相关红 1（修前既有，与本次改动无关）：`test_cl005_hardening.py::test_t26` 断言 `CLOCK_MONOTONIC > 1e4`（uptime 量级），本机 uptime 不足 1e4 秒
+- 设计件：`documents/http-server-cl006-registry-stale-design-v1.0-20261013.md`
+- 本仓**未 push**（用户放行后再推）
+
 ## 1.4.1 (2026-09-23)
 
 ### Added
