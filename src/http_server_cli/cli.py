@@ -101,6 +101,7 @@ _HELP = """http-server v{version} — 忘记端口，只管预览
   hs history               显示所有历史启动记录
   hs history --json        JSON 格式输出历史记录
   hs search <keyword>      搜索实例（按端口或路径模糊匹配，忽略大小写）
+  hs prune                 清理 registry 中已退出进程的陈旧登记（-n/--dry-run 仅预览）
 
   --json                   所有命令后追加此参数可获取结构化 JSON 输出
   --url                    启动后仅输出完整 URL 字符串（仅 start，与 --json 互斥）
@@ -312,15 +313,17 @@ def _list_servers(manager, json: bool = False, port_only: bool = False,
                   path_only: bool = False, short: bool = False) -> None:
     """列出所有服务（用户服务 + managed 基础设施服务）"""
     from http_server_cli.registry_managed import ManagedRegistry
+    from http_server_cli.registry import select_display_entries
     from http_server_cli.utils import (
         eprint, format_path, format_duration, get_process_stats, json_output,
     )
     config = manager.config
 
-    user_servers = manager.registry.active_servers()
-    user_servers = sorted(user_servers, key=lambda x: x['port'])
-    # 仅显示运行中的实例
-    user_servers = [s for s in user_servers if s.get('_alive')]
+    all_user = manager.registry.active_servers()
+    stale_count = sum(1 for s in all_user if not s.get('_alive'))
+    all_user = sorted(all_user, key=lambda x: x['port'])
+    # 仅显示运行中的实例；同端口多条按「存活优先 + 最近 started_at」保留一条（A4）
+    user_servers = select_display_entries([s for s in all_user if s.get('_alive')])
 
     mreg = ManagedRegistry()
     managed_servers = mreg.active_servers()
@@ -355,6 +358,7 @@ def _list_servers(manager, json: bool = False, port_only: bool = False,
             })
         json_output(True, 'list', data={
             'count': len(user_servers),
+            'stale_count': stale_count,
             'servers': user_data,
             'managed': managed_data,
         })
@@ -364,6 +368,8 @@ def _list_servers(manager, json: bool = False, port_only: bool = False,
     if total == 0:
         print_msg('No running HTTP services', 'ℹ️')
         print_msg('Use hs start [path] -o to start one', '💡')
+        if stale_count:
+            print_msg(f'{stale_count} stale registry record(s) — run `hs prune` to clean', '🧹')
         return
 
     # 过滤输出模式（优先级: --port > --path > --short）
@@ -423,6 +429,18 @@ def _list_servers(manager, json: bool = False, port_only: bool = False,
             print(f'{icon}  {name}{tag}  →  http://127.0.0.1:{port}')
             print(f'    🔧  PID: {pid}  |  Started: {started}')
             print()
+
+    if stale_count:
+        print_msg(f'{stale_count} stale registry record(s) hidden — run `hs prune` to clean', '🧹')
+
+@_register
+def _cmd_prune(manager, args):
+    """hs prune — 清理 registry 中 pid 已不存活的沉积记录（HTTP-SERVER-CL006 A4）"""
+    parser = argparse.ArgumentParser(prog='hs prune', add_help=False)
+    parser.add_argument('--json', action='store_true')
+    parser.add_argument('-n', '--dry-run', action='store_true')
+    parsed, _ = _parse_known_args(parser, args)
+    manager.prune_stale(json=parsed.json, dry_run=parsed.dry_run)
 
 @_register
 def _cmd_status(manager, args):

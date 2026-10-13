@@ -72,6 +72,52 @@ def _flush_access_cache() -> None:
     _last_flush_time = _time.time()
 
 
+# ── 选择口径（CL006/A1 + A4）：同键多记录时的「存活优先 + 最近 started_at」 ──
+
+
+def select_entry(candidates: list) -> Optional[dict]:
+    """从同键候选条中选一条（D1/A1 口径）。
+
+    优先级：存活（pid 活）→ 最近 started_at → 原始顺序（首个）。
+    单条候选原样返回；空候选返回 None。
+    """
+    if not candidates:
+        return None
+    if len(candidates) == 1:
+        return candidates[0]
+    alive = [e for e in candidates if is_process_alive(e.get('pid'))]
+    pool = alive or candidates
+    if len(pool) == 1:
+        return pool[0]
+    return max(pool, key=lambda e: e.get('started_at') or '')
+
+
+def select_display_entries(entries: list, key=None) -> list:
+    """按 key（默认 port）分组，每组保留一条：存活优先 → 最近 started_at（A4 展示口径）。
+
+    entries 为 active_servers() 装饰后的条目（含 '_alive'）。保持组首次出现顺序。
+    """
+    if key is None:
+        key = lambda e: e.get('port')
+    order, groups = [], {}
+    for e in entries:
+        k = key(e)
+        if k not in groups:
+            groups[k] = []
+            order.append(k)
+        groups[k].append(e)
+    out = []
+    for k in order:
+        group = groups[k]
+        if len(group) == 1:
+            out.append(group[0])
+            continue
+        alive = [e for e in group if e.get('_alive')]
+        pool = alive or group
+        out.append(max(pool, key=lambda e: e.get('started_at') or ''))
+    return out
+
+
 # ── Registry 类 ─────────────────────────────────────────
 
 class Registry:
@@ -86,14 +132,27 @@ class Registry:
         """返回所有条目（引用，修改需调用 save）"""
         return self._data['servers']
 
-    def find(self, port: Optional[int] = None, path: Optional[str] = None) -> Optional[dict]:
-        """查找条目，支持 port 或 path"""
-        for entry in self._data['servers']:
-            if port is not None and entry.get('port') == port:
-                return entry
-            if path is not None and entry.get('path') == path:
-                return entry
-        return None
+    def find(self, port: Optional[int] = None, path: Optional[str] = None,
+             prefer_alive: bool = True) -> Optional[dict]:
+        """查找条目，支持 port 或 path。
+
+        同键多条（历史沉积，D1/D2）时默认按「存活优先 + 最近 started_at」选择，
+        使 `hs status` / `hs kill` / 访问记账与 `hs list` 口径一致；
+        ``prefer_alive=False`` 退回旧「首个命中」语义（逃生口）。
+        """
+        candidates = [
+            e for e in self._data['servers']
+            if (port is not None and e.get('port') == port)
+            or (path is not None and e.get('path') == path)
+        ]
+        if not prefer_alive:
+            return candidates[0] if candidates else None
+        return select_entry(candidates)
+
+    def stale_entries(self) -> list:
+        """pid 已不存活的条目（副本）——供 prune 预览，不修改数据。"""
+        return [dict(e) for e in self._data['servers']
+                if not is_process_alive(e.get('pid'))]
 
     def active_servers(self) -> list:
         """返回存活状态装饰后的条目列表"""
@@ -140,18 +199,33 @@ class Registry:
         self._data['servers'] = []
         self.save()
 
+    def prune_stale(self) -> list:
+        """删除 pid 已不存活的沉积记录，返回被删条目的副本（A4）。
+
+        仅动 registry.json；history.json 为独立文件，语义不受影响。
+        存活记录（即使同端口重复）一律保留。
+        """
+        kept, removed = [], []
+        for entry in self._data['servers']:
+            (kept if is_process_alive(entry.get('pid')) else removed).append(entry)
+        if removed:
+            self._data['servers'] = kept
+            self.save()
+        return [dict(e) for e in removed]
+
     def touch(self, port: int) -> None:
         """更新指定端口的 last_access_at（请求访问时调用）。
 
+        A2：写入**存活实例**对应记录（同端口多条时按 find 口径选择），
+        不再盲写同端口首条（旧实现会把访问记账刷到陈旧沉积条上）。
         保留此方法供 dashboard API 等非热路径调用方使用。
         handler 热路径请使用 _touch_memory()。
         """
-        for entry in self._data['servers']:
-            if entry.get('port') == port:
-                from http_server_cli.utils import timestamp as _ts
-                entry['last_access_at'] = _ts()
-                self.save()
-                return
+        entry = self.find(port=port)
+        if entry is not None:
+            from http_server_cli.utils import timestamp as _ts
+            entry['last_access_at'] = _ts()
+            self.save()
 
     def save(self) -> None:
         """原子写 registry 并刷新模块缓存。"""

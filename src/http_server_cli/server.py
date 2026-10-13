@@ -14,7 +14,7 @@ from urllib.parse import quote
 
 from http_server_cli.config import Config
 from http_server_cli.history import HistoryStore
-from http_server_cli.registry import Registry
+from http_server_cli.registry import Registry, select_display_entries
 from http_server_cli.utils import (
     eprint,
     print_msg,
@@ -598,13 +598,14 @@ class ServerManager:
 
     def list(self, json: bool = False) -> None:
         """列出所有已注册服务及其存活状态"""
-        servers = self.registry.active_servers()
+        all_servers = self.registry.active_servers()
+        stale_count = sum(1 for s in all_servers if not s.get('_alive'))
 
         # 按端口排序
-        servers = sorted(servers, key=lambda x: x['port'])
+        all_servers = sorted(all_servers, key=lambda x: x['port'])
 
-        # 只显示存活的正在运行的服务
-        servers = [s for s in servers if s.get('_alive', False)]
+        # 只显示存活的正在运行的服务；同端口多条按「存活优先 + 最近 started_at」保留一条（A4）
+        servers = select_display_entries([s for s in all_servers if s.get('_alive', False)])
 
         # 获取当前目录
         current_dir = os.getcwd()
@@ -615,6 +616,8 @@ class ServerManager:
             else:
                 print_msg('No running HTTP services', 'ℹ️')
                 print_msg('Use hs start [path] -o to start one', '💡')
+                if stale_count:
+                    print_msg(f'{stale_count} stale registry record(s) — run `hs prune` to clean', '🧹')
             return
 
         if json:
@@ -673,6 +676,9 @@ class ServerManager:
             print(f'    📊  CPU: {stats["cpu"]}  |  Memory: {stats["memory"]} ({stats["memory_percent"]}) | Duration: {duration}')
             print()
 
+        if stale_count:
+            print_msg(f'{stale_count} stale registry record(s) hidden — run `hs prune` to clean', '🧹')
+
     # ── status ─────────────────────────────────────────
 
     def status(self, arg: Optional[str] = None, json: bool = False) -> None:
@@ -727,7 +733,15 @@ class ServerManager:
         pid = entry.get('pid')
         alive = is_process_alive(pid)
         port_active = is_port_in_use(port)
+        live = alive and port_active
+        record_status = 'live' if live else 'stale-record'
         ep = entry.get('domain', domain)
+
+        # A3：本记录 pid 已死但端口仍被占 ⇒ 找出真实占用者具名，消除「❌ stopped + Port: in use」误导
+        occupants = []
+        if port_active and not alive:
+            from http_server_cli.utils import get_pid_by_lsof
+            occupants = [p for p in get_pid_by_lsof(port) if p != pid]
 
         if json:
             duration = format_duration(entry.get('started_at', ''))
@@ -739,18 +753,21 @@ class ServerManager:
                 'path': entry['path'],
                 'pid': pid,
                 'domain': ep,
-                'alive': alive and port_active,
+                'alive': live,
                 'port_active': port_active,
+                'record_status': record_status,
                 'mode': 'daemon' if entry.get('daemon') else ('foreground' if entry.get('foreground') else 'normal'),
                 'started_at': entry.get('started_at'),
                 'index_page': entry.get('index_page', 'index.html'),
                 'stats': stats,
                 'duration': duration,
             }
+            if occupants:
+                data['occupants'] = occupants
             json_output(True, 'status', data=data)
             return
 
-        if alive and port_active:
+        if live:
             print_msg(f'http://{ep}:{port}  ✅ running', '🔍')
         else:
             print_msg(f'http://{ep}:{port}  ❌ stopped', '🔍')
@@ -758,10 +775,54 @@ class ServerManager:
         print(f'  Path:  {format_path(entry["path"])}')
         print(f'  PID:   {pid}')
         print(f'  Process: {"alive" if alive else "exited"}')
-        print(f'  Port:  {"in use" if port_active else "free"}')
+        if live:
+            print('  Port:  in use (this record)')
+        elif port_active:
+            who = ('PID ' + '/'.join(str(p) for p in occupants[:2])) if occupants else 'another process'
+            print(f'  Port:  occupied by {who}（非本记录）')
+        else:
+            print('  Port:  free')
+        print(f'  Status:  {record_status}')
         mode = '🖥 daemon' if entry.get('daemon', False) else ('⌨ foreground' if entry.get('foreground', False) else 'normal')
         print(f'  Mode:  {mode}')
         print(f'  Started:  {entry.get("started_at", "-")}')
+
+    # ── prune（A4：显式清理沉积记录） ───────────────────
+
+    def prune_stale(self, json: bool = False, dry_run: bool = False) -> bool:
+        """清理 registry 中 pid 已不存活的沉积记录（A4）。
+
+        仅动 registry.json；history.json 为独立文件、语义不受影响。
+        dry_run=True 仅预览（列出将删条）而不写盘。
+        """
+        if dry_run:
+            stale = self.registry.stale_entries()
+        else:
+            stale = self.registry.prune_stale()
+
+        if json:
+            json_output(True, 'prune', data={
+                'dry_run': dry_run,
+                'removed': len(stale),
+                'entries': [
+                    {'port': e.get('port'), 'path': e.get('path'), 'pid': e.get('pid')}
+                    for e in stale
+                ],
+            })
+            return True
+
+        if not stale:
+            print_msg('No stale registry records', 'ℹ️')
+            return True
+
+        verb = 'Would remove' if dry_run else 'Removed'
+        print_msg(f'{verb} {len(stale)} stale registry record(s):', '🧹')
+        for e in stale:
+            print(f'    • port {e.get("port")}  pid {e.get("pid")}  '
+                  f'{format_path(e.get("path") or "")}')
+        if dry_run:
+            print_msg('Re-run without --dry-run to apply', '💡')
+        return True
 
     # ── kill ───────────────────────────────────────────
 
