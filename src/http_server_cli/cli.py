@@ -30,9 +30,9 @@ _UNKNOWN_HINTS = (
 )
 
 
-def _warn_unknown_args(unknown, *, allow=(), allow_html: bool = False,
-                       allow_positional: bool = False) -> list:
-    """未识别参数告警（D6）：仅 stderr，stdout / JSON 信封零污染，退出码不变。
+def _filter_unknown(unknown, *, allow=(), allow_html: bool = False,
+                    allow_positional: bool = False) -> list:
+    """纯函数：返回未识别 token 列表（应用显式豁免规则）。
 
     allow            显式豁免的 token
     allow_html       豁免 *.html / *.htm（hs start 多文件通配的既有语义）
@@ -40,34 +40,93 @@ def _warn_unknown_args(unknown, *, allow=(), allow_html: bool = False,
     """
     if not unknown:
         return []
-    rest = [t for t in unknown
+    return [t for t in unknown
             if t not in allow
             and not (allow_html and str(t).lower().endswith(('.html', '.htm')))
             and not (allow_positional and not str(t).startswith('-'))]
-    if not rest:
-        return []
-    print(f'⚠️ 未识别参数（已忽略）: {" ".join(rest)}', file=sys.stderr)
+
+
+def _print_unknown_hints(rest) -> None:
+    """近形引导（typo → 正确用法），仅 stderr。"""
     for tokens, hint in _UNKNOWN_HINTS:
         if any(t in tokens for t in rest):
             print(f'    💡 {hint}', file=sys.stderr)
             break
+
+
+# 全局识别别名（A1）：即使出现在子命令**之后**，也一律视为「请求帮助 / 版本」。
+# 动机：`hs prune --help` 因顶层 REMAINDER 把 --help 吞进子命令 args，旧实现既
+# 不触发全局 help 分支、又被子命令当「未知参数」忽略，最终照常执行破坏性动作。
+_HELP_ALIASES = ('-h', '--help')
+_VERSION_ALIASES = ('-v', '--version')
+
+
+def _warn_unknown_args(unknown, *, allow=(), allow_html: bool = False,
+                       allow_positional: bool = False) -> list:
+    """未识别参数告警（D6 / 读命令口径）：仅 stderr，stdout / JSON 信封零污染。
+
+    仅用于**无副作用**的查询命令（list/status/history/config/search…）：
+    未识别 token 告警后放行（退出码不变）。
+    """
+    rest = _filter_unknown(unknown, allow=allow, allow_html=allow_html,
+                           allow_positional=allow_positional)
+    if not rest:
+        return []
+    print(f'⚠️ 未识别参数（已忽略）: {" ".join(rest)}', file=sys.stderr)
+    _print_unknown_hints(rest)
     return rest
 
 
+def _fail_unknown_args(rest, prog: str, *, json_mode: bool = False) -> None:
+    """fail-closed：未知参数不得放行执行（HTTP-SERVER-CL007 / A1）。
+
+    · -h / --help    → 打印帮助，exit 0（无副作用，视为请求帮助）
+    · -v / --version → 打印版本，exit 0
+    · 其余           → stderr 用法错误，exit 2；--json 时额外输出 JSON 错误信封
+
+    「不得放行」= 不执行任何副作用（不启动 / 不 kill / 不 prune）。
+    """
+    if not rest:
+        return
+    if any(t in _HELP_ALIASES for t in rest):
+        print(_HELP.format(version=__version__))
+        sys.exit(0)
+    if any(t in _VERSION_ALIASES for t in rest):
+        print(f'http-server v{__version__}')
+        sys.exit(0)
+    joined = ' '.join(rest)
+    name = prog.split()[-1] if prog else 'hs'
+    if json_mode:
+        from http_server_cli.utils import json_output
+        json_output(False, name, error=f'unrecognized arguments: {joined}')
+    print(f'❌ 未识别参数: {joined}', file=sys.stderr)
+    _print_unknown_hints(rest)
+    print(f'💡 用法: {prog} …（运行 hs help 查看全部命令）', file=sys.stderr)
+    sys.exit(2)
+
+
 def _parse_known_args(parser, args, *, allow=(), allow_html: bool = False,
-                      allow_positional: bool = False):
-    """统一解析入口（D6 / D9e）：
+                      allow_positional: bool = False, mutating: bool = True):
+    """统一解析入口（D6 / D9e / CL007）：
 
     · 参数错误（非法值 / 缺值）不再静默成功 → exit 2（P4：消灭「假成功」）
-    · 未识别参数告警到 stderr，不污染 stdout / JSON
+    · mutating=True（默认，写 / 破坏性命令）：未识别参数 **fail-closed**（exit 2，无副作用）
+    · mutating=False（读命令）：未识别参数仅 stderr 告警后放行（D6 口径不变）
     """
     try:
         parsed, unknown = parser.parse_known_args(args)
     except SystemExit as e:  # argparse 的报错路径（argparse 已打印具体错误）
         code = e.code if isinstance(e.code, int) and e.code else 2
         sys.exit(code)
-    _warn_unknown_args(unknown, allow=allow, allow_html=allow_html,
-                       allow_positional=allow_positional)
+    if mutating:
+        rest = _filter_unknown(unknown, allow=allow, allow_html=allow_html,
+                               allow_positional=allow_positional)
+        if rest:
+            _fail_unknown_args(rest, getattr(parser, 'prog', 'hs'),
+                               json_mode=('--json' in args))
+    else:
+        _warn_unknown_args(unknown, allow=allow, allow_html=allow_html,
+                           allow_positional=allow_positional)
     return parsed, unknown
 
 # ── 帮助文本 ──────────────────────────────────────────
@@ -84,7 +143,7 @@ _HELP = """http-server v{version} — 忘记端口，只管预览
   hs . -p 8099             指定端口（1024-65535；被占用即失败退出，不自动漂移）
   hs . -d                  后台运行 + 前台 tail 日志（Ctrl+C 仅退出 tail，服务仍在后台）
   hs . --url               仅返回服务 URL（与 --json 互斥）
-  hs                       默认等于 hs .（当前目录启动）
+  hs                       无参数 → 打印本用法并退出非 0（不启动服务）；等价启动用 hs .
 
   快捷方式: hs start [path]  启动服务;  -o 打开浏览器  -d 后台（前台 tail 日志）  -i <file> 首页  -p <port> 指定端口
 
@@ -164,6 +223,10 @@ def _handle_set(args):
     """set port|domain <value>"""
     json_mode = '--json' in args
     clean_args = [a for a in args if a != '--json']
+
+    # fail-closed（CL007/A1）：set 为写命令，未知 flag 不得放行
+    _fail_unknown_args([a for a in clean_args if str(a).startswith('-')], 'hs set',
+                       json_mode=json_mode)
 
     if len(clean_args) < 2:
         if json_mode:
@@ -304,7 +367,7 @@ def _cmd_list(manager, args):
     parser.add_argument('--port', action='store_true')
     parser.add_argument('--path', action='store_true')
     parser.add_argument('--short', action='store_true')
-    parsed, _ = _parse_known_args(parser, args)
+    parsed, _ = _parse_known_args(parser, args, mutating=False)
     _list_servers(manager, json=parsed.json, port_only=parsed.port,
                   path_only=parsed.path, short=parsed.short)
 
@@ -447,7 +510,7 @@ def _cmd_status(manager, args):
     parser = argparse.ArgumentParser(prog='hs status', add_help=False)
     parser.add_argument('--json', action='store_true')
     parser.add_argument('arg', nargs='?', default=None)
-    parsed, _ = _parse_known_args(parser, args)
+    parsed, _ = _parse_known_args(parser, args, mutating=False)
     arg = parsed.arg
     # bookmark 名称解析：非 digit → 查 bookmark
     if arg and not arg.isdigit():
@@ -494,13 +557,16 @@ def _cmd_kill_all(manager, args):
 
 @_register
 def _cmd_killall(manager, args):
+    # fail-closed（CL007/A1）：kill-all 为破坏性命令，未知参数不得放行
+    _fail_unknown_args([a for a in args if a != '--json'], 'hs killall',
+                       json_mode=('--json' in args))
     manager.kill_all(json='--json' in args)
 
 @_register
 def _cmd_config(manager, args):
     parser = argparse.ArgumentParser(prog='hs config', add_help=False)
     parser.add_argument('--json', action='store_true')
-    parsed, _ = _parse_known_args(parser, args)
+    parsed, _ = _parse_known_args(parser, args, mutating=False)
     Config().show(json=parsed.json)
 
 @_register
@@ -508,7 +574,7 @@ def _cmd_history(manager, args):
     """显示所有历史记录（过滤掉系统临时目录条目）"""
     parser = argparse.ArgumentParser(prog='hs history', add_help=False)
     parser.add_argument('--json', action='store_true')
-    parsed, _ = _parse_known_args(parser, args)
+    parsed, _ = _parse_known_args(parser, args, mutating=False)
     from http_server_cli.history import HistoryStore
     from http_server_cli.utils import json_output, eprint
     history = HistoryStore()
@@ -565,7 +631,7 @@ def _cmd_search(manager, args):
     parser = argparse.ArgumentParser(prog='hs search', add_help=False)
     parser.add_argument('keyword', nargs='?', default=None)
     parser.add_argument('--json', action='store_true')
-    parsed, _ = _parse_known_args(parser, args, allow_positional=True)
+    parsed, _ = _parse_known_args(parser, args, allow_positional=True, mutating=False)
     if not parsed.keyword:
         from http_server_cli.utils import eprint, json_output
         if parsed.json:
@@ -896,6 +962,9 @@ def _cmd_mcp(manager, args):
     # 子命令优先
     sub = args[0] if args else None
     if sub in ('help', 'stop', 'status', 'restart'):
+        # fail-closed（CL007/A1）：mcp stop/restart 为破坏性操作，未知参数不得放行
+        _fail_unknown_args([a for a in args[1:] if a != '--json'],
+                           f'hs mcp {sub}', json_mode=('--json' in args))
         _manage_mcp(sub, json_mode=('--json' in args))
         return
 
@@ -1137,7 +1206,7 @@ def _bookmark_add(args):
 def _bookmark_list(args):
     parser = argparse.ArgumentParser(prog='hs bookmark list', add_help=False)
     parser.add_argument('--json', action='store_true')
-    parsed, _ = _parse_known_args(parser, args)
+    parsed, _ = _parse_known_args(parser, args, mutating=False)
 
     from http_server_cli.bookmark import BookmarkStore, DataCorruptionError
     from http_server_cli.utils import format_path, json_output
@@ -1177,7 +1246,7 @@ def _bookmark_show(args):
     parser = argparse.ArgumentParser(prog='hs bookmark show', add_help=False)
     parser.add_argument('name', nargs='?', default=None)
     parser.add_argument('--json', action='store_true')
-    parsed, _ = _parse_known_args(parser, args)
+    parsed, _ = _parse_known_args(parser, args, mutating=False)
 
     from http_server_cli.bookmark import BookmarkStore, DataCorruptionError
     from http_server_cli.utils import format_path, json_output
@@ -1517,7 +1586,7 @@ def _web_list(args):
     parser.add_argument('--sort-by', dest='sort_by', default=None,
                         choices=['name', 'cmd+url'],
                         help='排序键（默认 name → cmd+url，a-z）')
-    parsed, _ = _parse_known_args(parser, args)
+    parsed, _ = _parse_known_args(parser, args, mutating=False)
 
     from http_server_cli.services import ServiceStore, DataCorruptionError
     from http_server_cli.utils import json_output
@@ -1579,7 +1648,7 @@ def _web_show(args):
     parser = argparse.ArgumentParser(prog='hs web show', add_help=False)
     parser.add_argument('name', nargs='?', default=None)
     parser.add_argument('--json', action='store_true')
-    parsed, _ = _parse_known_args(parser, args)
+    parsed, _ = _parse_known_args(parser, args, mutating=False)
 
     from http_server_cli.services import ServiceStore, DataCorruptionError
     from http_server_cli.utils import json_output
@@ -1917,7 +1986,11 @@ def main():
         # 未输入命令名但有关键字（如 hs -o），视作 start 的参数
         if unknown:
             parsed.args = unknown[:]
-        cmd = 'start'
+            cmd = 'start'
+        else:
+            # A2：真正裸调用（无路径 / 无命令 / 无参数）不得静默在当前目录起服务
+            print(_HELP.format(version=__version__))
+            sys.exit(2)
     elif cmd not in _COMMANDS:
         # ➊ 先查 bookmark
         from http_server_cli.bookmark import BookmarkStore

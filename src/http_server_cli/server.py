@@ -800,10 +800,13 @@ class ServerManager:
         else:
             stale = self.registry.prune_stale()
 
+        kept = self.registry.count()   # 现存登记数（dry-run 时未变；A3 汇总口径）
+
         if json:
             json_output(True, 'prune', data={
                 'dry_run': dry_run,
                 'removed': len(stale),
+                'kept': kept,
                 'entries': [
                     {'port': e.get('port'), 'path': e.get('path'), 'pid': e.get('pid')}
                     for e in stale
@@ -820,6 +823,7 @@ class ServerManager:
         for e in stale:
             print(f'    • port {e.get("port")}  pid {e.get("pid")}  '
                   f'{format_path(e.get("path") or "")}')
+        print_msg(f'Kept {kept} registry record(s)', '📦')   # A3：已删/保留汇总
         if dry_run:
             print_msg('Re-run without --dry-run to apply', '💡')
         return True
