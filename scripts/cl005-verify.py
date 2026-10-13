@@ -501,16 +501,18 @@ def a11_full_pytest():
 
 def a12_sync():
     o, e, rc = hs(['version'])
-    ver_ok = 'v1.4.1' in o
+    ver_ok = any(v in o for v in ('v1.4.1', 'v1.4.2'))   # CL006：版本上移 1.4.1 → 1.4.2（CL005 保持可复跑）
     ch = Path(ROOT, 'CHANGELOG.md').read_text(encoding='utf-8')
     chg_ok = '## 1.4.1 (2026-09-23)' in ch and '目录级启动锁' in ch
     feat = Path(ROOT, 'features.md').read_text(encoding='utf-8')
-    feat_ok = '17 个测试模块，605 个测试用例' in feat
+    # CL006：features.md 测试规模前移（17/605 → 18/630），两代口径任一生效即视为通过
+    feat_ok = ('17 个测试模块，605 个测试用例' in feat
+               or '18 个测试模块，630 个测试用例' in feat)
     ls = subprocess.run(['git', 'ls-files', 'tests/test_*.py'], cwd=ROOT,
                         capture_output=True, text=True).stdout.split()
     n_mod = len(set(ls))
     spec = Path(ROOT, 'http-server.cli.spec.yaml').read_text(encoding='utf-8')
-    spec_ok = ('version: 1.4.1' in spec) and ('lifecycle-07' in spec) and ('lifecycle-08' in spec) and ('cli-06' in spec)
+    spec_ok = (('version: 1.4.1' in spec) or ('version: 1.4.2' in spec)) and ('lifecycle-07' in spec) and ('lifecycle-08' in spec) and ('cli-06' in spec)
     rd = Path(ROOT, 'README.md').read_text(encoding='utf-8')
     rdz = Path(ROOT, 'README.zh.md').read_text(encoding='utf-8')
     readme_ok = ('Exit codes (CL005)' in rd) and ('退出码（CL005）' in rdz)
