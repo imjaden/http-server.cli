@@ -1513,29 +1513,27 @@ def _cmd_web(manager, args):
 
 
 def _is_hs_cmd(cmd_line: str) -> bool:
-    """判断 cmd 首 token 是否为 hs（含绝对路径 symlink 解析）。"""
-    import shutil
+    """判断 cmd 首 token 是否为 hs（CL008 SEC-001 加固）。
+
+    命中条件（大小写不敏感）: 首 token 经 `~` 展开后 `basename` 为 `hs` / `hs.exe`
+    —— 覆盖 `hs` / `HS` / `./hs` / `~/bin/hs` / `/usr/local/bin/hs` / symlink 名。
+
+    不识别（help 与 skills/hs-web/SKILL.md 已收窄表述）:
+    `env hs …` / `command hs …` / `sh -c 'hs …'`。
+
+    旧实现（CL008 首轮）用 `shutil.which('hs')` 比对绝对路径 → PATH 无 hs 时
+    返回 False（fail-open，静默放行）；改用 basename 判定后不依赖 PATH。
+    """
+    import os
     import shlex
-    from pathlib import Path
     try:
         tokens = shlex.split(cmd_line)
     except ValueError:
         return False
     if not tokens:
         return False
-    first = tokens[0]
-    if first == 'hs':
-        return True
-    p = Path(first)
-    if p.is_absolute():
-        hs_bin = shutil.which('hs')
-        if hs_bin:
-            try:
-                if p.resolve() == Path(hs_bin).resolve():
-                    return True
-            except OSError:
-                pass
-    return False
+    first = os.path.expanduser(tokens[0])
+    return os.path.basename(first).casefold() in ('hs', 'hs.exe')
 
 
 def _web_help():
@@ -1566,7 +1564,8 @@ def _web_help():
     print('  --url            服务 URL（固定端口必填；动态端口不填，启动前未知）')
     print('  --open           开浏览器策略（默认 url: web 统一开 / cmd: 命令自带 -o / both / none）')
     print('  --domain         执行时注入 config.domain 到 cmd 末尾')
-    print('                   仅 cmd 自身支持 --domain 时可用（dk/daily-checker）；hs 型 cmd 的')
+    print('                   仅 cmd 自身支持 --domain 时可用（dk/daily-checker）；hs 型 cmd')
+    print('                   （首 token 为 hs，或 basename=hs/hs.exe 的可执行路径，大小写不敏感）')
     print('                   domain 由 config.json 统一决定（hs set domain），重复注入既双源又故障源')
     print('  --force-domain   跳过 hs 型 cmd 的 --domain 防呆检查（逃生开关）')
     print('  --port           执行时注入 --port <N>（与 --domain 同开时 domain 先 port 后）')
@@ -1961,24 +1960,26 @@ def _web_update(args):
             print(f'❌ {err}', file=sys.stderr)
         sys.exit(2)   # CL004 D3
 
-    # A2 CL008: hs 型 cmd + --domain → fail-closed（hs 自身无 --domain）
-    if parsed.domain and not parsed.force_domain:
-        effective_cmd = parsed.cmd if parsed.cmd is not None else existing['cmd']
-        if _is_hs_cmd(effective_cmd):
-            err = ("hs 型 cmd 不支持 --domain 注入（hs 自身无该 flag）；"
-                   "请用 --no-domain 或不加 --domain；若确认可注入，使用 --force-domain")
-            if json_mode:
-                json_output(False, cmd, error=err)
-            else:
-                print(f'❌ {err}', file=sys.stderr)
-            sys.exit(2)
-
     # --no-domain 优先（清除语义，对齐 --url ''）
     use_domain = None
     if parsed.no_domain:
         use_domain = False
     elif parsed.domain:
         use_domain = True
+
+    # A2 CL008 (SEC-002): 按「更新后的有效状态」判定，而非「本次是否传 --domain」
+    # —— 否则 update --cmd '<hs …>' 可在既有 use_domain=true 条目上重建风险态
+    eff_cmd = parsed.cmd if parsed.cmd is not None else existing['cmd']
+    eff_use_domain = (bool(use_domain) if use_domain is not None
+                      else bool(existing.get('use_domain')))
+    if eff_use_domain and not parsed.force_domain and _is_hs_cmd(eff_cmd):
+        err = ("hs 型 cmd 不支持 --domain 注入（hs 自身无该 flag）；"
+               "请用 --no-domain 或不加 --domain；若确认可注入，使用 --force-domain")
+        if json_mode:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
+        sys.exit(2)
 
     # --no-port 优先（清除：use_port=False 且 port 同清，D9b / F-9）
     use_port = None

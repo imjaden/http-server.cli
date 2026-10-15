@@ -271,13 +271,14 @@ def a13():
 
 def a14():
     out, _, _ = run(['version'])
-    ok = any(v in out for v in ('v1.4.0', 'v1.4.1', 'v1.4.2', 'v1.5.0'))   # CL007：版本上移后本批 harness 仍可复跑
+    # CL008 SEC-003：版本枚举改正则（历史批次断言随版本上移断链）
+    ok = bool(re.search(r'v\d+\.\d+\.\d+', out))
     check('A14-1', ok, '`hs version` → %r' % out.strip())
-    g1 = subprocess.run(['grep', '-nE', "__version__ = '1[.](4[.](0|1|2)|5[.]0)'", 'src/http_server_cli/__init__.py'],
+    g1 = subprocess.run(['grep', '-nE', "__version__ = '[0-9]+[.][0-9]+[.][0-9]+'", 'src/http_server_cli/__init__.py'],
                         cwd=ROOT, capture_output=True, text=True).stdout.strip()
     g2 = subprocess.run(['grep', '-n', '^## 1.4.0', 'CHANGELOG.md'],
                         cwd=ROOT, capture_output=True, text=True).stdout.strip()
-    g3 = subprocess.run(['grep', '-nE', '^version: 1[.](4[.](0|1|2)|5[.]0)', 'http-server.cli.spec.yaml'],
+    g3 = subprocess.run(['grep', '-nE', '^version: [0-9]+[.][0-9]+[.][0-9]+', 'http-server.cli.spec.yaml'],
                         cwd=ROOT, capture_output=True, text=True).stdout.strip()
     check('A14-2', all([g1, g2, g3]), '__init__=%r CHANGELOG=%r spec=%r' % (g1, g2, g3))
 

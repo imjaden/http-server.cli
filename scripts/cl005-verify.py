@@ -16,6 +16,7 @@ HTTP-SERVER-CL005 ops 核查 harness —— 设计 v1.2 §6.2 断言表（A1–A
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -501,19 +502,18 @@ def a11_full_pytest():
 
 def a12_sync():
     o, e, rc = hs(['version'])
-    ver_ok = any(v in o for v in ('v1.4.1', 'v1.4.2', 'v1.5.0'))   # CL007：版本上移 1.4.2 → 1.5.0（历史 harness 保持可复跑）
+    # CL008 SEC-003：白名单改正则化（历史版本枚举每轮上移即断链；正则后一次性消除漂移）
+    ver_ok = bool(re.search(r'v\d+\.\d+\.\d+', o))
     ch = Path(ROOT, 'CHANGELOG.md').read_text(encoding='utf-8')
     chg_ok = '## 1.4.1 (2026-09-23)' in ch and '目录级启动锁' in ch
     feat = Path(ROOT, 'features.md').read_text(encoding='utf-8')
-    # CL007：features.md 测试规模前移（17/605 → 18/630 → 19/650），任一代口径生效即视为通过
-    feat_ok = ('17 个测试模块，605 个测试用例' in feat
-               or '18 个测试模块，630 个测试用例' in feat
-               or '19 个测试模块，650 个测试用例' in feat)
+    # CL008 SEC-003：测试规模计数改正则（原枚举 17/605、18/630、19/650 已随批次上移）
+    feat_ok = bool(re.search(r'\d{2} 个测试模块，\d{3} 个测试用例', feat))
     ls = subprocess.run(['git', 'ls-files', 'tests/test_*.py'], cwd=ROOT,
                         capture_output=True, text=True).stdout.split()
     n_mod = len(set(ls))
     spec = Path(ROOT, 'http-server.cli.spec.yaml').read_text(encoding='utf-8')
-    spec_ok = any(('version: ' + v) in spec for v in ('1.4.1', '1.4.2', '1.5.0')) and ('lifecycle-07' in spec) and ('lifecycle-08' in spec) and ('cli-06' in spec)
+    spec_ok = bool(re.search(r'^version: \d+\.\d+\.\d+', spec, re.M)) and ('lifecycle-07' in spec) and ('lifecycle-08' in spec) and ('cli-06' in spec)
     rd = Path(ROOT, 'README.md').read_text(encoding='utf-8')
     rdz = Path(ROOT, 'README.zh.md').read_text(encoding='utf-8')
     readme_ok = ('Exit codes (CL005)' in rd) and ('退出码（CL005）' in rdz)

@@ -9,13 +9,19 @@
   - **A3 存量止血**：`hs web list/show` 对 hs 型 + use_domain=true 条目打 `⚠️` 风险标记；JSON 信封新增 `domain_risk` 字段
   - **A4 文档**：--domain 语义边界补全（hs 型 cmd domain 由 config.json 统一决定）
 
+### Fixed（round-2 复审修订，评审 HM-CL008-SEC-001/002/003）
+- **SEC-001 `_is_hs_cmd` fail-open 收口** — 旧实现依赖 `shutil.which('hs')` 比对绝对路径，PATH 无 hs 即静默放行（`~/bin/hs` / `./hs` / `HS` 既不拦也不标记）。改为 `os.path.expanduser` + `basename` 判定（大小写不敏感，覆盖 `hs`/`HS`/`./hs`/`~/bin/hs`/任意绝对路径/symlink 名），不依赖 PATH；`_web_help` 与 `skills/hs-web/SKILL.md` 同步收窄「hs 型 cmd」表述（明确不识别 `env hs` / `command hs` / `sh -c 'hs …'`）
+- **SEC-002 update 按有效态判定** — 旧判据只看「本次是否传 `--domain`」，`hs web update <name> --cmd '<hs …>'` 可在既有 `use_domain=true` 条目上静默重建风险态（rc=0）。改为先算 effective（`--no-domain` 清除优先 → `--domain` → 既有态）再判定；OBS-002「`--no-domain --domain` 同给提示矛盾」随之收敛
+- **SEC-003 历史 harness 白名单正则化** — 版本 1.5.0→1.5.1 未同步 `scripts/*-verify.py` 版本/计数枚举 → `cl005-verify.py::a12_sync`、`port-flag-verify.py::a14`、`port-residual-verify.py::a9_sync_greps` 复跑即红（证据链断）。三处改正则（`v\d+\.\d+\.\d+` / `^version: \d+\.\d+\.\d+` / `\d{2} 个测试模块，\d{3} 个测试用例`），一次性消除此类漂移
+
 ### Changed
 - **Help 打印规范化（hm-style grouped help）**— 参考治理规范 §8（hermes-manager/skills-governance/cli-architecture-patterns.md）+ `hm help` / `dk help` 实例，`hs help` 及子命令 help（web / dashboard / mcp / bookmark）统一改造：`=`-rule + `📖 名称 · 版本(发布日) · 别名` 标题 + 【功能概述】 + `── 分组 ──` 两行条目（name+usage / description 缩进）+ `── 选项 ──` + `📋 示例:`；危险命令（kill / kill-all / prune）⚠️ 标记；`hs version` 保持机器可读格式不变
 
 ### Notes
-- 新增测试模块 `tests/test_cl008_web_domain_guard.py`（18 用例）+ `tests/test_help_format.py`（10 用例）；全量 **678 passed**（+28）
+- 新增测试模块 `tests/test_cl008_web_domain_guard.py`（31 用例，含 round-2 SEC-001/002 回归）+ `tests/test_help_format.py`（10 用例）；全量 **691 passed**
+- round-2 复审面复跑：`cl005-verify.py --only A12` PASS；`port-flag-verify.py` 31/31 PASS（含 A14）；`port-residual-verify.py` 13/13 PASS（含 A9）
 - 兼容性：JSON 信封字段零变更（只增 `domain_risk`）；退出码语义不变
-- 设计件：`documents/http-server-cl008-web-domain-guard-design-v1.0-20261015.md`
+- 设计件：`documents/http-server-cl008-web-domain-guard-design-v1.0-20261015.md`；审计件：`documents/review/http-server-cli-cl008-audit-v1.0-20261015.md`
 
 ## 1.5.0 (2026-10-13)
 

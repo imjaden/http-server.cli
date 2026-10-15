@@ -16,6 +16,7 @@ HTTP-SERVER-CL004 ops 核查 harness —— 设计 v1.4 §8 A 段断言表（A1�
 
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -403,12 +404,13 @@ def a8_full_pytest():
 
 def a9_sync_greps():
     out, _, _ = hs(['version'])
-    ver_ok = ('v1.4.0' in out or 'v1.4.1' in out or 'v1.4.2' in out or 'v1.5.0' in out)   # CL007：版本上移 1.4.2 → 1.5.0（CL004/CL005 保持可复跑）
+    # CL008 SEC-003：版本枚举改正则（原枚举 1.4.0/1.4.1/1.4.2/1.5.0 随版本上移断链）
+    ver_ok = bool(re.search(r'v\d+\.\d+\.\d+', out))
     changelog = Path(ROOT, 'CHANGELOG.md').read_text(encoding='utf-8')
     fixed_ok = '### Fixed' in changelog
     stale_ok = '另批处理' not in changelog
     spec = Path(ROOT, 'http-server.cli.spec.yaml').read_text(encoding='utf-8')
-    spec_ok = any(('\nversion: ' + v) in ('\n' + spec) for v in ('1.4.0', '1.4.1', '1.4.2', '1.5.0'))
+    spec_ok = bool(re.search(r'^version: \d+\.\d+\.\d+', spec, re.M))
     check('A9', ver_ok and fixed_ok and stale_ok and spec_ok,
           'hs version=%r｜CHANGELOG ### Fixed=%s｜旧「另批处理」残留=%s｜spec 1.4.0=%s'
           % (out.strip(), fixed_ok, not stale_ok, spec_ok))

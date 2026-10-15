@@ -38,8 +38,9 @@ description: 跨项目 web 服务注册管理 — hs web 命令速查 + 其他�
 - **--url** 可选：固定端口服务填 url → web 先探测，可达则幂等直达（不执行 cmd）；**动态端口服务（启动前未知端口）不填** → 直接透传 cmd
 - **--open** 开浏览器策略（默认 `url`）：`url`=web 统一开 / `cmd`=命令自带 -o / `both`=都试 / `none`=不开
 - **--domain** 布尔：执行时把 `config.json` 的 domain 注入 cmd 末尾（`cmd ... --domain "<domain>"`），适合服务需要绑定域名参数（如 `dk server start --daemon --open` → 追加 `--domain "jaden.local"`）
-  - **语义边界（CL008）**：`--domain` 仅当 cmd 自身的 server start 支持 `--domain` 时可用（如 `dk` / `daily-checker`）；**cmd 为 hs 型时 domain 由 config.json 统一决定**（`hs set domain`），重复注入既是双源也是故障源（hs 自身无 `--domain`，CL007 fail-closed 后注入必挂 exit 2）
-  - **防呆（CL008）**：`hs web add/update` 检测到 `use_domain=true` + hs 型 cmd → fail-closed（exit 2）；`--force-domain` 逃生开关绕过
+  - **语义边界（CL008）**：`--domain` 仅当 cmd 自身的 server start 支持 `--domain` 时可用（如 `dk` / `daily-checker`）；**hs 型 cmd 时 domain 由 config.json 统一决定**（`hs set domain`），重复注入既是双源也是故障源（hs 自身无 `--domain`，CL007 fail-closed 后注入必挂 exit 2）
+    - **hs 型 cmd 判据（CL008 SEC-001 收窄）**：首 token 为 `hs`（大小写不敏感），或首 token 经 `~` 展开后 `basename` 为 `hs`/`hs.exe`（覆盖 `./hs`、`~/bin/hs`、`/usr/local/bin/hs`）；**不识别** `env hs …` / `command hs …` / `sh -c 'hs …'` 包装形态
+  - **防呆（CL008）**：`hs web add/update` 检测到有效态 `use_domain=true` + hs 型 cmd → fail-closed（exit 2）；`--force-domain` 逃生开关绕过；update 按「更新后的有效状态」判定（含未传 `--domain` 的既有态）
   - **存量标记（CL008）**：`hs web list/show` 对 hs 型 + use_domain=true 条目打 `⚠️` 风险标记；JSON 信封新增 `domain_risk` 字段
 
 ## 执行语义（hs web <name>）
