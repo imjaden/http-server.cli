@@ -1313,3 +1313,55 @@ CL005 实现审计 round-2 收口复审（只审闭合面 + 回归）。基线 5
 | HM-CL005-OBS-001 | 测试 dashboard daemon 泄漏（test_dashboard.py，既有） | 🟢 | P2 | 记录（下批 test 收口清理） |
 
 
+---
+
+## 2026-10-15 — Implementation audit: HTTP-SERVER-CL008（web --domain 防呆 + 横幅修正 + help 规范化）
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（代码审计 — CLI 写路径防呆 + JSON 信封兼容 + help 契约 + 自证工具链）
+- **Scope**: 单 commit `0e6ee00`（ahead 1，未 push；14 文件 +738/−145）= A1 cmd_failed 横幅修正 + A2 hs 型 cmd `--domain` fail-closed + A3 `domain_risk` 风险标记 + A4 文档语义边界 + help 规范化（hs help + web/dashboard/mcp/bookmark 子命令，对齐治理规范 §8 hm-style）；设计件 `documents/http-server-cl008-web-domain-guard-design-v1.0-20261015.md`
+- **Commit(s)**: `0e6ee00`（基线 `f4633b6`）
+- **Verdict**: ⚠️ CONDITIONAL PASS
+- **Score**: 82 / 100 (Rating: B)
+- **Report**: documents/review/http-server-cli-cl008-audit-v1.0-20261015.md
+- **push**: ❌ 未 push（3×🟡 待闭合）
+
+### Summary
+
+CL008 实现审计（单 commit、两主题）。独立复算：全量 **678 passed**（`.venv` py3.11.15；基线 `f4633b6` 同解释器 646 passed + 4 failed = **650**，4 处失败即本 commit 更新的 4 断言，因 editable 指向主仓 src 属版本偏斜非基线红；678 = 650 + 18 CL008 + 10 help，与 features.md 21/678、spec 1.5.1 自洽）。**PASS 项**：A1 横幅解耦到位（`cmd_failed` → stderr `❌ Service '<name>' failed (exit N)`，✅ 仅 `exit_code=0`，JSON 分支 diff 未触碰 → 字段零变更）；A3 仅运行时富化（`list --json` 前后 `services.json` 逐字节一致、落盘无 `domain_risk` 键，真机 11 条零假阳性）；A6 真机态已清（`daily-tracker`/`local.jaden.tech` 均 `use_domain=false`，`hs web list` 零 ⚠️）；help 与 `hm help` 实机逐字同形（`📖 http-server · 1.5.1(20261015) · 别名 hs` vs `📖 hermes-manager · 1.10(20261013) · 别名 hm,hermes-manager`），`_HELP` 模板花括号仅 `{version}`/`{date}`（无 `KeyError` 隐患），`hs version` 保持机器可读（E1 兑现），空参 exit 2 契约不变（CL007 A2）。**3×🟡**：(1) `_is_hs_cmd` 绕过面使防呆与 A3 标记**双重失效**——实测 `add --cmd '~/bin/hs …' --domain` rc=0 注册成功且该条目 `list` 无 ⚠️（`./hs`/`sh -c`/非同一 PATH 绝对路径同理，`shutil.which` 缺 hs 时 fail-open）；(2) A2 update 判据取「本次是否传 --domain」而非「更新后有效状态」——`update --cmd '<hs …>'`（既有 use_domain=true）rc=0 直接重建 R4 风险态，与 AC A2 字面不符（实测）；(3) 1.5.1 未同步历史 harness 白名单（CL007 有先例）——直调 `cl005-verify.py::a12_sync` 返回 **`[FAIL] A12 version=False features=False spec=False`**，`port-flag-verify.py:274`、`port-residual-verify.py:406,411` 同族断言均 False，本批 ops 证据链断。4×🟢 记录（`--plain` 无风险标记 / `--no-domain --domain` 同给提示自相矛盾 / 请求「668 基线」口径 / §8 空参返回码有意偏差）。全程探针在 `HS_DATA_DIR` 沙箱，真实 registry/services 零污染。结论：**CONDITIONAL PASS，本轮不 push**；3 🟡 修复（合计约 10 行 + harness 白名单正则化）后走 round-2 限定复审。
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| HM-CL008-SEC-001 | 🟡 | `_is_hs_cmd` 绕过面（`~/bin/hs`/`./hs`/`sh -c`/PATH 依赖）→ 防呆与 A3 标记双重失效（fail-open） | `cli.py:1515-1538` | 待修 |
+| HM-CL008-SEC-002 | 🟡 | update 判据用「是否传 --domain」代替「有效状态」→ 重建风险态（AC A2 字面偏差） | `cli.py:1964-1973` | 待修 |
+| HM-CL008-SEC-003 | 🟡 | 1.5.1 未同步历史 harness 白名单 → cl005/port-flag/port-residual 复跑即红 | `scripts/cl005-verify.py:504-516`、`port-flag-verify.py:274`、`port-residual-verify.py:406,411` | 待修 |
+| HM-CL008-OBS-001 | 🟢 | `list --plain` 路径无 ⚠️ 风险标记 | `cli.py:1762-1765` | 记录 |
+| HM-CL008-OBS-002 | 🟢 | `--no-domain --domain` 同给仍 exit 2，提示与用户已给参数自相矛盾 | `cli.py:1964` | 记录（随 SEC-002 收敛） |
+| HM-CL008-OBS-003 | 🟢 | 请求/TODO「668 passed 基线」与实测 650→678 不符（仓库文档自洽） | 请求件 / `cache/draft/TODO-20261015.md` | 记录 |
+| HM-CL008-OBS-004 | 🟢 | 治理 §8「空参 → help」返回 0 范例 vs 本仓 exit 2（有意偏差，CL007 A2 已裁定） | `cli.py:2144-2147` | 记录 |
+
+### Positives
+
+- A1 横幅与退出码语义彻底解耦（非「补一句 warning」与旧 ✅ 共存），且 JSON 分支零变更 → 两条通道同时自洽
+- A3 以「只增字段 + 零数据迁移」实现兼容，`domain_risk` 不落盘（`list --json` 前后 `services.json` 逐字节一致），真机零假阳性
+- A6 存量止血可核：真机服务注册表两条 `use_domain=false`，与「真机复跑无 ❌/⚠️」声明互证
+- help 与参照实机（`hm help`）逐字同形，`_help_text()` 单一入口收敛三处散落调用；`hs version` 机器可读格式 E1 兑现
+- 新测试断言落在契约上（零副作用 / JSON 三字段兼容 / escape hatch 生效 / 非首 token 负例），而非仅断言退出码
+- 审计结论全部由沙箱探针 + harness 直调产出，未采信 dev 自评口径
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| HM-CL008-SEC-001 | `_is_hs_cmd` 绕过面使防呆 + A3 标记双重失效 | 🟡 | P1 | 待修（回 ops → round-2） |
+| HM-CL008-SEC-002 | update 有效态判据缺失（AC A2 偏差） | 🟡 | P1 | 待修（回 ops → round-2） |
+| HM-CL008-SEC-003 | 历史 harness 版本白名单未随 1.5.1 同步 | 🟡 | P1 | 待修（回 ops → round-2） |
+| HM-CL008-OBS-001 | `list --plain` 无风险标记 | 🟢 | P2 | 记录 |
+| HM-CL008-OBS-002 | `--no-domain --domain` 同给提示矛盾 | 🟢 | P2 | 记录（随 SEC-002） |
+| HM-CL008-OBS-003 | 「668 基线」口径勘误 | 🟢 | P2 | 记录 |
+| HM-CL008-OBS-004 | §8 空参返回码有意偏差 | 🟢 | P2 | 记录 |
+
+
+

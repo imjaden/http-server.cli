@@ -297,3 +297,13 @@ review_history:
     tracking: HTTP-SERVER-CL005 (R-16~R-23)
     scope: "Design doc rereview: http-server-cl005-hardening-design-v1.2-20260923.md (commit 502a114) — round-3 限定复审(只审 F-2a/F-4a/N-2/N-4 闭合 + 本版增量 M-1~M-5); 四项全闭合(F-2a clock_gettime(CLOCK_MONOTONIC) 双解释器跨进程可比 236357s + 删负龄规则 fail-closed 无双持有; F-4a 63 点判定表 stdout23/stderr38/分叉2 + §4.1 穷举 12 必改与全量 grep 逐条对上; N-2 命中且就绪措辞; N-4 裸 print 303 处结构性兜底成立); 8 🟢 记录 R-16~R-23(T26 阈值容器假失败/§5 漏容器+跨平台/sleep-inclusive TTL 语义/D1.3 两处措辞失实/A12 features 计数应为模块数/D9 计数/§2.1#7 标签/端口 LISTEN 精确化) 非阻断"
     report: documents/review/http-server-cli-cl005-design-rereview2-v1.0-20260923.md
+  - date: 2026-10-15
+    reviewer: Security Reviewer (review profile)
+    review_level: L2
+    verdict: CONDITIONAL_PASS
+    score: 82
+    findings_total: 7
+    findings_open: 3
+    tracking: HTTP-SERVER-CL008 (HM-CL008-SEC-001~003 待修; HM-CL008-OBS-001~004 记录)
+    scope: "Implementation audit：HTTP-SERVER-CL008（单 commit 0e6ee00，ahead 1 未 push）— A1 cmd_failed 横幅修正／A2 hs 型 cmd --domain fail-closed／A3 domain_risk 风险标记／A4 文档语义边界／help 规范化（治理 §8 hm-style，hs + web/dashboard/mcp/bookmark）；独立复算 678 passed（基线 f4633b6 = 650：646 passed + 4 failed，4 处即本 commit 更新的断言且因 editable 指向主仓 src 属版本偏斜）｜PASS 项：A1 横幅解耦 + JSON 信封零变更、A3 仅运行时富化（list --json 前后 services.json 逐字节一致、不落盘）、A6 真机 daily-tracker／local.jaden.tech 已 use_domain=false 且零 ⚠️、help 与 hm help 实机逐字同形、hs version 机器可读保持（E1）、空参 exit 2 契约不变（CL007 A2）｜3×🟡：SEC-001 _is_hs_cmd 绕过面（~/bin/hs、./hs、sh -c、PATH 依赖的绝对路径）致防呆与 A3 标记双重失效（实测 ~/bin/hs + --domain rc=0 注册风险态且 list 无 ⚠️）／SEC-002 update 判据取「本次是否传 --domain」而非有效状态（update --cmd hs 型 在 use_domain=true 条目上 rc=0 重建 R4 风险态，AC A2 字面偏差）／SEC-003 1.5.1 未同步历史 harness 白名单（直调 cl005-verify a12_sync = FAIL version=False features=False spec=False；port-flag-verify:274 与 port-residual-verify:406,411 同族 False）｜4×🟢 记录（list --plain 无标记／--no-domain --domain 同给提示矛盾／请求 668 基线口径／§8 空参返回码有意偏差）｜全程 HS_DATA_DIR 沙箱，真实数据零污染；未 push，3 🟡 修复后 round-2 限定复审"
+    report: documents/review/http-server-cli-cl008-audit-v1.0-20261015.md
