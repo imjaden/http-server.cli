@@ -191,7 +191,7 @@ class TestWebExitCodes:
                             types.SimpleNamespace(run=lambda *a, **kw: mock))
         assert self._run_web(['a', '--no-probe']) == 1              # F-3：cmd 失败 → 1
         captured = capsys.readouterr()
-        assert 'exited with code 3' in captured.err
+        assert 'failed (exit 3)' in captured.err  # CL008 A1：不再打印 ✅ 成功横幅
 
     def test_t13b_run_cmd_failure_json_envelope(self, capsys, monkeypatch):
         import types

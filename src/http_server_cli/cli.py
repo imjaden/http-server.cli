@@ -10,7 +10,7 @@ import subprocess
 import sys
 import webbrowser
 
-from http_server_cli import __version__
+from http_server_cli import __version__, __release_date__
 from http_server_cli.config import Config
 from http_server_cli.server import ServerManager, UsageError
 from http_server_cli.utils import eprint, print_msg, ensure_storage
@@ -89,7 +89,7 @@ def _fail_unknown_args(rest, prog: str, *, json_mode: bool = False) -> None:
     if not rest:
         return
     if any(t in _HELP_ALIASES for t in rest):
-        print(_HELP.format(version=__version__))
+        print(_help_text())
         sys.exit(0)
     if any(t in _VERSION_ALIASES for t in rest):
         print(f'http-server v{__version__}')
@@ -131,91 +131,112 @@ def _parse_known_args(parser, args, *, allow=(), allow_html: bool = False,
 
 # ── 帮助文本 ──────────────────────────────────────────
 
-_HELP = """http-server v{version} — 忘记端口，只管预览
+_HELP = """============================================================
+📖 http-server · {version}({date}) · 别名 hs
+============================================================
+【功能概述】
+  忘记端口，只管预览 — 基于 python3 -m http.server 的本地静态服务管理器
+  端口自动分配 · 进程追踪 · 书签直达 · 跨项目 web 服务注册 · Web 面板 · MCP 集成
 
-用法:  hs [command] [args]
+── 日常预览 ──
+  start [path]
+            启动静态服务（path 默认当前目录）
+            -o 开浏览器 / -d 后台（前台 tail 日志）/ -i <file> 首页 /
+            -p <port> 指定端口（1024-65535；被占用即失败退出，不自动漂移）
+  <path>
+            隐式启动简写（省略 start）：hs -o · hs ~/my-site -o · hs . -i app.html
+  <name>
+            书签或 web 注册名直达：hs <name> -o · hs <name> --url
 
-━━━ 日常预览 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+── 服务管理 ──
+  list
+            列出运行中服务（端口/路径/PID/CPU/内存）
+            --port 仅端口清单 / --path 仅路径清单 / --short "端口:路径"
+  status <port|path>
+            查询指定服务状态
+  ⚠️ kill <port|path>
+            关闭单个服务（按端口或路径匹配）
+  ⚠️ kill-all
+            关闭所有运行中服务
+  history [--json]
+            历史启动记录
+  search <keyword>
+            模糊搜索实例（端口/路径，忽略大小写）
+  ⚠️ prune [-n|--dry-run]
+            清理 registry 中 pid 已退出的陈旧登记（-n 仅预览）
 
-  hs -o                    当前目录启动 + 打开浏览器
-  hs ~/my-site -o          指定目录启动 + 打开浏览器
-  hs . -i app.html         指定首页文件
-  hs . -p 8099             指定端口（1024-65535；被占用即失败退出，不自动漂移）
-  hs . -d                  后台运行 + 前台 tail 日志（Ctrl+C 仅退出 tail，服务仍在后台）
-  hs . --url               仅返回服务 URL（与 --json 互斥）
-  hs                       无参数 → 打印本用法并退出非 0（不启动服务）；等价启动用 hs .
+── 图形与集成 ──
+  dashboard [start]
+            启动 Web 管理面板（后台运行，默认端口 8180）
+            -o 打开浏览器 / --json 一次性查询服务列表
+  dashboard stop|status|restart [-p <port>]
+            停止 / 查看状态 / 重启面板（未运行时提示 not running，不启动）
+  mcp [start]|stop|status|restart
+            启动 MCP Server（后台 SSE，AI Agent 集成）/ 停止 / 状态 / 重启
+  prompt [<name>]
+            列出可用技能；带 <name> 输出技能全文（AI 对接）
 
-  快捷方式: hs start [path]  启动服务;  -o 打开浏览器  -d 后台（前台 tail 日志）  -i <file> 首页  -p <port> 指定端口
+── 配置 ──
+  config
+            查看当前配置（默认端口/域名）
+  set port <N>
+            修改默认端口
+  set domain <d>
+            修改绑定域名
 
-━━━ 服务管理 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+── 书签 ──
+  bookmark add <name> [path] [-i <index>]
+            注册书签（path 默认当前目录）
+  bookmark update <name> [path] [-i <index>]
+            更新书签路径或首页
+  bookmark list|show <name>|remove <name>
+            列出 / 查看 / 删除书签
 
-  hs list                  列出所有运行中的服务（端口/路径/PID/CPU/内存）
-  hs list --port           仅打印端口号清单（布尔开关；指定启动端口用 hs start -p <N>）
-  hs list --path           仅打印路径清单
-  hs list --short          打印"端口:路径"清单
-  hs status 8080           查询端口 8080 状态
-  hs kill 8080             关闭端口 8080 的服务
-  hs kill ~/my-site        关闭指定路径的服务
-  hs kill-all              一键关闭所有服务
-  hs history               显示所有历史启动记录
-  hs history --json        JSON 格式输出历史记录
-  hs search <keyword>      搜索实例（按端口或路径模糊匹配，忽略大小写）
-  hs prune                 清理 registry 中已退出进程的陈旧登记（-n/--dry-run 仅预览）
+── Web 服务注册 ──
+  web add <name> --cmd '<cmd>' [--url <url>] [--open cmd|url|both|none] [--domain] [--port <N>]
+            注册任意启动命令（跨项目，如 dk server start --daemon --open）
+  web update <name> [--cmd ...] [--url ...] [--open ...] [--domain|--no-domain] [--port <N>|--no-port]
+            更新注册（--url '' / --no-domain / --no-port 清除）
+  web list|show <name>|remove <name>
+            列出 / 查看 / 删除注册
+  web <name> [--no-probe]
+            执行：已运行→直接访问（幂等）；未运行→执行启动命令
+  web help
+            子命令帮助（--domain / --force-domain / --port 详解）
 
-  --json                   所有命令后追加此参数可获取结构化 JSON 输出
-  --url                    启动后仅输出完整 URL 字符串（仅 start，与 --json 互斥）
+── 帮助 ──
+  version
+            版本信息（{version}({date})）
+  help
+            此帮助信息（子命令: hs web help / dashboard help / mcp help / bookmark help）
 
-━━━ 图形与集成 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+── 选项 ──
+  --json         结构化 JSON 输出（所有管理命令可追加）
+  --url          仅输出完整 URL 字符串（仅 start，与 --json 互斥）
 
-  hs dashboard -o          打开 Web 管理面板（自动后台运行，默认端口 8180）
-  hs dashboard --json      一次性查询服务列表
-  hs dashboard stop        停止仪表盘
-  hs dashboard status      查看仪表盘状态
-  hs dashboard restart     重启仪表盘（未运行时提示 not running，不启动）
-  hs dashboard restart -p 8290   用指定端口重启（未给 -p 则沿用当前端口）
-  hs mcp                   启动 MCP Server（后台运行 SSE，AI Agent 集成）
-  hs mcp stop              停止 MCP 服务
-  hs mcp status            查看 MCP 状态
-  hs prompt                列出可用技能（AI 对接，`hs prompt <name>` 输出全文）
-
-━━━ 配置 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  hs config                查看当前配置（默认端口/域名）
-  hs set port 3000         修改默认端口
-  hs set domain 0.0.0.0    修改绑定域名
-
-━━━ 书签 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  hs bookmark add <name> [path] [-i index]    注册书签（path 默认 CWD）
-  hs bookmark update <name> [path] [-i index]  更新书签路径或首页
-  hs bookmark list                             列出所有书签
-  hs bookmark show <name>                      查看书签详情
-  hs bookmark remove <name>                    删除书签
-
-  注册后直接用名称启动:
-    hs <name> --url        获取 URL
-    hs <name> -o           启动 + 打开浏览器
-    hs kill <name>         停止服务
-
-━━━ Web 服务注册 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  hs web add <name> --cmd '<cmd>' [--url <url>] [--open cmd|url|both|none] [--domain]
-  hs web list / show <name> / remove <name> / update <name>
-  hs web <name> [--no-probe]      已运行→直接访问; 未运行→执行启动命令
-
-  注册任意 web 服务启动命令（可跨项目），按名称快速启动/访问:
-    hs web daily.checker        启动/访问 daily-checker 面板
-    hs web jaden.tech           启动/访问 jaden.tech 站点
-    hs web <name> --no-probe    跳过探测，强制重启
-    --domain                    执行时注入 config.domain（--domain "<domain>"）
-
-━━━ 其他 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  hs version               显示版本号
-  hs help                  显示此帮助
+📋 示例:
+  hs -o                                  # 当前目录起服务 + 开浏览器
+  hs ~/my-site -o                        # 指定目录
+  hs . -i app.html -p 8099               # 指定首页 + 端口
+  hs . -d                                # 后台运行（前台 tail 日志）
+  hs list --short                        # "端口:路径" 清单
+  hs status 8080                         # 查询端口状态
+  hs kill 8080                           # 关闭服务
+  hs bookmark add blog ~/blog -i index.html
+  hs blog -o                             # 书签名直达
+  hs web add dk --cmd 'dk server start --daemon --open' --domain
+  hs web daily.checker                   # web 注册直达（幂等）
+  hs dashboard -o                        # Web 管理面板
+  hs prune -n                            # 预览陈旧登记
 
 数据目录: ~/.http-server.cli/（config.json / registry.json / logs/）
 """
+
+
+def _help_text():
+    """主帮助文本（版本行含版本号 + 发布日, hm-style；CL008 后续改造）。"""
+    return _HELP.format(version=__version__,
+                        date=__release_date__.replace('-', ''))
 
 # ── Set 子命令 ─────────────────────────────────────────
 
@@ -678,7 +699,7 @@ def _cmd_search(manager, args):
 
 @_register
 def _cmd_help(manager, args):
-    print(_HELP.format(version=__version__))
+    print(_help_text())
 
 @_register
 def _cmd_version(manager, args):
@@ -740,16 +761,30 @@ def _manage_dashboard(subcmd: str, json_mode: bool = False, port=None) -> None:
     entry = mreg.find(name='dashboard')
 
     if subcmd == 'help':
-        print('━━━ hs dashboard ━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-        print('  hs dashboard              Foreground start (debug mode)')
-        print('  hs dashboard -o           Background + open browser')
-        print('  hs dashboard -d           Background daemon')
-        print('  hs dashboard -p PORT      Specify port')
-        print('  hs dashboard --json       One-shot server list')
-        print('  hs dashboard stop         Stop dashboard')
-        print('  hs dashboard status       View status')
-        print('  hs dashboard restart      Restart dashboard')
-        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+        print('============================================================')
+        print('📖 http-server · dashboard 服务')
+        print('============================================================')
+        print('【功能概述】')
+        print('  Web 管理面板（服务列表/资源监控），默认端口 8180')
+        print()
+        print('── 命令 ──')
+        print('  [start]')
+        print('            前台启动（debug 模式）')
+        print('            -o 后台 + 开浏览器 / -d 后台守护 / -p <port> 指定端口')
+        print('  stop')
+        print('            停止面板')
+        print('  status')
+        print('            查看面板状态')
+        print('  restart [-p <port>]')
+        print('            重启面板（未运行时提示 not running，不启动；-p 切换端口）')
+        print()
+        print('── 选项 ──')
+        print('  --json       一次性查询服务列表（不启动面板）')
+        print()
+        print('📋 示例:')
+        print('  hs dashboard -o                      # 后台启动 + 开浏览器')
+        print('  hs dashboard --json                  # 一次性查询服务列表')
+        print('  hs dashboard restart -p 8290         # 指定端口重启')
         return
 
     if subcmd in ('stop', 'status', 'restart') and not entry:
@@ -1009,14 +1044,28 @@ def _manage_mcp(subcmd: str, json_mode: bool = False) -> None:
     entry = mreg.find(name='mcp')
 
     if subcmd == 'help':
-        print('━━━ hs mcp ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-        print('  hs mcp                    Background SSE (default)')
-        print('  hs mcp --transport stdio  Foreground stdio mode')
-        print('  hs mcp --port PORT        Specify port')
-        print('  hs mcp stop               Stop MCP service')
-        print('  hs mcp status             View status')
-        print('  hs mcp restart            Restart MCP service')
-        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+        print('============================================================')
+        print('📖 http-server · MCP 服务')
+        print('============================================================')
+        print('【功能概述】')
+        print('  MCP Server（SSE/stdio，AI Agent 集成）')
+        print()
+        print('── 命令 ──')
+        print('  [start]')
+        print('            后台启动 SSE（默认）')
+        print('            --transport stdio 前台 stdio 模式 / --port <port> 指定端口')
+        print('  stop')
+        print('            停止 MCP 服务')
+        print('  status')
+        print('            查看 MCP 状态')
+        print('  restart')
+        print('            重启 MCP 服务')
+        print()
+        print('📋 示例:')
+        print('  hs mcp                        # 后台 SSE 启动')
+        print('  hs mcp --transport stdio      # 前台 stdio 模式')
+        print('  hs mcp stop')
+        print('  hs mcp status')
         return
 
     if subcmd in ('stop', 'status', 'restart') and not entry:
@@ -1104,18 +1153,32 @@ def _cmd_bookmark(manager, args):
 
 
 def _bookmark_help():
-    print('━━━ hs bookmark ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    print('  hs bookmark add <name> [path] [-i index]     Add bookmark')
-    print('  hs bookmark update <name> [path] [-i index]   Update path and/or index')
-    print('  hs bookmark list                              List all')
-    print('  hs bookmark show <name>                       Show details')
-    print('  hs bookmark remove <name>                     Remove')
+    print('============================================================')
+    print('📖 http-server · 书签管理')
+    print('============================================================')
+    print('【功能概述】')
+    print('  书签 = 名称 → 静态目录映射，注册后可用名称直达启动')
     print()
-    print('  After adding, use the name directly:')
-    print('    hs <name> --url        Get URL')
-    print('    hs <name> -o           Start + open browser')
-    print('    hs kill <name>         Stop service')
-    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    print('── 命令 ──')
+    print('  add <name> [path] [-i <index>]')
+    print('            注册书签（path 默认当前目录）')
+    print('  update <name> [path] [-i <index>]')
+    print('            更新书签路径或首页')
+    print('  list')
+    print('            列出所有书签')
+    print('  show <name>')
+    print('            查看书签详情')
+    print('  remove <name>')
+    print('            删除书签')
+    print()
+    print('📋 示例:')
+    print('  hs bookmark add blog ~/blog -i index.html')
+    print('  hs blog -o                    # 书签名直达（启动 + 开浏览器）')
+    print('  hs blog --url                 # 仅获取 URL')
+    print('  hs bookmark list')
+    print('  hs bookmark remove blog')
+    print()
+    print('数据: ~/.http-server.cli/bookmarks.json')
 
 
 def _bookmark_add(args):
@@ -1449,23 +1512,77 @@ def _cmd_web(manager, args):
         _web_run(args)
 
 
+def _is_hs_cmd(cmd_line: str) -> bool:
+    """判断 cmd 首 token 是否为 hs（含绝对路径 symlink 解析）。"""
+    import shutil
+    import shlex
+    from pathlib import Path
+    try:
+        tokens = shlex.split(cmd_line)
+    except ValueError:
+        return False
+    if not tokens:
+        return False
+    first = tokens[0]
+    if first == 'hs':
+        return True
+    p = Path(first)
+    if p.is_absolute():
+        hs_bin = shutil.which('hs')
+        if hs_bin:
+            try:
+                if p.resolve() == Path(hs_bin).resolve():
+                    return True
+            except OSError:
+                pass
+    return False
+
+
 def _web_help():
-    print('━━━ hs web ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    print('  注册任意 web 服务启动命令，按名称快速启动/访问')
+    print('============================================================')
+    print('📖 http-server · web 服务注册')
+    print('============================================================')
+    print('【功能概述】')
+    print('  注册任意 web 服务启动命令（可跨项目），按名称快速启动/访问')
     print()
-    print("  hs web add <name> --cmd '<cmd>' [--url <url>] [--open cmd|url|both|none] [--domain] [--port <N>]")
-    print('      --cmd  启动命令（如 dk server start --daemon --open）')
-    print('      --url  服务 URL（固定端口必填；动态端口不填，启动前未知）')
-    print('      --open 开浏览器策略（默认 url: web 统一开; cmd: 命令自带 -o; both: 都试; none: 不开）')
-    print('      --domain 执行时注入 config.domain 到 cmd 末尾（--domain "<domain>"）')
-    print('      --port 执行时注入 --port <N> 到 cmd 末尾（1024-65535；与 --domain 同时开启时顺序为 domain 先 port 后）')
-    print('      --no-port 清除端口注入')
-    print('  hs web update <name> [--cmd ...] [--url ...] [--open ...] [--domain|--no-domain] [--port <N>|--no-port]')
-    print('  hs web list [--json|--plain] [--sort-by name|cmd+url] / show <name> / remove <name>')
-    print('  hs web <name> [--no-probe]   执行：已运行→直接访问；未运行→执行启动命令')
-    print('      --no-probe 跳过探测，总是执行启动命令（强制重启）')
-    print('  hs web help')
-    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    print('── 命令 ──')
+    print("  add <name> --cmd '<cmd>' [--url <url>] [--open cmd|url|both|none] [--domain] [--port <N>]")
+    print('            注册新服务（--cmd 必填；name 冲突 / 非法 url·open 退出 2）')
+    print('  update <name> [--cmd ...] [--url ...] [--open ...] [--domain|--no-domain] [--port <N>|--no-port]')
+    print("            更新注册（清除语义: --url '' / --no-domain / --no-port）")
+    print('  list [--json|--plain] [--sort-by name|cmd+url]')
+    print('            列出所有注册（风险条目带 ⚠️ 标记）')
+    print('  show <name> [--json]')
+    print('            查看注册详情')
+    print('  remove <name> [--json]')
+    print('            删除注册')
+    print('  <name> [--no-probe]')
+    print('            执行：已运行→直接访问（幂等）；未运行→执行启动命令')
+    print('  help')
+    print('            此帮助')
+    print()
+    print('── 选项 ──')
+    print('  --cmd            启动命令（如 dk server start --daemon --open）')
+    print('  --url            服务 URL（固定端口必填；动态端口不填，启动前未知）')
+    print('  --open           开浏览器策略（默认 url: web 统一开 / cmd: 命令自带 -o / both / none）')
+    print('  --domain         执行时注入 config.domain 到 cmd 末尾')
+    print('                   仅 cmd 自身支持 --domain 时可用（dk/daily-checker）；hs 型 cmd 的')
+    print('                   domain 由 config.json 统一决定（hs set domain），重复注入既双源又故障源')
+    print('  --force-domain   跳过 hs 型 cmd 的 --domain 防呆检查（逃生开关）')
+    print('  --port           执行时注入 --port <N>（与 --domain 同开时 domain 先 port 后）')
+    print('  --no-port        清除端口注入')
+    print('  --no-probe       跳过探测，总是执行启动命令（强制重启）')
+    print('  --json           结构化 JSON 输出')
+    print()
+    print('📋 示例:')
+    print("  hs web add dk --cmd 'dk server start --daemon --open' --domain")
+    print("  hs web add blog --cmd 'python3 -m http.server 9000' --url http://127.0.0.1:9000")
+    print('  hs web list')
+    print('  hs web show dk --json')
+    print('  hs web dk                               # 直达（幂等）')
+    print('  hs web dk --no-probe                    # 强制重启')
+    print()
+    print('数据存储: ~/.http-server.cli/services.json')
 
 
 def _web_add(args):
@@ -1481,6 +1598,8 @@ def _web_add(args):
     parser.add_argument('--no-port', dest='no_port', action='store_true',
                         help='不注入端口（清除既有 port 配置）')
     parser.add_argument('--force', action='store_true')
+    parser.add_argument('--force-domain', action='store_true',
+                        help='跳过 hs 型 cmd 的 --domain 防呆检查（逃生开关）')
     parser.add_argument('--json', action='store_true')
     parsed, _ = _parse_known_args(parser, args)
 
@@ -1542,6 +1661,16 @@ def _web_add(args):
         else:
             print(f'❌ {err}', file=sys.stderr)
         sys.exit(2)   # CL004 D3
+
+    # A2 CL008: hs 型 cmd + --domain → fail-closed（hs 自身无 --domain）
+    if parsed.domain and not parsed.force_domain and _is_hs_cmd(parsed.cmd):
+        err = ("hs 型 cmd 不支持 --domain 注入（hs 自身无该 flag）；"
+               "请用 --no-domain 或不加 --domain；若确认可注入，使用 --force-domain")
+        if json_mode:
+            json_output(False, cmd, error=err)
+        else:
+            print(f'❌ {err}', file=sys.stderr)
+        sys.exit(2)
 
     store = ServiceStore()
     try:
@@ -1613,6 +1742,10 @@ def _web_list(args):
 
     services.sort(key=sort_key)
 
+    # A3 CL008: enrich domain_risk for JSON + human risk markers
+    for svc in services:
+        svc['domain_risk'] = bool(svc.get('use_domain') and _is_hs_cmd(svc['cmd']))
+
     if parsed.json:
         json_output(True, cmd, data={
             'count': len(services),
@@ -1638,6 +1771,8 @@ def _web_list(args):
         line = f"     👁  Open: {svc.get('open', 'url')}"
         if svc.get('use_domain'):
             line += ' 🏷  Domain: on'
+        if svc.get('domain_risk'):
+            line += ' ⚠️  hs cmd 不支持 --domain，执行将 exit 2'
         if svc.get('use_port'):
             line += f" 🔌 Port: {svc.get('port')}"
         print(line)
@@ -1680,6 +1815,9 @@ def _web_show(args):
             print(f'❌ {err}', file=sys.stderr)
         sys.exit(1)   # CL005 D2：名不存在 = 运行期失败
 
+    # A3 CL008: enrich domain_risk for JSON + human risk markers
+    svc['domain_risk'] = bool(svc.get('use_domain') and _is_hs_cmd(svc['cmd']))
+
     if parsed.json:
         json_output(True, cmd, data=svc)
         return
@@ -1691,6 +1829,8 @@ def _web_show(args):
     print(f"   👁  Open: {svc.get('open', 'url')}")
     if svc.get('use_domain'):
         print('   🏷  Domain: on (inject config.domain at run)')
+    if svc.get('domain_risk'):
+        print('   ⚠️  hs cmd 不支持 --domain，执行将 exit 2（CL008）')
     if svc.get('use_port'):
         print(f"   🔌 Port: on (inject --port {svc.get('port')} at run)")
     print(f"   🕐 Created: {svc.get('created_at', '-')}")
@@ -1750,6 +1890,8 @@ def _web_update(args):
                         help='执行时注入 --port <N> 到 cmd 末尾（1024-65535，D9b）')
     parser.add_argument('--no-port', dest='no_port', action='store_true',
                         help='不注入端口（同时清除 port 值）')
+    parser.add_argument('--force-domain', action='store_true',
+                        help='跳过 hs 型 cmd 的 --domain 防呆检查（逃生开关）')
     parser.add_argument('--json', action='store_true')
     parsed, _ = _parse_known_args(parser, args)
 
@@ -1818,6 +1960,18 @@ def _web_update(args):
         else:
             print(f'❌ {err}', file=sys.stderr)
         sys.exit(2)   # CL004 D3
+
+    # A2 CL008: hs 型 cmd + --domain → fail-closed（hs 自身无 --domain）
+    if parsed.domain and not parsed.force_domain:
+        effective_cmd = parsed.cmd if parsed.cmd is not None else existing['cmd']
+        if _is_hs_cmd(effective_cmd):
+            err = ("hs 型 cmd 不支持 --domain 注入（hs 自身无该 flag）；"
+                   "请用 --no-domain 或不加 --domain；若确认可注入，使用 --force-domain")
+            if json_mode:
+                json_output(False, cmd, error=err)
+            else:
+                print(f'❌ {err}', file=sys.stderr)
+            sys.exit(2)
 
     # --no-domain 优先（清除语义，对齐 --url ''）
     use_domain = None
@@ -1957,11 +2111,12 @@ def _web_run(args):
         else:
             json_output(True, cmd, data=payload)
     else:
-        print(f"✅ Service '{parsed.name}' started")
-        if url:
-            print(f"   🌐 {url}")
         if cmd_failed:
-            print(f'   ⚠️ Cmd exited with code {result.returncode}', file=sys.stderr)
+            print(f"❌ Service '{parsed.name}' failed (exit {result.returncode})", file=sys.stderr)
+        else:
+            print(f"✅ Service '{parsed.name}' started")
+            if url:
+                print(f"   🌐 {url}")
     if cmd_failed:
         sys.exit(1)   # CL005 D2：cmd 退出码非 0 = 运行期失败
 
@@ -1989,7 +2144,7 @@ def main():
             cmd = 'start'
         else:
             # A2：真正裸调用（无路径 / 无命令 / 无参数）不得静默在当前目录起服务
-            print(_HELP.format(version=__version__))
+            print(_help_text())
             sys.exit(2)
     elif cmd not in _COMMANDS:
         # ➊ 先查 bookmark

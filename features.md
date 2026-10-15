@@ -60,7 +60,9 @@
 16. 退出码三态扩展（O7/O8 收口，HTTP-SERVER-CL005）— `hs set` / `hs search` 用法错误 → 2（缺参 / 越界 / 非数字 / domain 字符集 / 未知键 / 缺 keyword）；`hs dashboard` / `hs mcp` 的 `stop`・`restart` 未运行 → 1（`status` 查询仍 0）；`--json` 一律先给可解析失败信封 ✅
 17. 锁常量可调（O10 收口，HTTP-SERVER-CL005）— `HS_LOCK_TTL` / `HS_LOCK_WAIT` / `HS_LOCK_POLL` / `HS_LOCK_WRITE_GRACE` 环境变量覆盖，非法值退回默认 ✅
 18. `HS_DATA_DIR` 数据目录覆盖（O11 收口，HTTP-SERVER-CL005）— 数据目录可由环境变量指向任意路径（测试/CI 隔离）；子进程继承，daemon 登记不回写真实 `~/.http-server.cli` ✅
-19. 关联文档: HTTP-SERVER-CL001 review (documents/review/http-server-cli-web-registration-audit-v1.0-20260827.md) / HTTP-SERVER-CL002 review (documents/review/http-server-cli-cl002-web-domain-promo-audit-v1.0-20260827.md, documents/review/http-server-cli-cl002-sec023-1-domain-validation-rereview-v1.1-20260827.md)
+19. `--domain` 源头防呆 + 存量风险标记（HTTP-SERVER-CL008）— `hs web add/update` 检测到 `use_domain=true` + hs 型 cmd → fail-closed（exit 2）；`--force-domain` 逃生开关；`hs web list/show` 对 hs 型 + use_domain=true 条目打 `⚠️` 风险标记；JSON 信封新增 `domain_risk` 字段 ✅
+20. Help 打印规范化（hm-style grouped help）— `hs help` + 子命令 help（web/dashboard/mcp/bookmark）统一 `=`-rule + `📖` 标题 + 【功能概述】 + `── 分组 ──` 两行条目 + `── 选项 ──` + `📋 示例:`；危险命令 ⚠️ 标记；对齐治理规范 §8 ✅
+21. 关联文档: HTTP-SERVER-CL001 review (documents/review/http-server-cli-web-registration-audit-v1.0-20260827.md) / HTTP-SERVER-CL002 review (documents/review/http-server-cli-cl002-web-domain-promo-audit-v1.0-20260827.md, documents/review/http-server-cli-cl002-sec023-1-domain-validation-rereview-v1.1-20260827.md)
 
 ## HTTP 服务
 
@@ -142,7 +144,7 @@
 
 ## 测试
 
-1. 19 个测试模块，650 个测试用例（650 passed）✅ — `documents/test-design-spec-v1.2-20260702.md`
+1. 21 个测试模块，678 个测试用例（678 passed）✅ — `documents/test-design-spec-v1.2-20260702.md`
 2. `conftest.py` — autouse 数据隔离 + monkeypatch 路径注入 ✅
 3. 集成测试模式 — mock `_COMMANDS` / `ensure_storage`，set `sys.argv`，catch `SystemExit` ✅
 

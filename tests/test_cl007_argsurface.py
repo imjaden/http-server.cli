@@ -77,7 +77,8 @@ class TestA1FailClosed:
             cli._cmd_prune(mgr, ['--help'])
         assert exc.value.code == 0
         assert mgr.registry.count() == before
-        assert '用法:' in capsys.readouterr().out
+        out = capsys.readouterr().out
+        assert '用法:' in out or '【功能概述】' in out
 
     def test_kill_unknown_flag_no_kill(self, monkeypatch, capsys):
         """`hs kill 8090 --bogus` 不得 kill。"""
@@ -133,7 +134,8 @@ class TestA2BareInvocation:
             cli.main()
         assert exc.value.code == 2
         assert 'started' not in _capture                    # 未启动
-        assert '用法:' in capsys.readouterr().out
+        out = capsys.readouterr().out
+        assert '用法:' in out or '【功能概述】' in out
 
     def test_hs_dot_still_starts(self, monkeypatch, _capture):
         """显式给路径仍正常进 start（不破坏既有接口）。"""

@@ -182,6 +182,8 @@ hs web daily.checker     # 5001 alive → open; else start it
 hs web jaden.tech        # dynamic port: no url → transparent passthrough
 hs web jaden.tech --no-probe   # skip probe, force restart
 hs web add dk --cmd 'dk server start --daemon --open' --domain   # inject config.domain → ... --domain "jaden.local"
+# --domain 仅当 cmd 自身支持 --domain（dk/daily-checker）；hs 型 cmd domain 由 config.json 统一决定
+# hs 型 cmd + --domain → fail-closed (exit 2)，--force-domain 逃生
 ```
 
 > `services.json` (independent of bookmarks): bookmark maps a name to a static directory; `hs web` maps a name to any command.

@@ -540,7 +540,7 @@ class TestWebCliRun:
             with pytest.raises(SystemExit) as exc:
                 _COMMANDS['web'](None, ['a'])
         assert exc.value.code == 1   # CL005 D2/F-3：cmd 退出码非 0 = 运行期失败
-        assert 'exited with code 1' in capsys.readouterr().err
+        assert 'failed (exit 1)' in capsys.readouterr().err  # CL008 A1：改横幅格式
 
 
 # ── use_domain（--domain 入参, HTTP-SERVER-CL002）────────

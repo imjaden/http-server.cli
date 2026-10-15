@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.5.1 (2026-10-15)
+
+### Fixed
+- **web --domain 注入在 hs 型 cmd 上必挂 + 启动横幅假成功**（HTTP-SERVER-CL008）— CL007 fail-closed 升级后，`hs web` 无条件注入 `--domain` 对 hs 型 cmd 成为故障源（hs 自身无 `--domain`，注入必 exit 2）；且 cmd 失败时仍打印 `✅` 成功横幅。修正：
+  - **A1 横幅修正**：cmd 退出码非 0 → stderr `❌ Service '<name>' failed (exit N)`；✅ 仅 exit_code=0；JSON 信封字段零变更
+  - **A2 源头防呆**：`hs web add/update` 在 `use_domain=true` + hs 型 cmd 时 fail-closed（exit 2）；`--force-domain` 逃生开关
+  - **A3 存量止血**：`hs web list/show` 对 hs 型 + use_domain=true 条目打 `⚠️` 风险标记；JSON 信封新增 `domain_risk` 字段
+  - **A4 文档**：--domain 语义边界补全（hs 型 cmd domain 由 config.json 统一决定）
+
+### Changed
+- **Help 打印规范化（hm-style grouped help）**— 参考治理规范 §8（hermes-manager/skills-governance/cli-architecture-patterns.md）+ `hm help` / `dk help` 实例，`hs help` 及子命令 help（web / dashboard / mcp / bookmark）统一改造：`=`-rule + `📖 名称 · 版本(发布日) · 别名` 标题 + 【功能概述】 + `── 分组 ──` 两行条目（name+usage / description 缩进）+ `── 选项 ──` + `📋 示例:`；危险命令（kill / kill-all / prune）⚠️ 标记；`hs version` 保持机器可读格式不变
+
+### Notes
+- 新增测试模块 `tests/test_cl008_web_domain_guard.py`（18 用例）+ `tests/test_help_format.py`（10 用例）；全量 **678 passed**（+28）
+- 兼容性：JSON 信封字段零变更（只增 `domain_risk`）；退出码语义不变
+- 设计件：`documents/http-server-cl008-web-domain-guard-design-v1.0-20261015.md`
+
 ## 1.5.0 (2026-10-13)
 
 ### Changed
