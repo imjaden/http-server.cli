@@ -1364,4 +1364,55 @@ CL008 实现审计（单 commit、两主题）。独立复算：全量 **678 pas
 | HM-CL008-OBS-004 | §8 空参返回码有意偏差 | 🟢 | P2 | 记录 |
 
 
+---
 
+## 2026-10-15 — CL008 round-2 限定复审: SEC-001/002/003 闭合（HTTP-SERVER-CL008）
+
+- **Reviewer**: Security Reviewer (review profile)
+- **Level**: L2（限定复审 — 只审 round-1 三项 🟡 闭合面 + 回归面，不重开已 PASS 项）
+- **Scope**: `5a33f4d`（round-2 修订，8 文件 +139/−45：`_is_hs_cmd` basename 判定 / update 有效态判据 / 三条历史 harness 白名单正则化 / 文档收窄）+ 基线面 `0e6ee00`；ahead 3 未 push
+- **Commit(s)**: `5a33f4d`（本回复审新增面）、`0e6ee00`、`1bcd5bc`（round-1 审计件）
+- **Verdict**: ✅ PASS
+- **Score**: 96 / 100 (Rating: A)
+- **Report**: documents/review/http-server-cli-cl008-audit-v1.1-20261015.md
+- **push**: ✅ 已 push（PASS 流程；`f4633b6..` 4 commits → `origin/main`）
+
+### Summary
+
+round-2 限定复审（范围严格按 v1.0 §六）。**SEC-001 闭合**：`_is_hs_cmd` 由 `shutil.which('hs')` 比对绝对路径（PATH 无 hs 即 fail-open）改为 `os.path.expanduser(tokens[0])` + `basename.casefold() in ('hs','hs.exe')` 纯函数判定——独立矩阵 25/25 命中预期，`add --domain` 8/8 拦截（`HS`/`./hs`/`~/bin/hs`/`/opt/other/bin/hs`/`hs.exe` + **PATH 剥除 hs** 两例），4 例非 hs（`hsync`/`hs-helper`/`dk`/`python3 -m http.server`）零误伤；`$HOME/bin/hs` 亦保守命中（shlex 不展开但 basename 已为 hs）。**SEC-002 闭合**：update 先算有效态（`--no-domain` 清除优先 → `--domain` → 既有态）再判定，round-1 实测漏洞场景（既有 `use_domain=true` + `update --cmd '<hs …>'` 不带 `--domain`）现 **rc=2 且零落盘**（cmd 未改写 / use_domain 保持 true；JSON 通道同判），负例（既有 true + 非 hs 新 cmd / 既有 false + hs cmd）不误伤；OBS-002「`--no-domain --domain` 同给提示矛盾」随之收敛（实测 rc=0、`use_domain=false`）。**SEC-003 闭合**：`cl005-verify --only A9,A10,A12` → A9/A10/A12 全 PASS（A12 `version=True CHANGELOG=True features=True spec=True README=True`，round-1 同点为 FAIL），`port-flag-verify` **31/31**（A14-1 `v1.5.1`、A14-2 `__init__=1.5.1 / spec=1.5.1`），`port-residual-verify` **13/13**（含 A9）。回归面独立复算：**691 passed**（6.22s；= round-1 678 + 13 新 SEC 回归，`test_cl008_web_domain_guard.py` 实测 31 passed、`grep -c "def test"` = 31，吻合声明）、21 测试模块、A1/A3/help 零改动 smoke 全绿、真机 11 条 `use_domain=true` 5 条均非 hs 型 → **风险条目 0**。新增 4 项 🟢 记录（无 🟡/🔴）：OBS-005 包装形态 `env`/`command`/`sh -c` 仍不识别（round-1 明确要求的文档化边界，两处文档已收窄，运行期 CL007 fail-closed 兜底非静默）／OBS-006 SEC-003 正则化后「四同步」不再与单一源 `__version__` 等值交叉（非能力倒退——枚举式亦无等值校验，建议后续 `test@verify` 加固）／OBS-007 历史 harness 触碰真实 `services.json`（A11 add/remove cl003-demo，本轮使 mtime 更新而内容 11 条不变、零残留；CL003 批次既有形态非本批引入）／OBS-008 A11 在无 pytest-xdist 的 `.venv`(3.11.15) 抛 IndexError 而非 FAIL（`python3.12` 有 xdist 时 A11 PASS 691；已用 `1bcd5bc` 副本复跑证明基线同样 → 非本批引入）。探针全程 `HS_DATA_DIR` 沙箱（56/56 OK），真机数据零写入。**PASS 96/100，已 push。**
+
+### Findings
+
+| # | Severity | Title | File:Line | Status |
+|:--|:--------|:------|:----------|:------|
+| HM-CL008-SEC-001 | 🟡 | `_is_hs_cmd` 绕过面（fail-open） | `cli.py:1515-1534` | ✅ Closed（独立复现） |
+| HM-CL008-SEC-002 | 🟡 | update 有效态判据缺失（AC A2 偏差） | `cli.py:1966-1980` | ✅ Closed（独立复现） |
+| HM-CL008-SEC-003 | 🟡 | 历史 harness 版本白名单未随 1.5.1 同步 | `scripts/cl005-verify.py`、`port-flag-verify.py`、`port-residual-verify.py` | ✅ Closed（三处转绿） |
+| HM-CL008-OBS-002 | 🟢 | `--no-domain --domain` 同给提示矛盾 | `cli.py:1962-1979` | ✅ Closed（随 SEC-002） |
+| HM-CL008-OBS-005 | 🟢 | 包装形态仍不识别（文档化边界，运行期兜底） | `cli.py:1515-1534`；`SKILL.md:42` | 记录 |
+| HM-CL008-OBS-006 | 🟢 | harness 版本断言正则化后无单一源等值校验 | `scripts/*-verify.py` | 记录 + 建议 |
+| HM-CL008-OBS-007 | 🟢 | 历史 harness 触碰真实 `services.json`（非沙箱） | `port-flag-verify.py:219-234` | 记录 + 建议 |
+| HM-CL008-OBS-008 | 🟢 | A11 缺 xdist 时 IndexError（非 FAIL，非本批引入） | `cl005-verify.py:485-497` | 记录 |
+
+### Positives
+
+- SEC-001 移除 PATH 依赖后，判定成为不依赖环境的纯函数——`which` 返回 None 的 fail-open 分支在结构上消失，实现与 help/SKILL 收窄后的承诺同宽
+- SEC-002 顺序正确（先算有效态再判定，仍位于 `store.update` 之前）→ 拦截零副作用，探针逐项验证；顺手收敛 OBS-002
+- round-2 diff 高度收敛（8 文件；`cli.py` 净 +24/−22 集中在两处判据 + 两行 help），未顺手重构已 PASS 面
+- 回归测试覆盖「旧实现 fail-open 的具体写法」与「有效态」契约，而非仅断言退出码
+- harness 白名单正则化直击根因（消除「每轮版本上移即断链/误归因」），三处同族改法一致
+
+### Tracking
+
+| Issue | Title | Severity | Priority | Status |
+|:------|:------|:--------|:--------|:------|
+| HM-CL008-SEC-001 | `_is_hs_cmd` fail-open 收口 | 🟡 | P1 | ✅ Closed（round-2） |
+| HM-CL008-SEC-002 | update 按有效态判定 | 🟡 | P1 | ✅ Closed（round-2） |
+| HM-CL008-SEC-003 | 历史 harness 白名单正则化 | 🟡 | P1 | ✅ Closed（round-2） |
+| HM-CL008-OBS-001 | `list --plain` 无风险标记 | 🟢 | P2 | 记录（不变） |
+| HM-CL008-OBS-003 | 「668 基线」口径勘误 | 🟢 | P2 | 记录（不变） |
+| HM-CL008-OBS-004 | §8 空参返回码有意偏差 | 🟢 | P2 | 记录（不变） |
+| HM-CL008-OBS-005 | 包装形态不识别（文档化边界） | 🟢 | P3 | 记录 |
+| HM-CL008-OBS-006 | harness 版本断言无单一源等值 | 🟢 | P2 | 记录 + 建议（下批 `test@verify`） |
+| HM-CL008-OBS-007 | harness 触碰真实 `services.json` | 🟢 | P2 | 记录 + 建议（下批 `test@verify`） |
+| HM-CL008-OBS-008 | A11 缺 xdist 时 IndexError | 🟢 | P3 | 记录 |
