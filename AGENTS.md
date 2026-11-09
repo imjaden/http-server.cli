@@ -13,4 +13,5 @@ http-server（CLI 名 `hs`，PyPI 包 `http-server-cli`）：本地静态预览�
 ## 引用与维护
 
 - 规范正文只存一处（hermes-manager），本仓仅保留指针，不复制正文、不新增 skill 副本。
+- 本仓特有约定（服务注册、页面入口、CL 闭环等）一律在本文件追加，不另开 AGENTS/约定文件。
 - 改本文件：path-scoped `git add AGENTS.md`，单笔提交，subject 用 `docs@agents: <verb …>`。
